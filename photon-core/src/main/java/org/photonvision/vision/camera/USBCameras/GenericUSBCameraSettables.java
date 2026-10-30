@@ -81,6 +81,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
     }
 
     protected void setUpExposureProperties() {
+        logger.debug("start usb setupexposure");
         // Photonvision needs to be able to control absolute exposure. Make sure we can
         // first.
         var expProp =
@@ -252,7 +253,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
     @Override
     public void setBrightness(int brightness) {
         try {
-            camera.setBrightness(brightness);
+            softSet("brightness", brightness);
             this.lastBrightness = brightness;
         } catch (VideoException e) {
             logger.error("Failed to set camera brightness!", e);
@@ -289,8 +290,8 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
         try {
             for (VideoMode videoMode : camera.enumerateVideoModes()) {
                 // Filter grey modes
-                if (videoMode.pixelFormat == PixelFormat.GRAY
-                        || videoMode.pixelFormat == PixelFormat.UNKNOWN) {
+                // FRC 4143: gray modes are allowed (the CUDA AprilTag pipeline takes gray frames)
+                if (videoMode.pixelFormat == PixelFormat.UNKNOWN) {
                     continue;
                 }
 

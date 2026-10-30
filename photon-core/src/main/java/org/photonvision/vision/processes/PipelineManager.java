@@ -257,6 +257,11 @@ public class PipelineManager implements AutoCloseable {
                 currentUserPipeline =
                         new AprilTagPipeline((AprilTagPipelineSettings) desiredPipelineSettings);
             }
+            case AprilTagCuda -> {
+                logger.debug("Creating AprilTagCuda pipeline");
+                currentUserPipeline =
+                        new AprilTagCudaPipeline((AprilTagCudaPipelineSettings) desiredPipelineSettings);
+            }
             case Aruco -> {
                 logger.debug("Creating ArUco Pipeline");
                 currentUserPipeline = new ArucoPipeline((ArucoPipelineSettings) desiredPipelineSettings);
@@ -338,6 +343,7 @@ public class PipelineManager implements AutoCloseable {
                     case Reflective -> new ReflectivePipelineSettings();
                     case ColoredShape -> new ColoredShapePipelineSettings();
                     case AprilTag -> new AprilTagPipelineSettings();
+                    case AprilTagCuda -> new AprilTagCudaPipelineSettings();
                     case Aruco -> new ArucoPipelineSettings();
                     case ObjectDetection -> new ObjectDetectionPipelineSettings();
                     case Calib3d, DriverMode, FocusCamera -> {

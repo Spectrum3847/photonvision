@@ -149,6 +149,7 @@ public class OutputStreamPipeline implements Releasable {
             sumPipeNanosElapsed += pipeProfileNanos[3] = draw2dCrosshairResultOnInput.nanosElapsed;
 
             if (!(settings instanceof AprilTagPipelineSettings)
+                    && !(settings instanceof AprilTagCudaPipelineSettings)
                     && !(settings instanceof ArucoPipelineSettings)
                     && !(settings instanceof Calibration3dPipelineSettings)) {
                 // If we're processing anything other than AprilTags or Aruco targets
@@ -181,7 +182,8 @@ public class OutputStreamPipeline implements Releasable {
                 sumPipeNanosElapsed += pipeProfileNanos[7] = drawOnInputResult.nanosElapsed;
 
                 pipeProfileNanos[8] = 0;
-            } else if (settings instanceof AprilTagPipelineSettings) {
+            } else if ((settings instanceof AprilTagPipelineSettings)
+                    || (settings instanceof AprilTagCudaPipelineSettings)) {
                 // If we are doing apriltags...
                 if (settings.solvePNPEnabled) {
                     // Draw 3d Apriltag markers (camera is calibrated and running in 3d mode)
