@@ -15,7 +15,7 @@ v2026.10.30.2 (patches 00-87); it stays the reference for what each feature does
 | Branch | What |
 | --- | --- |
 | `main` | Upstream's `main`, untouched (the fork's default; keep it in sync with upstream) |
-| `spectrum-2027` | Our work: upstream `main` (WPILib 2027 alpha-7) plus our feature commits |
+| `spectrum-2027` | Our work: upstream `main` plus our feature commits, on WPILib 2027 alpha-8 |
 
 Started 2026-10-30 from upstream `main` at `14cc2298` ("reject negative focal length (#2662)"),
 88 commits past `v2027.0.0-alpha-2`.
@@ -32,14 +32,16 @@ PhotonLib in the same step as the first Jetson running this branch. Until then, 
 SpectrumJetson v2026.10.30.2.
 
 **WPILib alpha-8** (released 2026-10-30): upstream's PR #2663 only bumps versions (`wpilibVersion`,
-OpenCV `2027-4.13.0-4`), no source or message changes. Target alpha-8: rebase onto it once it merges
-(or make the same bump here), and build the robot's PhotonLib from this branch at the same version.
+OpenCV `2027-4.13.0-4`), no source or message changes. This branch carries the same bump as its own
+commit ("WPILib 2027 alpha-8 (same as upstream #2663)"), so the next rebase drops it once #2663
+merges. Robot code is on alpha-8 too: build its PhotonLib from this branch.
 
 ## Status
 
 | Feature | State |
 | --- | --- |
-| 1 CUDA AprilTag pipeline | **Ported, builds** (`ad54244c`, 2026-10-30). Not yet run on a Jetson: needs the detector rebuilt for WPILib 2027 (below) |
+| WPILib alpha-8 | **Done**, builds (2026-10-30) |
+| 1 CUDA AprilTag pipeline | **Ported, builds** on alpha-7 and alpha-8 (2026-10-30). Not yet run on a Jetson: needs the detector rebuilt for WPILib 2027 (below) |
 | 2-14 | Not started |
 
 **The CUDA detector must be rebuilt against WPILib 2027 before feature 1 can detect a tag.**
