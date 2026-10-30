@@ -31,6 +31,29 @@ only talks to robot code with a matching PhotonLib: robot code moves to WPILib a
 PhotonLib in the same step as the first Jetson running this branch. Until then, Jetsons stay on
 SpectrumJetson v2026.10.30.2.
 
+**WPILib alpha-8** (released 2026-10-30): upstream's PR #2663 only bumps versions (`wpilibVersion`,
+OpenCV `2027-4.13.0-4`), no source or message changes. Target alpha-8: rebase onto it once it merges
+(or make the same bump here), and build the robot's PhotonLib from this branch at the same version.
+
+## Status
+
+| Feature | State |
+| --- | --- |
+| 1 CUDA AprilTag pipeline | **Ported, builds** (`ad54244c`, 2026-10-30). Not yet run on a Jetson: needs the detector rebuilt for WPILib 2027 (below) |
+| 2-14 | Not started |
+
+**The CUDA detector must be rebuilt against WPILib 2027 before feature 1 can detect a tag.**
+`lib971apriltag.so` (SpectrumJetson `detector/`) creates the Java `AprilTagDetection` objects it
+returns by class name, and WPILib 2027 moved that class from `edu/wpi/first/apriltag` to
+`org/wpilib/vision/apriltag` (same constructor, `(String, int, int, float, double[], double, double,
+double[])`). It also links WPILib's C++ libraries (`libwpiutil` for its JNI helpers, `RawFrame`,
+timestamps), built from allwpilib 2026 and installed in `/usr/local/lib`; a 2027 PhotonVision loads
+WPILib 2027's libraries of the same names into the same process, so the detector would bind to
+libraries it wasn't built against. So: build it against WPILib 2027's C++ (with 2027's namespace and
+header moves), and look the class up by its 2027 name, falling back to the 2026 one so a single
+library serves both during the switch. That needs a Jetson set up from source (cmake and allwpilib);
+this is the `bos`/`gpudetector` fork step, moved ahead of feature 2.
+
 ## Already upstream (patches that go away)
 
 Checked 2026-10-30 against upstream `main` (`git log upstream/main --grep "(#N)"`):
