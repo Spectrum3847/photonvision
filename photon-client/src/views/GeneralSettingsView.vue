@@ -5,12 +5,14 @@ import LightingControlCard from "@/components/settings/LEDControlCard.vue";
 import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import ApriltagControlCard from "@/components/settings/ApriltagControlCard.vue";
 import DeviceCard from "@/components/settings/DeviceCard.vue";
+import ThriftiestFirmwareCard from "@/components/settings/ThriftiestFirmwareCard.vue";
 </script>
 
 <template>
   <div class="pa-3">
     <DeviceCard />
     <GlobalSettingsCard />
+    <ThriftiestFirmwareCard />
     <ObjectDetectionCard v-if="useSettingsStore().general.supportedBackends.length > 0" />
     <LightingControlCard v-if="useSettingsStore().lighting.supported" />
     <Suspense>

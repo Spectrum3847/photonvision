@@ -51,6 +51,7 @@ import org.photonvision.common.dataflow.networktables.NetworkTablesManager;
 import org.photonvision.common.dataflow.websocket.UIPhotonConfiguration;
 import org.photonvision.common.hardware.HardwareManager;
 import org.photonvision.common.hardware.Platform;
+import org.photonvision.common.hardware.ThriftiestFirmware;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
 import org.photonvision.common.networking.NetworkManager;
@@ -949,6 +950,59 @@ public class RequestHandler {
                         new OutgoingUIEvent<>(
                                 "fullsettings",
                                 UIPhotonConfiguration.programStateToUi(ConfigProvider.getInstance().getConfig())));
+    }
+
+    // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.
+    @Json
+    record ThriftiestFlashRequest(String port, String image) {}
+
+    private static final io.avaje.json.node.JsonNodeMapper kNodeMapper =
+            io.avaje.json.node.JsonNodeMapper.builder().build();
+
+    private static void thriftiestJson(Context ctx, io.avaje.json.node.JsonObject body) {
+        ctx.contentType("application/json");
+        ctx.result(kNodeMapper.toJson(body));
+    }
+
+    public static void onThriftiestFirmwareRequest(Context ctx) {
+        thriftiestJson(ctx, ThriftiestFirmware.status());
+    }
+
+    public static void onThriftiestFirmwareUploadRequest(Context ctx) {
+        var file = ctx.uploadedFile("data");
+        if (file == null) {
+            ctx.status(400);
+            ctx.result("No file was sent (form field 'data')");
+            return;
+        }
+        try {
+            thriftiestJson(ctx, ThriftiestFirmware.upload(file.filename(), file.content()));
+        } catch (IOException e) {
+            ctx.status(400);
+            ctx.result("Not stored: " + e.getMessage());
+        }
+    }
+
+    public static void onThriftiestFirmwareDeleteRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(ThriftiestFlashRequest.class);
+            ThriftiestFirmware.delete(req.image());
+            thriftiestJson(ctx, ThriftiestFirmware.status());
+        } catch (IOException | RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Couldn't delete: " + e.getMessage());
+        }
+    }
+
+    public static void onThriftiestFirmwareFlashRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(ThriftiestFlashRequest.class);
+            ThriftiestFirmware.flash(req.port(), req.image());
+            ctx.status(202);
+        } catch (IOException | RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Not flashed: " + e.getMessage());
+        }
     }
 
     @Json

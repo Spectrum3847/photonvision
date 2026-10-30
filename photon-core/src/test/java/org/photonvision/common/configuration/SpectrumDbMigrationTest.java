@@ -61,7 +61,8 @@ public class SpectrumDbMigrationTest {
     @Test
     public void migrate2026Database() throws Exception {
         var source = System.getenv("SPECTRUM_MIGRATION_DB");
-        assumeTrue(source != null && Files.isRegularFile(Path.of(source)), "SPECTRUM_MIGRATION_DB not set");
+        assumeTrue(
+                source != null && Files.isRegularFile(Path.of(source)), "SPECTRUM_MIGRATION_DB not set");
 
         var db = tmpDir.resolve("photon.sqlite");
         Files.copy(Path.of(source), db);
@@ -71,7 +72,10 @@ public class SpectrumDbMigrationTest {
 
         var provider = new ConfigProvider(tmpDir);
         provider.load();
-        assertEquals(provider.getExpectedVersion(), provider.getDbVersion(), "not migrated to the latest version");
+        assertEquals(
+                provider.getExpectedVersion(),
+                provider.getDbVersion(),
+                "not migrated to the latest version");
 
         var cameras = provider.getConfig().getCameraConfigurations();
         assertEquals(before.keySet(), cameras.keySet(), "cameras lost or renamed");
@@ -84,8 +88,10 @@ public class SpectrumDbMigrationTest {
                     cam.pipelineSettings.size(),
                     cam.calibrations.size(),
                     cam.matchedCameraInfo.path());
-            assertEquals(before.get(entry.getKey()).size(), cam.pipelineSettings.size(), "pipelines lost");
-            assertEquals(calibrationsBefore.get(entry.getKey()), cam.calibrations.size(), "calibrations lost");
+            assertEquals(
+                    before.get(entry.getKey()).size(), cam.pipelineSettings.size(), "pipelines lost");
+            assertEquals(
+                    calibrationsBefore.get(entry.getKey()), cam.calibrations.size(), "calibrations lost");
             for (int i = 0; i < cam.pipelineSettings.size(); i++) {
                 var legacyType = before.get(entry.getKey()).get(i).extract("type");
                 assertEquals(
@@ -131,10 +137,13 @@ public class SpectrumDbMigrationTest {
     private static Map<String, List<JsonObject>> legacyPipelines(Path db) throws Exception {
         var out = new LinkedHashMap<String, List<JsonObject>>();
         try (var conn = DriverManager.getConnection("jdbc:sqlite:" + db);
-                var rs = conn.createStatement().executeQuery("SELECT unique_name, pipeline_jsons FROM cameras")) {
+                var rs =
+                        conn.createStatement()
+                                .executeQuery("SELECT unique_name, pipeline_jsons FROM cameras")) {
             while (rs.next()) {
                 var pipelines = new java.util.ArrayList<JsonObject>();
-                for (JsonNode s : Jsonb.instance().type(JsonArray.class).fromJson(rs.getString(2)).elements()) {
+                for (JsonNode s :
+                        Jsonb.instance().type(JsonArray.class).fromJson(rs.getString(2)).elements()) {
                     var pair = Jsonb.instance().type(JsonArray.class).fromJson(s.text());
                     var settings = ((JsonObject) pair.elements().get(1)).copy();
                     settings.add("type", pair.elements().get(0).text());
@@ -149,7 +158,8 @@ public class SpectrumDbMigrationTest {
     private static Map<String, Integer> legacyCalibrationCounts(Path db) throws Exception {
         var out = new LinkedHashMap<String, Integer>();
         try (var conn = DriverManager.getConnection("jdbc:sqlite:" + db);
-                var rs = conn.createStatement().executeQuery("SELECT unique_name, config_json FROM cameras")) {
+                var rs =
+                        conn.createStatement().executeQuery("SELECT unique_name, config_json FROM cameras")) {
             while (rs.next()) {
                 var cfg = Jsonb.instance().type(JsonObject.class).fromJson(rs.getString(2));
                 out.put(rs.getString(1), ((JsonArray) cfg.get("calibrations")).size());

@@ -161,6 +161,12 @@ public class Server {
         app.post("/api/objectdetection/delete", RequestHandler::onDeleteObjectDetectionModelRequest);
         app.post("/api/objectdetection/rename", RequestHandler::onRenameObjectDetectionModelRequest);
         app.post("/api/objectdetection/nuke", RequestHandler::onNukeObjectDetectionModelsRequest);
+        app.get(
+                "/api/thriftiest/firmware",
+                RequestHandler::onThriftiestFirmwareRequest); // SpectrumJetson (87)
+        app.post("/api/thriftiest/firmware/upload", RequestHandler::onThriftiestFirmwareUploadRequest);
+        app.post("/api/thriftiest/firmware/delete", RequestHandler::onThriftiestFirmwareDeleteRequest);
+        app.post("/api/thriftiest/firmware/flash", RequestHandler::onThriftiestFirmwareFlashRequest);
 
         /* Testing API Events */
 

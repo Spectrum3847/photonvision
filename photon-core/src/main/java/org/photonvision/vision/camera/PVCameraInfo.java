@@ -97,6 +97,12 @@ public sealed interface PVCameraInfo {
 
         @Override
         public String uniquePath() {
+            // SpectrumJetson (photonvision-86): a camera with a serial of its own is known by its
+            // /dev/v4l/by-id path, so its settings and calibration follow it to any USB port.
+            // Every other camera by its port, as before: identical cameras share one serial.
+            var own =
+                    Arrays.stream(super.otherPaths).filter(PVCameraInfo::hasOwnSerial).sorted().findFirst();
+            if (own.isPresent()) return own.get();
             return Arrays.stream(super.otherPaths)
                     .sorted() // Must sort to ensure a consistent unique path as we can get more than one
                     // by-path and their order changes at random?
@@ -268,6 +274,17 @@ public sealed interface PVCameraInfo {
         public String toString() {
             return "PVFileCameraInfo[type=" + type() + ", filename=" + name + ", path='" + path + "']";
         }
+    }
+
+    /**
+     * SpectrumJetson (photonvision-86): this /dev/v4l/by-id path names a camera by a serial of its
+     * own. Only serials we stored ("SJ-...", scripts/host/thriftiest-flash.sh rename) count: a
+     * factory serial can be shared by every camera of a model (each Thriftiest Cam's is "01.00.00"),
+     * and a camera known by one would change identity when a second one is plugged in. udev names it
+     * usb-VENDOR_PRODUCT_SERIAL-video-index0.
+     */
+    static boolean hasOwnSerial(String path) {
+        return path.contains("/by-id/") && path.contains("_SJ-") && path.endsWith("-video-index0");
     }
 
     public static PVCameraInfo fromUsbCameraInfo(UsbCameraInfo info) {

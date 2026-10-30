@@ -186,6 +186,14 @@ public class NetworkTablesManager {
         }
     }
 
+    /**
+     * SpectrumJetson (photonvision-87): the robot is connected and enabled, from the driver station
+     * control word NTDriverStation follows.
+     */
+    public boolean robotEnabled() {
+        return ntInstance.isConnected() && ntDriverStation.lastControlWord.m_enabled();
+    }
+
     public NetworkTableInstance getNTInst() {
         return ntInstance;
     }

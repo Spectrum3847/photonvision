@@ -97,6 +97,7 @@ public class VisionSourceManager implements AutoCloseable {
      */
     public synchronized void registerLoadedConfigs(Collection<CameraConfiguration> configs) {
         logger.info("Registering loaded camera configs");
+        moveToOwnSerials(configs); // photonvision-86
 
         final HashMap<String, CameraConfiguration> deserializedConfigs = new HashMap<>();
 
@@ -139,6 +140,55 @@ public class VisionSourceManager implements AutoCloseable {
                         + " active VisionModules, with "
                         + deserializedConfigs.size()
                         + " disabled VisionModules");
+    }
+
+    /**
+     * SpectrumJetson (photonvision-86): a saved camera known by its USB port whose camera now has a
+     * serial of its own (PVCameraInfo.hasOwnSerial) is re-pointed to that serial and saved, so it
+     * keeps its settings and calibration, now and wherever it's plugged in later. Only if no other
+     * saved camera already claims that serial: swapping two cameras' ports can't cross their
+     * calibrations. A camera that isn't plugged in now is moved at a later start.
+     */
+    private void moveToOwnSerials(Collection<CameraConfiguration> configs) {
+        List<PVCameraInfo> connected;
+        try {
+            connected = getConnectedCameras();
+        } catch (Exception e) {
+            logger.error("Couldn't list cameras to check for serials", e);
+            return;
+        }
+        for (var config : configs) {
+            var saved = config.matchedCameraInfo;
+            if (saved == null || saved.type() != CameraType.UsbCamera) continue;
+            String port = saved.uniquePath();
+            if (!port.contains("/by-path/")) continue;
+            for (var camera : connected) {
+                String own = camera.uniquePath();
+                if (!PVCameraInfo.hasOwnSerial(own) || !Arrays.asList(camera.otherPaths()).contains(port))
+                    continue;
+                if (configs.stream()
+                        .anyMatch(
+                                o -> o.matchedCameraInfo != null && o.matchedCameraInfo.uniquePath().equals(own))) {
+                    logger.warn(
+                            "Not moving "
+                                    + config.nickname
+                                    + " to "
+                                    + own
+                                    + ": another saved camera already has that serial");
+                    break;
+                }
+                logger.info(
+                        config.nickname
+                                + "'s camera has a serial of its own: it's now known as "
+                                + own
+                                + " instead of its USB port ("
+                                + port
+                                + "), and its settings and calibration go with it");
+                config.matchedCameraInfo = camera;
+                ConfigProvider.getInstance().saveModule(config, config.uniqueName);
+                break;
+            }
+        }
     }
 
     /**
