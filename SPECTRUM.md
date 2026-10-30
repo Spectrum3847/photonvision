@@ -61,7 +61,9 @@ Robot code should be able to use upstream's PhotonLib, unchanged. So:
 | --- | --- |
 | WPILib alpha-8 | **Done**, builds (2026-10-30) |
 | 1 CUDA AprilTag pipeline | **Ported, builds** on alpha-7 and alpha-8 (2026-10-30). Not yet run on a Jetson: needs the detector rebuilt for WPILib 2027 (below) |
-| 2-14 | Not started |
+| 6 Thriftiest Cam | **Ported, builds, unit tests pass** (2026-10-30): serial identity (86), firmware card (87). 86's USB-port guard comes with feature 5 |
+| 11 Field map from the robot (74) | **Ported, builds, unit tests pass** (2026-10-30), WPILib 2027 Field JSON (below). Rest of feature 11 not started |
+| 2-5, 7-10, 12-14 | Not started |
 
 **The CUDA detector must be rebuilt against WPILib 2027 before feature 1 can detect a tag.**
 `lib971apriltag.so` (SpectrumJetson `detector/`) creates the Java `AprilTagDetection` objects it
@@ -87,6 +89,21 @@ saved: `cameraContrast`, `cameraGamma`, `cameraSharpness`, `cameraBacklightCompe
 and `detectionMask` (feature 11). So those two features land before a Jetson boots this branch on
 its 2026 settings. Rerun the test on a current database (with patch 86's serial identity) before the
 switch.
+
+## Field map: WPILib 2027 Field JSON
+
+Robot code (2026-FM-SystemCore `upgrade/alpha-8`, `61baeeb`) sends `/SpectrumVision/FieldMap/Json` as
+WPILib 2027 Field JSON (`field-tags`, `field-dimensions`, plus `name`, `season`, `game`,
+`program`); `FieldMapSync` reads it with WPILib's own parser (as upstream's
+`/photonvision/field_layout` does) and still reads the 2026 form (`tags`, `field`), which is what a
+2026 Jetson saved in `spectrum/field-map.json`. The hash text is unchanged and both forms hash the
+same (2026 AndyMark `2792cd4e868967b8`, Welded `ca28a7c1139ed099`, as robot code's tests).
+
+The sign of zero is part of the hash, and four 2026 tags have a `-0.0` quaternion X. WPILib's Field
+JSON writer, and avaje's JSON nodes, write `-0.0` as `0`. So the robot's JSON text is parsed as
+sent, never re-written first, and kept as sent for the next boot; a map PhotonVision re-wrote (its
+settings database, an export) can hash differently from the robot's, and is then just reloaded from
+the robot.
 
 ## Already upstream (patches that go away)
 

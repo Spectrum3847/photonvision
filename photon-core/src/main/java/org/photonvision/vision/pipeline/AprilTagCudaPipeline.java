@@ -60,6 +60,9 @@ public class AprilTagCudaPipeline
     private final AprilTagPoseEstimatorPipe singleTagPoseEstimatorPipe =
             new AprilTagPoseEstimatorPipe();
     private final MultiTargetPNPPipe multiTagPNPPipe = new MultiTargetPNPPipe();
+    // SpectrumJetson (photonvision-74): read once per frame, so a map loaded from the robot can't
+    // give one frame's multi-tag and single-tag poses different layouts.
+    private org.wpilib.fields.Field frameLayout;
     private final CalculateFPSPipe calculateFPSPipe = new CalculateFPSPipe();
 
     private static final FrameThresholdType PROCESSING_TYPE = FrameThresholdType.GREYSCALE;
@@ -76,6 +79,7 @@ public class AprilTagCudaPipeline
 
     @Override
     protected void setPipeParamsImpl() {
+        frameLayout = ConfigProvider.getInstance().getConfig().getFieldLayout();
         // Sanitize thread count - not supported to have fewer than 1 threads
         settings.threads = Math.max(1, settings.threads);
 
@@ -116,7 +120,7 @@ public class AprilTagCudaPipeline
                                 settings.numIterations));
 
                 // TODO global state ew
-                var field = ConfigProvider.getInstance().getConfig().getFieldLayout();
+                var field = frameLayout;
                 multiTagPNPPipe.setParams(
                         new MultiTargetPNPPipeParams(frameStaticProperties.cameraCalibration, field, tagModel));
             }
@@ -174,7 +178,7 @@ public class AprilTagCudaPipeline
             // Clear target list that was used for multitag so we can add target transforms
             targetList.clear();
             // TODO global state again ew
-            var field = ConfigProvider.getInstance().getConfig().getFieldLayout();
+            var field = frameLayout;
 
             for (AprilTagDetection detection : usedDetections) {
                 AprilTagPoseEstimate tagPoseEstimate = null;

@@ -28,7 +28,9 @@ public class PhotonConfiguration {
     private final HardwareSettings hardwareSettings;
     private NetworkConfig networkConfig;
 
-    private Field fieldLayout;
+    // SpectrumJetson (photonvision-74): volatile, as the robot's map is swapped in off the camera
+    // threads.
+    private volatile Field fieldLayout;
 
     private NeuralNetworkModelsSettings neuralNetworkProperties;
     private Map<String, CameraConfiguration> cameraConfigurations;

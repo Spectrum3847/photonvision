@@ -318,6 +318,10 @@ public class RequestHandler {
         }
 
         if (ConfigProvider.getInstance().saveUploadedFieldLayout(tempFilePath.get().toPath())) {
+            // SpectrumJetson (photonvision-74): this upload, not the robot's last map, after the
+            // restart (until the robot sends its map again).
+            org.photonvision.fieldmap.FieldMapSync.forgetSaved(
+                    org.photonvision.fieldmap.FieldMapNT.savedFile());
             ctx.status(200);
             ctx.result("Successfully saved the uploaded FieldLayout, rebooting...");
             logger.info("Successfully saved the uploaded FieldLayout, rebooting...");

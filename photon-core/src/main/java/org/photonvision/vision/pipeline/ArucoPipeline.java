@@ -52,6 +52,9 @@ public class ArucoPipeline extends CVPipeline<CVPipelineResult, ArucoPipelineSet
     private ArucoDetectionPipe arucoDetectionPipe = new ArucoDetectionPipe();
     private ArucoPoseEstimatorPipe singleTagPoseEstimatorPipe = new ArucoPoseEstimatorPipe();
     private final MultiTargetPNPPipe multiTagPNPPipe = new MultiTargetPNPPipe();
+    // SpectrumJetson (photonvision-74): read once per frame, so a map loaded from the robot can't
+    // give one frame's multi-tag and single-tag poses different layouts.
+    private org.wpilib.fields.Field frameLayout;
     private final CalculateFPSPipe calculateFPSPipe = new CalculateFPSPipe();
 
     public ArucoPipeline() {
@@ -66,6 +69,7 @@ public class ArucoPipeline extends CVPipeline<CVPipelineResult, ArucoPipelineSet
 
     @Override
     protected void setPipeParamsImpl() {
+        frameLayout = ConfigProvider.getInstance().getConfig().getFieldLayout();
         var params = new ArucoDetectionPipeParams();
         // sanitize and record settings
 
@@ -117,7 +121,7 @@ public class ArucoPipeline extends CVPipeline<CVPipelineResult, ArucoPipelineSet
                 singleTagPoseEstimatorPipe.setParams(estimatorParams);
 
                 // TODO global state ew
-                var field = ConfigProvider.getInstance().getConfig().getFieldLayout();
+                var field = frameLayout;
                 multiTagPNPPipe.setParams(
                         new MultiTargetPNPPipeParams(frameStaticProperties.cameraCalibration, field, tagModel));
             }
@@ -173,7 +177,7 @@ public class ArucoPipeline extends CVPipeline<CVPipelineResult, ArucoPipelineSet
             // Clear target list that was used for multitag so we can add target transforms
             targetList.clear();
             // TODO global state again ew
-            var field = ConfigProvider.getInstance().getConfig().getFieldLayout();
+            var field = frameLayout;
 
             for (ArucoDetectionResult detection : tagDetectionPipeResult.output) {
                 AprilTagPoseEstimate tagPoseEstimate = null;

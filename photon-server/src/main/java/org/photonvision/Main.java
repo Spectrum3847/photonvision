@@ -300,6 +300,9 @@ public class Main implements Callable<Integer> {
         logger.debug("Loading NetworkTablesManager...");
         NetworkTablesManager.getInstance().setConfig(conf.getNetworkConfig());
         NetworkTablesManager.getInstance().registerTimedTasks();
+        // SpectrumJetson (photonvision-74): the robot's field map (the saved one first, before the
+        // cameras start)
+        org.photonvision.fieldmap.FieldMapNT.start();
 
         logger.debug("Loading HardwareManager...");
         // Force load the hardware manager
