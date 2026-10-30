@@ -36,6 +36,25 @@ OpenCV `2027-4.13.0-4`), no source or message changes. This branch carries the s
 commit ("WPILib 2027 alpha-8 (same as upstream #2663)"), so the next rebase drops it once #2663
 merges. Robot code is on alpha-8 too: build its PhotonLib from this branch.
 
+## PhotonLib stays upstream's
+
+Robot code should be able to use upstream's PhotonLib, unchanged. So:
+
+- **`photon-lib`, `photon-targeting` and `photon-serde` stay identical to upstream** at the commit this
+  branch is based on: our changes are all in PhotonVision itself (the Jetson side). Check before
+  pushing: `git diff --quiet $(git merge-base HEAD upstream/main) HEAD -- photon-lib photon-targeting photon-serde`
+  (exit 0 = identical).
+- **Our own things go next to PhotonLib, not into it**: PhotonVision publishes them on NetworkTables
+  topics of their own (`/photonvision/jetson/...`, each camera's `health/...`, Rewind's, the field
+  map and clock topics), and robot code reads them with SpectrumVision (SpectrumJetson's
+  `robot-vision/`), beside PhotonLib. The message format PhotonLib reads is never changed.
+- **If PhotonLib really has to change**, propose it upstream first; only carry it here until then.
+- **Until upstream publishes a PhotonLib for the WPILib we're on**, we build it from this branch,
+  which is upstream's PhotonLib code, and switch robot code to upstream's vendordep as soon as
+  there is one built from the same `photon-serde` (the message hashes must match the Jetson's).
+  2026-10-30: WPILib alpha-8 is out, and upstream hasn't published an alpha-8 PhotonLib yet
+  (#2663 is open), so robot code uses ours for now.
+
 ## Status
 
 | Feature | State |
