@@ -75,6 +75,19 @@ header moves), and look the class up by its 2027 name, falling back to the 2026 
 library serves both during the switch. That needs a Jetson set up from source (cmake and allwpilib);
 this is the `bos`/`gpudetector` fork step, moved ahead of feature 2.
 
+## Settings from a 2026 Jetson
+
+Upstream's migration (`DbMigration`, versions 202701-202704) moves a 2026 settings database to
+2027's layout, and `SpectrumDbMigrationTest` checks it on a real robot's database (skipped unless
+`SPECTRUM_MIGRATION_DB` names one). 2026-10-30, the robot's database from before the camera serials
+(SpectrumJetson laptop `~/pv-backups/photon-20261029-before-serials.sqlite`): both cameras, all 3
+calibrations (8 coefficients) and both `AprilTagCuda` pipelines load. Everything else in the
+pipelines survives a save except 5 settings, which reset to defaults the first time anything is
+saved: `cameraContrast`, `cameraGamma`, `cameraSharpness`, `cameraBacklightCompensation` (feature 4)
+and `detectionMask` (feature 11). So those two features land before a Jetson boots this branch on
+its 2026 settings. Rerun the test on a current database (with patch 86's serial identity) before the
+switch.
+
 ## Already upstream (patches that go away)
 
 Checked 2026-10-30 against upstream `main` (`git log upstream/main --grep "(#N)"`):
