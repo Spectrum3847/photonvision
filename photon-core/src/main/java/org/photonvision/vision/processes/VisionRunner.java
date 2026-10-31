@@ -196,6 +196,26 @@ public class VisionRunner implements AutoCloseable {
         }
     }
 
+    // Spectrum: where each loop's time goes, logged every 10 s (frame = grab incl. decode,
+    // pipeline = pipeline.run, consumers = pipelineResultConsumer: NT, UI, health, ...).
+    private long tSettings, tFrame, tPipeline, tConsumers, tLoops, tLoggedNs = System.nanoTime();
+
+    private void logLoopTiming() {
+        long now = System.nanoTime();
+        if (now - tLoggedNs < 10_000_000_000L || tLoops == 0) return;
+        logger.info(
+                String.format(
+                        "Loop timing over %d frames: settings %.2f ms, frame %.2f ms, pipeline %.2f ms,"
+                                + " consumers %.2f ms",
+                        tLoops,
+                        tSettings / 1e6 / tLoops,
+                        tFrame / 1e6 / tLoops,
+                        tPipeline / 1e6 / tLoops,
+                        tConsumers / 1e6 / tLoops));
+        tSettings = tFrame = tPipeline = tConsumers = tLoops = 0;
+        tLoggedNs = now;
+    }
+
     private void update() {
         // wait for the camera to connect
         while (!frameSupplier.isConnected() && !Thread.interrupted()) {
@@ -223,6 +243,7 @@ public class VisionRunner implements AutoCloseable {
 
         while (!Thread.interrupted()) {
             long start = System.currentTimeMillis();
+            long n0 = System.nanoTime();
             changeSubscriber.processSettingChanges();
             synchronized (runnableList) {
                 for (var runnable : runnableList) {
@@ -244,7 +265,9 @@ public class VisionRunner implements AutoCloseable {
             configureFrameProviderForPipeline(frameSupplier, pipeline);
 
             // Grab the new camera frame
+            long n1 = System.nanoTime();
             var frame = frameSupplier.get();
+            long n2 = System.nanoTime();
 
             // Frame empty -- no point in trying to do anything more?
             if (frame.processedImage.getMat().empty() && frame.colorImage.getMat().empty()) {
@@ -273,8 +296,16 @@ public class VisionRunner implements AutoCloseable {
                 waitUntilNextTick(start);
                 try {
                     var pipelineResult = pipeline.run(frame, cameraQuirks);
+                    long n3 = System.nanoTime();
                     try {
                         pipelineResultConsumer.accept(pipelineResult);
+                        long n4 = System.nanoTime();
+                        tSettings += n1 - n0;
+                        tFrame += n2 - n1;
+                        tPipeline += n3 - n2;
+                        tConsumers += n4 - n3;
+                        tLoops++;
+                        logLoopTiming();
                     } catch (Exception ex) {
                         logger.error("Exception on loop " + loopCount, ex);
                         pipelineResult.release();
