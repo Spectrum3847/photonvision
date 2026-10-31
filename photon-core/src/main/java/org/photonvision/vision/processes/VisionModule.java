@@ -989,6 +989,10 @@ public class VisionModule implements AutoCloseable {
         Map<String, Object> subMap = new HashMap<>();
         subMap.put(propertyName, value);
         map.put("mutatePipelineSettings", subMap);
+        // SpectrumJetson (photonvision-41): the UI applies a mutation only with the camera's name
+        // (App.vue), so without it no other open dashboard ever saw a setting change: a second
+        // tab kept stale values and could overwrite the first's (seen with detection masks).
+        map.put("cameraUniqueName", uniqueName());
 
         DataChangeService.getInstance()
                 .publishEvent(new OutgoingUIEvent<>("mutatePipeline", map, originContext));
