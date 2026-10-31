@@ -23,6 +23,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.photonvision.common.LoadJNI;
+import org.photonvision.jni.LibraryLoader;
 import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
 import org.wpilib.networktables.NetworkTablesJNI;
@@ -36,6 +37,11 @@ public class NTDataPublisherBlankResultTest {
     @BeforeAll
     public static void init() {
         LoadJNI.loadLibraries();
+        // NTDataPublisher starts NetworkTablesManager, whose TimeSyncManager needs the
+        // photontargeting JNI (TimeSyncClient.create). LoadJNI.loadLibraries() skips it when any
+        // WPILib library fails to load, and ignores the result, so load it here and fail loudly
+        // (as VisionModuleCalibrationTest and FileSaveFrameConsumerTest do).
+        if (!LibraryLoader.loadTargeting()) fail("photontargeting JNI didn't load");
     }
 
     @Test
