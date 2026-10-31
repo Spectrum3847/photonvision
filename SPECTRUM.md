@@ -183,3 +183,40 @@ git switch spectrum-2027 && git rebase upstream/main     # conflicts per feature
 
 Rebase, don't merge: the feature commits stay a readable list on top of upstream. Retest after each
 rebase, then bump the pin in SpectrumJetson.
+
+## Version pins
+
+All in one place; change them together, and only with the upstream commit that moves them.
+
+| What | Pin | Where |
+| --- | --- | --- |
+| Upstream PhotonVision | `main` at `14cc2298` (2026-10-27, 88 past `v2027.0.0-alpha-2`) | merge base of `spectrum-2027` and `upstream/main` |
+| WPILib | `2027.0.0-alpha-8` (`wpilibVersion`) | `build.gradle` |
+| OpenCV | `2027-4.13.0-4` (`openCVversion`) | `build.gradle` |
+| libcamera driver / RKNN | `v2027.0.0-alpha-1` / `v2027.0.0` | `build.gradle` |
+| Java | JDK 25 (`/usr/lib/jvm/java-25-openjdk-arm64` on the Jetson), g++-14 for native | build scripts |
+| This fork in SpectrumJetson | a commit or release of `spectrum-2027` | SpectrumJetson |
+
+## Updating to a new upstream release
+
+SpectrumJetson's `scripts/host/check-upstream-rebase.sh` says whether a new upstream release (2027
+alphas, betas, 1.0) still fits our features, before anyone rebases:
+
+```bash
+scripts/host/check-upstream-rebase.sh                 # newest upstream tag, or upstream/main if we have it
+scripts/host/check-upstream-rebase.sh v2027.0.0-beta-1
+scripts/host/check-upstream-rebase.sh --build main    # clean? build + our unit tests on the Jetson
+```
+
+It merges the target into a detached copy of `spectrum-2027` in a scratch worktree (no branch moves,
+nothing pushed), and lists each conflicting file with our commits that touch it and their feature
+numbers (from the table above). `--build` syncs the merged tree to `~/build/spectrum-pv-rebasecheck`
+on the Jetson, builds the jar and runs the test classes our commits added, with a timeout; it never
+installs or restarts PhotonVision. A merge, not a rebase, because `spectrum-2027` has feature-branch
+merges: a merge shows every conflict once, against our end state.
+
+When it's clean (or the conflicts look small): do the real update as in "Keeping up with upstream"
+(rebase, resolve per feature commit), drop our commits upstream now covers (for example "WPILib 2027
+alpha-8 (same as upstream #2663)", and anything in "Already upstream"), update **Version pins**,
+build-install and retest on a Jetson, then bump the pin in SpectrumJetson. Robot code's PhotonLib
+must move with it (see "Robot code moves with it").
