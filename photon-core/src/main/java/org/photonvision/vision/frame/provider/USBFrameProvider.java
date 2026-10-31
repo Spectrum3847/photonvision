@@ -509,6 +509,7 @@ public class USBFrameProvider extends CpuImageProcessor {
         if (useGray && graySink != null && directGray.shouldTry()) {
             var mode = settables.getCurrentVideoMode();
             if (mode != null && mode.pixelFormat == PixelFormat.MJPEG) {
+                if (ASYNC_DECODE) return takeDecoded(mode.width, mode.height);
                 return grabMjpegAsGray(mode.width, mode.height, m_blockForFrames ? 0 : lastTime);
             }
         }
@@ -860,8 +861,85 @@ public class USBFrameProvider extends CpuImageProcessor {
         return "USBFrameProvider - " + cvSink.getName();
     }
 
+    // Spectrum: decode in its own thread, overlapped with the pipeline. The camera loop was serial
+    // (grab + decode 3.2 ms, then pipeline ~4.8 ms): ~8.3 ms a frame, the whole 120 fps period, so
+    // a finished frame waited 2.4 ms on average (up to 7) before the loop came back for it, and
+    // the decode sat in every frame's latency. Now a decoder thread grabs and decodes each frame
+    // as it arrives into a one-frame slot (a newer frame replaces an unclaimed one), and the loop
+    // takes the newest. SPECTRUM_ASYNC_DECODE=0 goes back to decoding in the loop.
+    private static final boolean ASYNC_DECODE =
+            !"0".equals(System.getenv("SPECTRUM_ASYNC_DECODE"));
+
+    private final Object decodedLock = new Object();
+    private CapturedFrame decoded = null; // the newest decoded frame not yet taken
+    private Thread decoder = null;
+    private volatile int decodeWidth, decodeHeight;
+    private volatile long lastTakenNs = 0;
+    private volatile boolean loggedAsync = false;
+
+    private CapturedFrame takeDecoded(int width, int height) {
+        decodeWidth = width;
+        decodeHeight = height;
+        lastTakenNs = System.nanoTime();
+        synchronized (decodedLock) {
+            if (decoder == null || !decoder.isAlive()) {
+                decoder = new Thread(this::decodeLoop, "SpectrumDecoder - " + camera.getName());
+                decoder.setDaemon(true);
+                decoder.start();
+            }
+            long deadline = System.nanoTime() + (long) (CSCORE_DEFAULT_FRAME_TIMEOUT * 1e9);
+            while (decoded == null) {
+                long left = deadline - System.nanoTime();
+                if (left <= 0) return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+                try {
+                    decodedLock.wait(Math.max(1, left / 1_000_000));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+                }
+            }
+            CapturedFrame f = decoded;
+            decoded = null;
+            return f;
+        }
+    }
+
+    // Runs while the camera loop keeps taking frames on the direct-gray path; stops itself 1 s after
+    // the loop stops asking (another pipeline type, a disabled camera, release()).
+    private void decodeLoop() {
+        if (!loggedAsync) {
+            loggedAsync = true;
+            logger.info("Decoding in its own thread, overlapped with the pipeline (SPECTRUM_ASYNC_DECODE)");
+        }
+        while (!Thread.currentThread().isInterrupted()
+                && System.nanoTime() - lastTakenNs < 1_000_000_000L
+                && graySink != null
+                && useGray) {
+            CapturedFrame f = grabMjpegAsGray(decodeWidth, decodeHeight, lastTime);
+            if (f.captureTimestamp == 0 || f.colorImage.getMat().empty()) {
+                f.colorImage.release();
+                continue; // timed out or dropped; grabMjpegAsGray logged and counted it
+            }
+            synchronized (decodedLock) {
+                if (decoded != null) decoded.colorImage.release(); // the loop didn't want it
+                decoded = f;
+                decodedLock.notifyAll();
+            }
+        }
+        synchronized (decodedLock) {
+            if (decoded != null) {
+                decoded.colorImage.release();
+                decoded = null;
+            }
+            decoder = null;
+        }
+    }
+
     @Override
     public void release() {
+        synchronized (decodedLock) {
+            if (decoder != null) decoder.interrupt();
+        }
         CameraServer.removeServer(cvSink.getName());
         cvSink.close();
         cvSink = null;
