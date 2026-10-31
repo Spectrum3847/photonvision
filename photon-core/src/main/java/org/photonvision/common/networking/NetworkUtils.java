@@ -83,12 +83,13 @@ public class NetworkUtils {
     }
 
     private static List<NMDeviceInfo> allInterfaces = null;
+    // SpectrumJetson (photonvision-65): monotonic ms (System.nanoTime); the date can jump.
     private static long lastReadTimestamp = 0;
     private static long timeout = 5000; // milliseconds
     private static long retry = 500; // milliseconds
 
     public static synchronized List<NMDeviceInfo> getAllInterfaces() {
-        var start = System.currentTimeMillis();
+        var start = System.nanoTime() / 1_000_000;
         if (start - lastReadTimestamp < 5000) {
             return allInterfaces;
         }
@@ -106,7 +107,7 @@ public class NetworkUtils {
                             "nmcli -t -f GENERAL.CONNECTION,GENERAL.DEVICE,GENERAL.TYPE device show", true, true);
                     // nmcli returns an error of 8 if NetworkManager isn't running
                     networkManagerRunning = shell.getExitCode() != 8;
-                    tryagain = System.currentTimeMillis() - start < timeout;
+                    tryagain = System.nanoTime() / 1_000_000 - start < timeout;
                     if (!networkManagerRunning && tryagain) {
                         logger.debug("NetworkManager not running, retrying in " + (retry) + " milliseconds");
                         Thread.sleep(retry);
@@ -147,7 +148,7 @@ public class NetworkUtils {
             }
             allInterfaces = ret;
         }
-        lastReadTimestamp = System.currentTimeMillis();
+        lastReadTimestamp = System.nanoTime() / 1_000_000;
 
         return ret;
     }

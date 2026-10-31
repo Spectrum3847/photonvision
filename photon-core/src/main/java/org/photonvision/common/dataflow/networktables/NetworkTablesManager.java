@@ -194,6 +194,11 @@ public class NetworkTablesManager {
         return ntInstance.isConnected() && ntDriverStation.lastControlWord.m_enabled();
     }
 
+    /** SpectrumJetson (photonvision-49): the robot's enabled / auto / FMS state. */
+    public NTDriverStation getDriverStation() {
+        return ntDriverStation;
+    }
+
     public NetworkTableInstance getNTInst() {
         return ntInstance;
     }

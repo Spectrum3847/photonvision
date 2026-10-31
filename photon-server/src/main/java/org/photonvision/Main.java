@@ -312,6 +312,9 @@ public class Main implements Callable<Integer> {
         // (INFO too while quiet: quiet mode hands over its own check when it starts)
         org.photonvision.common.logging.JetsonLogMirror.start(
                 NetworkTablesManager.getInstance().getNTInst(), () -> false);
+        // SpectrumJetson (photonvision-49, 51, 56): the robot state's listeners (event profile, GC
+        // on disable) and quiet mode, which hands the log mirror its check
+        org.photonvision.vision.processes.IdleMode.start();
         // SpectrumJetson (photonvision-82): diagnostics on /photonvision/jetson
         if (Platform.isLinux()) org.photonvision.common.hardware.metrics.JetsonDiagnostics.start();
 

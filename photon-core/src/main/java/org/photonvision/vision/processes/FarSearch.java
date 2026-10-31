@@ -35,8 +35,9 @@ import org.photonvision.jni.GpuDetectorJNI;
  * library (detector/far_search.h). Tags are normally searched for on a half-size image; while no
  * camera has a good view, one camera at a time also searches its full-size image (~1.7x the range).
  *
- * <p>In the 2026 tree these lived in IdleMode (Settings > Robot state); that isn't ported yet, so
- * they have their own small file and card until it is.
+ * <p>Shown and switched on Settings > Robot state, with idle mode (photonvision-50; IdleMode.status
+ * and /api/robotState), as in 2026. The settings keep their own file here, so the 2026
+ * spectrum-robot-state.json's farSearch (on, the 2026 default) doesn't switch it back on.
  */
 public final class FarSearch {
     private FarSearch() {}
@@ -149,7 +150,7 @@ public final class FarSearch {
         }
     }
 
-    /** The settings and counters, for Settings > Far-tag search. */
+    /** The settings and counters, for Settings > Robot state (IdleMode.status). */
     public static Map<String, Object> toMap() {
         var m = new LinkedHashMap<String, Object>();
         var s = settings;

@@ -1065,23 +1065,66 @@ public class RequestHandler {
         }
     }
 
-    // SpectrumJetson (photonvision-55): Settings > Far-tag search.
+    // SpectrumJetson (photonvision-50): Settings > Robot state: idle mode (49, 50), the event
+    // profile (51), the far-tag search (55), quiet mode (56), the thermal limit (57), the cooling
+    // (71), and the robot's state as PhotonVision sees it.
     @Json
-    record FarSearchRequest(Boolean farSearch, Double farSweepsPerSecond) {}
+    record RobotStateRequest(
+            Boolean idleWhileDisabled,
+            Double idleFps,
+            Boolean eventProfileOnFms,
+            Integer eventPipeline,
+            Boolean switchNow,
+            Boolean farSearch,
+            Double farSweepsPerSecond,
+            Boolean quietAfterMatch,
+            Integer quietAfterDisabledSeconds,
+            String fanMode) {}
 
-    public static void onFarSearchRequest(Context ctx) {
-        ctx.json(org.photonvision.vision.processes.FarSearch.toMap(), Types.mapOf(Object.class));
+    public static void onRobotStateRequest(Context ctx) {
+        ctx.json(org.photonvision.vision.processes.IdleMode.status(), Types.mapOf(Object.class));
     }
 
-    public static void onFarSearchSetRequest(Context ctx) {
+    public static void onRobotStateSetRequest(Context ctx) {
+        RobotStateRequest req;
         try {
-            var req = ctx.bodyAsClass(FarSearchRequest.class);
-            org.photonvision.vision.processes.FarSearch.update(req.farSearch(), req.farSweepsPerSecond());
-            ctx.json(org.photonvision.vision.processes.FarSearch.toMap(), Types.mapOf(Object.class));
+            req = ctx.bodyAsClass(RobotStateRequest.class);
         } catch (RuntimeException e) {
             ctx.status(400);
-            ctx.result("Far search not changed: " + e.getMessage());
+            ctx.result(
+                    "Expected {idleWhileDisabled, idleFps, eventProfileOnFms, eventPipeline, switchNow,"
+                            + " farSearch, farSweepsPerSecond, quietAfterMatch, quietAfterDisabledSeconds,"
+                            + " fanMode}: "
+                            + e.getMessage());
+            return;
         }
+        org.photonvision.vision.processes.IdleMode.update(
+                req.idleWhileDisabled(),
+                req.idleFps(),
+                req.eventProfileOnFms(),
+                req.eventPipeline(),
+                req.quietAfterMatch(),
+                req.quietAfterDisabledSeconds());
+        // photonvision-55: the far search keeps its own settings (FarSearch), shown here as in 2026.
+        if (req.farSearch() != null || req.farSweepsPerSecond() != null) {
+            org.photonvision.vision.processes.FarSearch.update(req.farSearch(), req.farSweepsPerSecond());
+        }
+        // photonvision-71: the cooling (quiet, full or off), applied and saved by spectrum-fan.
+        if (req.fanMode() != null) {
+            String why = org.photonvision.vision.processes.FanMode.set(req.fanMode());
+            if (why != null) {
+                ctx.status(400);
+                ctx.result("Couldn't change the cooling: " + why);
+                return;
+            }
+        }
+        // photonvision-51: "Switch now" on Settings > Robot state, to test the event profile.
+        if (Boolean.TRUE.equals(req.switchNow())) {
+            var idle = org.photonvision.vision.processes.IdleMode.getSettings();
+            org.photonvision.vision.processes.IdleMode.switchAllTo(
+                    idle.eventPipeline, "Switch now (Settings)");
+        }
+        onRobotStateRequest(ctx);
     }
 
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.

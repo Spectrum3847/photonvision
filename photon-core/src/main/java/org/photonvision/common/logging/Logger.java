@@ -126,6 +126,22 @@ public class Logger {
         currentAppenders.add(new FileLogAppender(logFilePath));
     }
 
+    // SpectrumJetson (photonvision-56): quiet mode closes the log file so the scratch partition can
+    // go read-only; the console and UI logs carry on. Resuming opens a new file (a new name, so
+    // nothing is overwritten). The appender list itself is left alone: other threads walk it while
+    // logging.
+    public static synchronized void pauseFileLogging() {
+        for (var a : currentAppenders) {
+            if (a instanceof FileLogAppender f) f.pause();
+        }
+    }
+
+    public static synchronized void resumeFileLogging() {
+        for (var a : currentAppenders) {
+            if (a instanceof FileLogAppender f) f.resume(PathManager.getInstance().getLogPath());
+        }
+    }
+
     public static void closeAllLoggers() {
         currentAppenders.forEach(LogAppender::shutdown);
         currentAppenders.clear();
@@ -320,8 +336,8 @@ public class Logger {
     }
 
     private static class FileLogAppender implements LogAppender {
-        private OutputStream out;
-        private boolean wantsFlush;
+        private volatile OutputStream out;
+        private volatile boolean wantsFlush;
 
         public FileLogAppender(Path logFilePath) {
             try {
@@ -331,8 +347,9 @@ public class Logger {
                                 "FileLogAppender",
                                 () -> {
                                     try {
-                                        if (wantsFlush) {
-                                            out.flush();
+                                        var o = out; // null while paused (photonvision-56)
+                                        if (wantsFlush && o != null) {
+                                            o.flush();
                                             wantsFlush = false;
                                         }
                                     } catch (IOException ignored) {
@@ -345,9 +362,34 @@ public class Logger {
             }
         }
 
+        /** photonvision-56: close the file (quiet mode); log() drops file output until resume. */
+        synchronized void pause() {
+            if (out == null) return;
+            try {
+                out.flush();
+                out.close();
+            } catch (IOException ignored) {
+            }
+            out = null;
+            paused = true;
+        }
+
+        synchronized void resume(Path logFilePath) {
+            if (!paused) return;
+            paused = false;
+            try {
+                out = new FileOutputStream(logFilePath.toFile());
+            } catch (FileNotFoundException e) {
+                System.err.println("Unable to log to file " + logFilePath);
+            }
+        }
+
+        private boolean paused = false;
+
         @Override
-        public void log(String message, LogLevel level) {
+        public synchronized void log(String message, LogLevel level) {
             message += "\n";
+            if (out == null) return;
             try {
                 out.write(message.getBytes());
                 wantsFlush = true;
@@ -359,9 +401,9 @@ public class Logger {
         }
 
         @Override
-        public void shutdown() {
+        public synchronized void shutdown() {
             try {
-                out.close();
+                if (out != null) out.close();
                 out = null;
             } catch (IOException e) {
                 // TODO Auto-generated catch block

@@ -58,6 +58,7 @@ public class VisionRunner implements AutoCloseable {
     private final Supplier<Boolean> enabledSupplier;
 
     private long loopCount;
+    private long lastGrabNanos = 0; // SpectrumJetson (photonvision-49)
 
     /**
      * VisionRunner contains a thread to run a pipeline, given a frame, and will give the result to
@@ -177,11 +178,13 @@ public class VisionRunner implements AutoCloseable {
     /**
      * Waits until the next time this VisionRunner should run its pipeline, based on current FPS limit
      */
-    private void waitUntilNextTick(long start) {
+    private void waitUntilNextTick(long startNanos) {
         int fpsLimit = fpsLimitSupplier.get();
 
         if (fpsLimit > 0) {
-            long sleepTime = (long) (1000 / fpsLimit - (System.currentTimeMillis() - start));
+            // SpectrumJetson (photonvision-65): a monotonic clock. The date can jump when the Jetson
+            // takes the robot's (RobotClockSync), and a jump back here slept this camera for as long.
+            long sleepTime = 1000 / fpsLimit - (System.nanoTime() - startNanos) / 1_000_000;
 
             if (sleepTime > 0) {
                 try {
@@ -242,7 +245,14 @@ public class VisionRunner implements AutoCloseable {
         }
 
         while (!Thread.interrupted()) {
-            long start = System.currentTimeMillis();
+            // SpectrumJetson (photonvision-49, 57): while the robot is disabled (idle mode) or the
+            // chip is too hot (the thermal limit), at most that many frames a second; the ones in
+            // between are never grabbed (decoded). Before the settings and the grab, so both are
+            // fresh for the frame that's processed.
+            if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;
+            lastGrabNanos = System.nanoTime();
+
+            long start = System.nanoTime(); // photonvision-65: monotonic
             long n0 = System.nanoTime();
             changeSubscriber.processSettingChanges();
             synchronized (runnableList) {

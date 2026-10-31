@@ -25,6 +25,7 @@ import org.photonvision.jni.CscoreExtras;
 import org.photonvision.jni.GpuDetectorJNI;
 import org.photonvision.vision.frame.FrameThresholdType;
 import org.photonvision.vision.opencv.CVMat;
+import org.photonvision.vision.processes.IdleMode;
 import org.photonvision.vision.processes.VisionSourceSettables;
 import org.wpilib.util.PixelFormat;
 import org.wpilib.util.RawFrame;
@@ -915,6 +916,7 @@ public class USBFrameProvider extends CpuImageProcessor {
                 && System.nanoTime() - lastTakenNs < 1_000_000_000L
                 && graySink != null
                 && useGray) {
+            if (!waitForTakeWindow()) break;
             CapturedFrame f = grabMjpegAsGray(decodeWidth, decodeHeight, lastTime);
             if (f.captureTimestamp == 0 || f.colorImage.getMat().empty()) {
                 f.colorImage.release();
@@ -932,6 +934,28 @@ public class USBFrameProvider extends CpuImageProcessor {
                 decoded = null;
             }
             decoder = null;
+        }
+    }
+
+    // SpectrumJetson (photonvision-49, 57): while IdleMode limits the frame rate (a disabled robot,
+    // the thermal limit), the camera loop takes a frame only every period; decoding every frame in
+    // between would keep most of the decode's power and heat. So the decoder waits until a period
+    // after the last take, less about a frame's grab and decode, and decodes only around the frames
+    // the loop will take. False if interrupted.
+    private static final long DECODE_LEAD_NS = 12_000_000L;
+
+    private boolean waitForTakeWindow() {
+        while (true) {
+            long period = IdleMode.periodNanos();
+            if (period == 0) return true;
+            long waitNanos = lastTakenNs + period - DECODE_LEAD_NS - System.nanoTime();
+            if (waitNanos <= 0) return true;
+            try {
+                Thread.sleep(Math.max(1, Math.min(5, waitNanos / 1_000_000)));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
         }
     }
 

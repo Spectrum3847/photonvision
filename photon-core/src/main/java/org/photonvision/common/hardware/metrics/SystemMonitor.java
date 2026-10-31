@@ -73,6 +73,8 @@ public class SystemMonitor {
     private double totalMemory = -1.0;
 
     private double lastCpuLoad = 0;
+    // SpectrumJetson (photonvision-65): this and lastTrafficUpdate are monotonic ms
+    // (System.nanoTime): the date can jump (RobotClockSync).
     private long lastCpuUpdate = 0;
     private long[] oldTicks;
 
@@ -246,7 +248,7 @@ public class SystemMonitor {
     private void resetNetworkTraffic() {
         lastBytesSent = monitoredIFace.getBytesSent();
         lastBytesRecv = monitoredIFace.getBytesRecv();
-        lastTrafficUpdate = System.currentTimeMillis();
+        lastTrafficUpdate = System.nanoTime() / 1_000_000;
     }
 
     private NetworkIF selectNetworkIfByName(String name) {
@@ -420,7 +422,7 @@ public class SystemMonitor {
      * @return load on the cpu in %.
      */
     public synchronized double getCpuUsage() {
-        long now = System.currentTimeMillis();
+        long now = System.nanoTime() / 1_000_000;
         double dTime = (now - lastCpuUpdate) / 1000.0;
         if (dTime > minimumDeltaTime) {
             var newTicks = cpu.getSystemCpuLoadTicks();
@@ -508,7 +510,7 @@ public class SystemMonitor {
         if (iFace == null) {
             return new NetworkTraffic(-1, -1);
         }
-        long now = System.currentTimeMillis();
+        long now = System.nanoTime() / 1_000_000;
         double dTime = (now - lastTrafficUpdate) / 1000.0;
         if (dTime > minimumDeltaTime) {
             // only update if it's been long enough since the last update

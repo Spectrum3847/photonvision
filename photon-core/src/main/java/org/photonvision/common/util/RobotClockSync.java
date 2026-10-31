@@ -36,7 +36,9 @@ import org.wpilib.networktables.NetworkTablesJNI;
  *
  * <p>This only fixes human-facing times: Rewind recording names, the system log, file dates. Vision
  * doesn't use the date: frame timestamps, PhotonVision's time sync with the robot and Rewind's
- * frame times all use a monotonic clock that setting the date doesn't touch.
+ * frame times all use a monotonic clock that setting the date doesn't touch. So do the timers
+ * (frame-rate limits, quiet mode, settings saves: photonvision-65). The jump here happens at every
+ * boot at an event, usually forward by about as long as the Jetson was off.
  *
  * <p>Checked once a second. The clock is set when it's more than {@link #MAX_ERROR_MS} off, from a
  * value received within the last few seconds that looks like a real date, and only if the Jetson

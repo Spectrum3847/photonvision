@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
+import { loadRobotState, robotState, setRobotState } from "@/lib/RobotState";
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
 import { useStateStore } from "@/stores/StateStore";
 import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
@@ -7,6 +8,15 @@ import { PipelineType } from "@/types/PipelineTypes";
 import PhotonCameraStream from "@/components/app/photon-camera-stream.vue";
 
 const value = defineModel<number[]>();
+
+// SpectrumJetson (photonvision-50): say when the cameras are idling because the robot is disabled
+// (photonvision-49), with a button to run them at full speed for testing.
+let robotStateTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  void loadRobotState();
+  robotStateTimer = setInterval(() => void loadRobotState(), 2000);
+});
+onBeforeUnmount(() => clearInterval(robotStateTimer));
 
 const driverMode = computed<boolean>({
   get: () => useCameraSettingsStore().isDriverMode,
@@ -63,6 +73,20 @@ const performanceRecommendation = computed<string>(() => {
         hide-details="auto"
       />
     </v-card-title>
+    <v-alert
+      v-if="robotState?.idleNow"
+      data-testid="idle-notice"
+      class="ml-3 mr-3 mb-2"
+      density="compact"
+      type="info"
+      variant="tonal"
+      icon="mdi-sleep"
+    >
+      Robot disabled: cameras idle at {{ robotState.idleFps }} fps, full speed on enable.
+      <template #append>
+        <v-btn size="small" variant="text" @click="setRobotState({ idleWhileDisabled: false })">Full speed</v-btn>
+      </template>
+    </v-alert>
     <v-divider class="ml-3 mr-3" />
     <v-row class="stream-viewer-container pa-3 align-center">
       <v-col v-if="value?.includes(0)" class="stream-view">

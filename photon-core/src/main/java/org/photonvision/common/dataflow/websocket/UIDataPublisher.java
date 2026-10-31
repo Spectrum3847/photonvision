@@ -43,7 +43,7 @@ public class UIDataPublisher implements CVPipelineResultConsumer {
 
     @Override
     public void accept(CVPipelineResult result) {
-        long now = System.currentTimeMillis();
+        long now = System.nanoTime() / 1_000_000; // SpectrumJetson (photonvision-65): monotonic
 
         // only update the UI at 10hz
         if (lastUIResultUpdateTime + 1000.0 / 10.0 > now) return;

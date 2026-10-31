@@ -266,7 +266,9 @@ public class ConfigProvider {
 
     public void requestSave() {
         logger.trace("Requesting save...");
-        saveRequestTimestamp = System.currentTimeMillis();
+        // SpectrumJetson (photonvision-65): monotonic. On the date, a jump back (RobotClockSync)
+        // held a settings change unsaved for as long as the jump.
+        saveRequestTimestamp = System.nanoTime() / 1_000_000;
         if (settingsSaveThread == null) {
             synchronized (this) {
                 if (settingsSaveThread == null) {
@@ -291,7 +293,7 @@ public class ConfigProvider {
     private void saveAndWriteTask() {
         while (!Thread.currentThread().isInterrupted()) {
             if (saveRequestTimestamp > 0
-                    && (System.currentTimeMillis() - saveRequestTimestamp) > 1000L
+                    && (System.nanoTime() / 1_000_000 - saveRequestTimestamp) > 1000L
                     && allowWriteTask) {
                 saveRequestTimestamp = -1;
                 logger.debug("Saving to disk...");
