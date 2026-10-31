@@ -303,6 +303,17 @@ public class Main implements Callable<Integer> {
         // SpectrumJetson (photonvision-74): the robot's field map (the saved one first, before the
         // cameras start)
         org.photonvision.fieldmap.FieldMapNT.start();
+        // SpectrumJetson (photonvision-08): set the Jetson's date from the robot's (no clock battery,
+        // no internet); off on the SystemCore, which is the robot
+        org.photonvision.common.util.RobotClockSync.start();
+        // SpectrumJetson (photonvision-80): log lines pairing the Jetson's clocks
+        org.photonvision.common.util.ClockMarks.start();
+        // SpectrumJetson (photonvision-83): log lines to the robot on /photonvision/jetson/log
+        // (INFO too while quiet: quiet mode hands over its own check when it starts)
+        org.photonvision.common.logging.JetsonLogMirror.start(
+                NetworkTablesManager.getInstance().getNTInst(), () -> false);
+        // SpectrumJetson (photonvision-82): diagnostics on /photonvision/jetson
+        if (Platform.isLinux()) org.photonvision.common.hardware.metrics.JetsonDiagnostics.start();
 
         logger.debug("Loading HardwareManager...");
         // Force load the hardware manager

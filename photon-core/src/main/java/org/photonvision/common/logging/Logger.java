@@ -182,6 +182,9 @@ public class Logger {
             var formattedMessage = format(message, level, group, clazz, shouldColor);
             a.log(formattedMessage, level);
         }
+        if (JetsonLogMirror.wants(level)) { // SpectrumJetson (photonvision-83)
+            JetsonLogMirror.accept(format(message, level, group, clazz, false));
+        }
         if (!connected) {
             synchronized (uiBacklog) {
                 uiBacklog.add(Pair.of(format(message, level, group, clazz, false), level));

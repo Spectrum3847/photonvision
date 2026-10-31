@@ -56,10 +56,14 @@ public class KernelLogLogger {
         }
 
         for (var msg : listener.getNewlines()) {
-            // We currently set all logs to debug regardless of their actual level
-            logger.log(msg, LogLevel.DEBUG);
+            // We currently set all logs to debug regardless of their actual level.
+            // SpectrumJetson (photonvision-82): USB trouble at INFO, so it's kept at any log level.
+            logger.log(
+                    msg,
+                    org.photonvision.common.hardware.UsbEvents.isEvent(msg) ? LogLevel.INFO : LogLevel.DEBUG);
             // SpectrumJetson (photonvision-31): USB bandwidth and connection trouble, by port.
             org.photonvision.common.hardware.UsbTrouble.noteKernelLine(msg);
+            org.photonvision.common.hardware.UsbEvents.noteKernelLine(msg);
         }
     }
 }
