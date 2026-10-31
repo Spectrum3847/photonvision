@@ -1302,6 +1302,66 @@ public class RequestHandler {
         onExcludedTagsRequest(ctx);
     }
 
+    // ---- Spectrum feature 13, part A (settings): copy settings, new pipeline from any camera's,
+    // settings snapshots (photonvision-25, 46, 53, 59, 68). ----
+
+    // SpectrumJetson (photonvision-25): copy settings from another camera's or pipeline's settings.
+    @Json
+    record CopySettingsRequest(
+            String fromCamera,
+            Integer fromPipeline,
+            String toCamera,
+            Integer toPipeline,
+            java.util.List<String> groups) {}
+
+    /**
+     * POST /api/settings/copySettings {fromCamera, fromPipeline, toCamera, toPipeline, groups}: copies
+     * the chosen groups (camera, resolution, apriltag, output, objectDetection) of settings.
+     */
+    public static void onCopySettingsRequest(Context ctx) {
+        CopySettingsRequest req;
+        try {
+            req = ctx.bodyAsClass(CopySettingsRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Expected {fromCamera, fromPipeline, toCamera, toPipeline, groups}");
+            return;
+        }
+        var vmm = VisionSourceManager.getInstance().vmm;
+        var from = req.fromCamera() == null ? null : vmm.getModule(req.fromCamera());
+        var to = req.toCamera() == null ? null : vmm.getModule(req.toCamera());
+        if (from == null || to == null || req.fromPipeline() == null || req.toPipeline() == null) {
+            ctx.status(400);
+            ctx.result("Unknown camera or pipeline");
+            return;
+        }
+        var source = from.getPipelineSettingsAt(req.fromPipeline());
+        if (source == null) {
+            ctx.status(400);
+            ctx.result("The source camera has no pipeline " + req.fromPipeline());
+            return;
+        }
+        if (req.fromCamera().equals(req.toCamera()) && req.fromPipeline().equals(req.toPipeline())) {
+            ctx.status(400);
+            ctx.result("Pick a different pipeline or camera to copy from");
+            return;
+        }
+        try {
+            var copied =
+                    to.copySettingsFrom(
+                            source,
+                            req.toPipeline(),
+                            req.groups() == null ? java.util.List.of() : req.groups(),
+                            from.videoModeList().equals(to.videoModeList()));
+            ctx.json(Map.of("copied", copied), Types.mapOf(Object.class));
+        } catch (IllegalArgumentException e) {
+            ctx.status(400);
+            ctx.result(e.getMessage());
+        }
+    }
+
+    // ---- end of feature 13 part A ----
+
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.
     @Json
     record ThriftiestFlashRequest(String port, String image) {}

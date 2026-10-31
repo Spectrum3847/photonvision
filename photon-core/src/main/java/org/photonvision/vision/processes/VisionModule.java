@@ -674,6 +674,114 @@ public class VisionModule implements AutoCloseable {
                 "output", outputVideoStreamer != null && outputVideoStreamer.hasViewers());
     }
 
+    // SpectrumJetson (photonvision-25): the settings "Copy settings from..." can copy, by group.
+    // Orientation, names and each camera's exposure limits are never copied.
+    public static final Map<String, List<String>> COPY_GROUPS =
+            Map.of(
+                    "camera",
+                    List.of(
+                            "cameraAutoExposure",
+                            "cameraExposureRaw",
+                            "cameraBrightness",
+                            "cameraGain",
+                            "cameraAutoWhiteBalance",
+                            "cameraWhiteBalanceTemp",
+                            "streamingFrameDivisor",
+                            "blockForFrames",
+                            "cameraContrast",
+                            "cameraGamma",
+                            "cameraSharpness",
+                            "cameraBacklightCompensation"),
+                    "resolution",
+                    List.of("cameraVideoModeIndex"),
+                    "apriltag",
+                    List.of(
+                            "tagFamily",
+                            "decimate",
+                            "blur",
+                            "threads",
+                            "refineEdges",
+                            "numIterations",
+                            "hammingDist",
+                            "decisionMargin"),
+                    "output",
+                    List.of(
+                            "solvePNPEnabled",
+                            "doMultiTarget",
+                            "doSingleTargetAlways",
+                            "outputShouldDraw",
+                            "outputMaximumTargets"),
+                    "objectDetection",
+                    List.of("confidence", "nms", "model"));
+
+    /** SpectrumJetson (photonvision-25): pipeline {@code index}'s settings, or null. */
+    public CVPipelineSettings getPipelineSettingsAt(int index) {
+        return pipelineManager.getPipelineSettings(index);
+    }
+
+    /** The video modes this camera offers, for comparing cameras before copying a resolution. */
+    public List<String> videoModeList() {
+        var modes = visionSource.getSettables().getAllVideoModes();
+        var out = new ArrayList<String>();
+        for (var m : modes) {
+            out.add(m == null ? "" : m.width + "x" + m.height + " " + m.pixelFormat + " " + m.fps);
+        }
+        return out;
+    }
+
+    /**
+     * SpectrumJetson (photonvision-25): copies groups of settings (see COPY_GROUPS) from another
+     * pipeline, of this camera or another one, into this camera's pipeline {@code targetIndex}. If
+     * that pipeline is running, the camera settings are re-applied. Fields the other pipeline type
+     * doesn't have are skipped.
+     *
+     * @return the fields copied
+     */
+    public List<String> copySettingsFrom(
+            CVPipelineSettings source, int targetIndex, Collection<String> groups, boolean sameVideoModes) {
+        var target = pipelineManager.getPipelineSettings(targetIndex);
+        if (target == null) throw new IllegalArgumentException("This camera has no pipeline " + targetIndex);
+        var copied = new ArrayList<String>();
+        // photonvision-63: every group checked before anything is copied. Checked inside the copy
+        // loop, a refused resolution left the groups before it copied, unsaved and not broadcast.
+        for (String group : groups) {
+            if (group == null || !COPY_GROUPS.containsKey(group)) {
+                throw new IllegalArgumentException("Unknown settings group " + group);
+            }
+            if (group.equals("resolution") && !sameVideoModes) {
+                throw new IllegalArgumentException(
+                        "The two cameras offer different video modes, so the resolution can't be copied");
+            }
+        }
+        for (String group : groups) {
+            var fields = COPY_GROUPS.get(group);
+            for (String name : fields) {
+                try {
+                    var from = source.getClass().getField(name);
+                    var to = target.getClass().getField(name);
+                    if (!to.getType().equals(from.getType())) continue;
+                    to.set(target, from.get(source));
+                    copied.add(name);
+                } catch (NoSuchFieldException e) {
+                    // The other pipeline type doesn't have this setting.
+                } catch (IllegalAccessException e) {
+                    logger.error("Could not copy " + name, e);
+                }
+            }
+        }
+        logger.info(
+                "Copied "
+                        + copied
+                        + " from pipeline '"
+                        + source.pipelineNickname
+                        + "' into pipeline '"
+                        + target.pipelineNickname
+                        + "'");
+        if (targetIndex == pipelineManager.getRequestedIndex()) setPipeline(targetIndex);
+        saveAndBroadcastAll();
+        return copied;
+    }
+
     boolean setPipeline(int index) {
         logger.info("Setting pipeline to " + index);
         logger.info("Pipeline name: " + pipelineManager.getPipelineNickname(index));

@@ -10,6 +10,7 @@ import { PipelineType } from "@/types/PipelineTypes";
 import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import { useTheme } from "vuetify";
 import PvDeleteModal from "@/components/common/pv-delete-modal.vue";
+import axios from "axios";
 
 const theme = useTheme();
 
@@ -139,6 +140,78 @@ const cancelPipelineCreation = () => {
 
 // Pipeline Deletion
 const showPipelineDeletionConfirmationDialog = ref(false);
+
+// SpectrumJetson (photonvision-25): copy settings from another camera or pipeline into this one, or into
+// the same pipeline number on every camera, instead of copying them by hand.
+const COPY_GROUPS = [
+  {
+    value: "camera",
+    name: "Camera: exposure, brightness, gain, white balance, contrast, gamma, sharpness, stream resolution, low latency"
+  },
+  { value: "apriltag", name: "AprilTag: decision margin, hamming, decimate, blur, threads, refinement, tag family" },
+  { value: "output", name: "3D and multi-tag: 3D, multi-tag, single-tag fallback, drawing, target count" },
+  { value: "resolution", name: "Resolution (only between cameras with the same video modes)" },
+  { value: "objectDetection", name: "Object detection: model, confidence, NMS" }
+];
+const showCopySettingsDialog = ref(false);
+const copyFromCamera = ref("");
+const copyFromPipeline = ref(0);
+const copyGroups = ref<string[]>(["camera", "apriltag", "output"]);
+const copyToAllCameras = ref(false);
+const copyBusy = ref(false);
+const copyCameraItems = computed<SelectItem<string>[]>(() =>
+  Object.keys(useCameraSettingsStore().cameras).map((id) => ({
+    name: useCameraSettingsStore().cameras[id].nickname,
+    value: id
+  }))
+);
+const copyPipelineItems = computed<SelectItem<number>[]>(() =>
+  (useCameraSettingsStore().cameras[copyFromCamera.value]?.pipelineNicknames ?? []).map((name, index) => ({
+    name: `${index}: ${name}`,
+    value: index
+  }))
+);
+const openCopySettingsDialog = () => {
+  const current = useStateStore().currentCameraUniqueName;
+  const others = Object.keys(useCameraSettingsStore().cameras).filter((id) => id !== current);
+  copyFromCamera.value = others[0] ?? current;
+  copyFromPipeline.value = Math.max(0, useCameraSettingsStore().currentCameraSettings.currentPipelineIndex);
+  showCopySettingsDialog.value = true;
+};
+const copySettings = async () => {
+  copyBusy.value = true;
+  const toPipeline = useCameraSettingsStore().currentCameraSettings.currentPipelineIndex;
+  const targets = copyToAllCameras.value
+    ? Object.keys(useCameraSettingsStore().cameras).filter(
+        (id) =>
+          (useCameraSettingsStore().cameras[id].pipelineNicknames?.length ?? 0) > toPipeline &&
+          !(id === copyFromCamera.value && toPipeline === copyFromPipeline.value)
+      )
+    : [useStateStore().currentCameraUniqueName];
+  const done: string[] = [];
+  const failed: string[] = [];
+  for (const toCamera of targets) {
+    try {
+      await axios.post("/settings/copySettings", {
+        fromCamera: copyFromCamera.value,
+        fromPipeline: copyFromPipeline.value,
+        toCamera,
+        toPipeline,
+        groups: copyGroups.value
+      });
+      done.push(useCameraSettingsStore().cameras[toCamera].nickname);
+    } catch (e) {
+      const why = axios.isAxiosError(e) && typeof e.response?.data === "string" ? e.response.data : "failed";
+      failed.push(`${useCameraSettingsStore().cameras[toCamera].nickname}: ${why}`);
+    }
+  }
+  copyBusy.value = false;
+  if (failed.length === 0) showCopySettingsDialog.value = false;
+  useStateStore().showSnackbarMessage({
+    message: failed.length ? `Copy failed for ${failed.join("; ")}` : `Copied settings into ${done.join(", ")}`,
+    color: failed.length ? "error" : "success"
+  });
+};
 const confirmDeleteCurrentPipeline = () => {
   useCameraSettingsStore().deleteCurrentPipeline();
   showPipelineDeletionConfirmationDialog.value = false;
@@ -323,6 +396,16 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
                 <pv-icon color="#c5c5c5" :right="true" icon-name="mdi-content-copy" tooltip="Duplicate pipeline" />
               </v-list-item-title>
             </v-list-item>
+            <v-list-item @click="openCopySettingsDialog">
+              <v-list-item-title>
+                <pv-icon
+                  color="#c5c5c5"
+                  :right="true"
+                  icon-name="mdi-clipboard-arrow-down-outline"
+                  tooltip="Copy settings from another camera or pipeline"
+                />
+              </v-list-item-title>
+            </v-list-item>
             <v-list-item @click="showCreatePipelineDialog">
               <v-list-item-title>
                 <pv-icon color="green" :right="true" icon-name="mdi-plus" tooltip="Add new pipeline" />
@@ -367,6 +450,53 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
         />
       </v-col>
     </v-row>
+    <v-dialog v-model="showCopySettingsDialog" width="600">
+      <v-card color="surface">
+        <v-card-title class="pb-0">
+          Copy settings into {{ useCameraSettingsStore().currentCameraSettings.nickname }} /
+          {{ useCameraSettingsStore().currentPipelineSettings.pipelineNickname }}
+        </v-card-title>
+        <v-card-text class="pt-2 pb-0">
+          <pv-select v-model="copyFromCamera" label="From camera" :select-cols="8" :items="copyCameraItems" />
+          <pv-select v-model="copyFromPipeline" label="From pipeline" :select-cols="8" :items="copyPipelineItems" />
+          <p class="pt-3 pb-1">Settings to copy:</p>
+          <v-checkbox
+            v-for="group in COPY_GROUPS"
+            :key="group.value"
+            v-model="copyGroups"
+            :value="group.value"
+            :label="group.name"
+            density="compact"
+            hide-details
+          />
+          <v-checkbox
+            v-model="copyToAllCameras"
+            class="pt-2"
+            density="compact"
+            hide-details
+            :label="`Also copy into pipeline ${useCameraSettingsStore().currentCameraSettings.currentPipelineIndex} of every other camera`"
+          />
+          <p class="pt-2 text-caption">Orientation, names and each camera's exposure limits are never copied.</p>
+        </v-card-text>
+        <v-card-actions class="pr-5 pt-10px pb-5">
+          <v-btn
+            color="buttonPassive"
+            :variant="theme.global.current.value.dark ? 'outlined' : 'elevated'"
+            @click="showCopySettingsDialog = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="buttonActive"
+            :variant="theme.global.current.value.dark ? 'outlined' : 'elevated'"
+            :disabled="copyBusy || copyGroups.length === 0"
+            @click="copySettings"
+          >
+            Copy
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-dialog v-model="showPipelineCreationDialog" persistent width="500">
       <v-card color="surface">
         <v-card-title class="pb-0"> Create New Pipeline </v-card-title>

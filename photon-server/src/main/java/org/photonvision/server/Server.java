@@ -152,6 +152,9 @@ public class Server {
         app.post("/api/settings/radios", RequestHandler::onRadioSetRequest);
         app.get("/api/excludedTags", RequestHandler::onExcludedTagsRequest); // SpectrumJetson (22)
         app.post("/api/excludedTags", RequestHandler::onExcludedTagsSetRequest); // SpectrumJetson (22)
+        // Spectrum feature 13, part A (settings)
+        app.post("/api/settings/copySettings", RequestHandler::onCopySettingsRequest); // (25)
+        // end of feature 13 part A
         app.get("/api/usb/bandwidth", RequestHandler::onUsbBandwidthRequest); // SpectrumJetson (32)
         app.post("/api/usb/bandwidth", RequestHandler::onUsbAllocationRequest);
         app.post("/api/utils/nukeConfigDirectory", RequestHandler::onNukeConfigDirectory);
