@@ -20,12 +20,16 @@ const selectedLogLevels = ref<Record<number, boolean>>({
   [LogLevel.DEBUG]: false
 });
 
-const logs = computed<LogMessage[]>(() =>
-  useStateStore()
+// SpectrumJetson (photonvision-73): only while the log window is open. This component is always
+// mounted, and the filter went over every line kept at each new line, with the window closed too.
+const logs = computed<LogMessage[]>(() => {
+  if (!useStateStore().showLogModal) return [];
+  const query = searchQuery.value?.toLowerCase() || "";
+  return useStateStore()
     .logMessages.filter(
       (message) =>
         selectedLogLevels.value[message.level] &&
-        message.message.toLowerCase().includes(searchQuery.value?.toLowerCase() || "") &&
+        (query === "" || message.message.toLowerCase().includes(query)) &&
         (timeInput.value === undefined ||
           message.timestamp.getTime() >=
             new Date().setHours(
@@ -34,8 +38,8 @@ const logs = computed<LogMessage[]>(() =>
               parseInt(timeInput.value.substring(6, 8))
             ))
     )
-    .map((item, index) => ({ ...item, index: index }))
-);
+    .map((item, index) => ({ ...item, index: index }));
+});
 
 watch(logs, () => {
   if (!logList.value) return;

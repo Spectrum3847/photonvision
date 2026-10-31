@@ -10,6 +10,9 @@ import type {
   WebsocketPipelineResultUpdate
 } from "@/types/WebsocketDataTypes";
 
+// SpectrumJetson (photonvision-73): lines of log the dashboard keeps.
+const kMaxClientLogs = 2000;
+
 export interface NTConnectionStatus {
   connected: boolean;
   address?: string;
@@ -138,6 +141,12 @@ export const useStateStore = defineStore("state", {
         message: data.logMessage.logMessage,
         timestamp: new Date()
       });
+      // SpectrumJetson (photonvision-73): keep the newest kMaxClientLogs lines. The list had no
+      // bound, and an unplugged camera logs a reconnect burst at every settings change: a
+      // dashboard open for a while got slower and slower (Download fetches the full log).
+      if (this.logMessages.length > kMaxClientLogs + kMaxClientLogs / 4) {
+        this.logMessages.splice(0, this.logMessages.length - kMaxClientLogs);
+      }
     },
     updateNTConnectionStatusFromWebsocket(data: WebsocketNTUpdate) {
       this.ntConnectionStatus = {
