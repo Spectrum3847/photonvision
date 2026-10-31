@@ -311,13 +311,14 @@ public class Calibrate3dPipe
         JsonMatOfDouble distortionCoefficientsMat =
                 new JsonMatOfDouble(1, 8, CvType.CV_64FC1, Arrays.copyOfRange(result.intrinsics, 4, 12));
 
-        // Spectrum (photonvision-91): mrcal's cornersUsed is indexed by board corner id; put it on
-        // the detections (see CornerAlignment).
+        // Spectrum (photonvision-91): one flag per detection. This mrcal JNI already returns them
+        // per detection (checked on the LifeCam test set: same length as each view's corners); a
+        // board-indexed array (older mrcal builds, per the 2026 analysis) is remapped by id.
         List<boolean[]> used = new ArrayList<>();
         for (int i = 0; i < observationCorners.size(); i++) {
             var obs = observationCorners.get(i);
             used.add(
-                    CornerAlignment.perDetection(
+                    CornerAlignment.normalizeLoaded(
                             result.cornersUsed.get(i),
                             obs.ids != null ? obs.ids.toArray() : null,
                             (int) obs.imagePoints.total()));

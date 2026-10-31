@@ -22,14 +22,13 @@ import java.util.Arrays;
 /**
  * Spectrum (photonvision-91): line up per-corner flags with the detections they belong to.
  *
- * <p>mrcal works on the whole board: it gets one slot per board corner (a partial ChArUco view
- * fills the missing ones with a negative weight) and hands back {@code cornersUsed} indexed by
- * <b>board corner id</b>. PhotonVision's observations are indexed by <b>detection</b> (the corners
- * that were seen, in the order the detector returned them). Upstream read mrcal's array by
- * detection index, so for every partial board the inlier/outlier flags (and the residual list,
- * which skipped the "outliers") belonged to other corners, the snapshot view marked the wrong
- * corners red, and the uncertainty estimate refused partial boards (length mismatch). The analysis
- * in SpectrumJetson tests/calibration-analysis found the stored residuals didn't line up.
+ * <p>PhotonVision's observations are indexed by <b>detection</b> (the corners that were seen, in
+ * the order the detector returned them). The photon-mrcal JNI in use (dev-v2027.0.2) returns
+ * {@code cornersUsed} per detection too, and that is used as is. A board-indexed array (one
+ * slot per board corner id, a different length from the detections: older builds, and the 2026
+ * calibrations the SpectrumJetson tests/calibration-analysis looked at) is remapped by id. The
+ * residuals are what didn't line up: upstream's list skipped the outliers, so from the first
+ * outlier on, residual i belonged to a later corner (fixed in Calibrate3dPipe).
  */
 public final class CornerAlignment {
     private CornerAlignment() {}
