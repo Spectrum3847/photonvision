@@ -2,6 +2,7 @@
 // dashboard's idle notice.
 import { ref } from "vue";
 import axios from "axios";
+import { oneAtATime, POLL_TIMEOUT_MS } from "@/lib/Poll";
 
 export interface RobotState {
   idleWhileDisabled: boolean;
@@ -60,13 +61,14 @@ export interface RobotStateChange {
 
 export const robotState = ref<RobotState | null>(null);
 
-export const loadRobotState = async () => {
+// Polled by several cards at once: one request at a time between them (photonvision-67).
+export const loadRobotState = oneAtATime(async () => {
   try {
-    robotState.value = (await axios.get<RobotState>("/robotState")).data;
+    robotState.value = (await axios.get<RobotState>("/robotState", { timeout: POLL_TIMEOUT_MS })).data;
   } catch {
     robotState.value = null;
   }
-};
+});
 
 export const setRobotState = async (change: RobotStateChange) => {
   robotState.value = (await axios.post<RobotState>("/robotState", change)).data;
