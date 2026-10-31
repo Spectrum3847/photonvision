@@ -140,7 +140,10 @@ public final class ThriftiestFirmware {
         try {
             // Parsed avaje nodes are read-only (add() throws, with no message): copy each one.
             var cams = JsonArray.create();
+            var seen = new java.util.HashSet<String>();
             for (var c : json.fromJsonArray(tool("variant", "--json")).elements()) {
+                // thriftiest-fw.py can list a camera once per video node: one row per USB port
+                if (!seen.add(((JsonObject) c).extract("port", ""))) continue;
                 var cam = JsonObject.create();
                 ((JsonObject) c).elements().forEach(cam::add);
                 cam.add("camera", names.getOrDefault(cam.extract("port", ""), ""));
