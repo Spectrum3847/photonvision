@@ -23,6 +23,7 @@ import org.photonvision.jni.GpuDetectorJNI;
 import org.photonvision.vision.opencv.CVMat;
 import org.photonvision.vision.opencv.Releasable;
 import org.photonvision.vision.pipe.CVPipe;
+import org.photonvision.vision.processes.FarSearch;
 import org.wpilib.vision.apriltag.AprilTagDetection;
 
 public class AprilTagDetectionCudaPipe
@@ -42,6 +43,9 @@ public class AprilTagDetectionCudaPipe
         if (in.getMat().empty()) {
             return List.of();
         }
+
+        // SpectrumJetson (photonvision-55): the far-search settings, once the library is loaded.
+        FarSearch.apply();
 
         var ret = m_cudadetector.processimage(handle, in.getMat().getNativeObjAddr());
 

@@ -6,6 +6,7 @@ import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import ApriltagControlCard from "@/components/settings/ApriltagControlCard.vue";
 import DeviceCard from "@/components/settings/DeviceCard.vue";
 import ThriftiestFirmwareCard from "@/components/settings/ThriftiestFirmwareCard.vue";
+import FarSearchCard from "@/components/settings/FarSearchCard.vue";
 </script>
 
 <template>
@@ -13,6 +14,7 @@ import ThriftiestFirmwareCard from "@/components/settings/ThriftiestFirmwareCard
     <DeviceCard />
     <GlobalSettingsCard />
     <ThriftiestFirmwareCard />
+    <FarSearchCard />
     <ObjectDetectionCard v-if="useSettingsStore().general.supportedBackends.length > 0" />
     <LightingControlCard v-if="useSettingsStore().lighting.supported" />
     <Suspense>

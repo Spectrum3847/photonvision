@@ -88,4 +88,22 @@ public class GpuDetectorJNI {
      */
     public static native int decodeMjpegBgr(long rawFramePtr, long cvMatPtr);
 
+    /**
+     * SpectrumJetson (photonvision-55): the far-tag search (detector/far_search.h): full-size
+     * searches, one camera at a time, only while no camera has a good view. {@code sweepsPerSecond}
+     * caps the full-size searches across all cameras.
+     */
+    public static native void setFarSearch(boolean enabled, double sweepsPerSecond);
+
+    /**
+     * SpectrumJetson (photonvision-69): the excluded tags, which don't count toward the far search's
+     * good view: they're left out of the multi-tag solve.
+     */
+    public static native void setFarSearchExcluded(int[] ids);
+
+    /**
+     * SpectrumJetson (photonvision-55): {enabled, starved now, full-size searches, crops, far tags
+     * returned, seconds starved, ms in full-size searches, ms in crops}, since PhotonVision started.
+     */
+    public static native double[] farSearchStatus();
 }

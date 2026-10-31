@@ -1027,6 +1027,25 @@ public class RequestHandler {
         }
     }
 
+    // SpectrumJetson (photonvision-55): Settings > Far-tag search.
+    @Json
+    record FarSearchRequest(Boolean farSearch, Double farSweepsPerSecond) {}
+
+    public static void onFarSearchRequest(Context ctx) {
+        ctx.json(org.photonvision.vision.processes.FarSearch.toMap(), Types.mapOf(Object.class));
+    }
+
+    public static void onFarSearchSetRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(FarSearchRequest.class);
+            org.photonvision.vision.processes.FarSearch.update(req.farSearch(), req.farSweepsPerSecond());
+            ctx.json(org.photonvision.vision.processes.FarSearch.toMap(), Types.mapOf(Object.class));
+        } catch (RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Far search not changed: " + e.getMessage());
+        }
+    }
+
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.
     @Json
     record ThriftiestFlashRequest(String port, String image) {}
