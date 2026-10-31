@@ -70,7 +70,7 @@ public final class FieldMapNT {
 
     /** Where the robot's map is kept between boots, with the other Spectrum settings. */
     public static Path savedFile() {
-        return PathManager.getInstance().getRootDir().resolve("spectrum").resolve("field-map.json");
+        return PathManager.getInstance().getConfigDir().resolve("spectrum").resolve("field-map.json");
     }
 
     /**
