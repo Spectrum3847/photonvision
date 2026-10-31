@@ -51,9 +51,22 @@ const cameraViewType = computed<number[]>({
         <CameraControlCard />
       </v-col>
       <v-col class="pl-md-3 pt-3 pt-md-0" cols="12" md="5">
-        <CamerasView v-model="cameraViewType" />
-        <CameraFocusCard />
+        <!-- Spectrum: the stream card is sticky on wide screens; pinning the Focus card with it keeps
+             the Focus card from scrolling up over the stream. -->
+        <div class="camera-view-and-focus">
+          <CamerasView v-model="cameraViewType" />
+          <CameraFocusCard />
+        </div>
       </v-col>
     </v-row>
   </div>
 </template>
+
+<style scoped>
+@media only screen and (min-width: 960px) {
+  .camera-view-and-focus {
+    position: sticky;
+    top: 12px;
+  }
+}
+</style>
