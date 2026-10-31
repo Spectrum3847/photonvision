@@ -990,6 +990,27 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * GET /api/focus/frame?camera=UNIQUE_NAME (Spectrum, focus view): the camera's latest image at
+     * full size as a JPEG, as FocusMeter measured it. 204 until the first one.
+     */
+    public static void onFocusFrameRequest(Context ctx) {
+        var m = moduleByUniqueName(ctx.queryParam("camera"));
+        if (m == null) {
+            ctx.status(404);
+            ctx.result("No camera " + ctx.queryParam("camera"));
+            return;
+        }
+        byte[] jpeg = m.focusMeter().frameJpeg();
+        if (jpeg == null) {
+            ctx.status(204);
+            return;
+        }
+        ctx.header("Cache-Control", "no-store");
+        ctx.contentType("image/jpeg");
+        ctx.result(jpeg);
+    }
+
     /** SpectrumJetson (photonvision-54): each camera's tag contrast over the last 2 s (TagContrast). */
     public static void onTagContrastRequest(Context ctx) {
         var names =

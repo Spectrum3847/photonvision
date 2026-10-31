@@ -24,7 +24,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfInt;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
 import org.photonvision.common.dataflow.CVPipelineResultConsumer;
@@ -44,6 +47,10 @@ import org.photonvision.vision.pipeline.result.CVPipelineResult;
 public class FocusMeter implements CVPipelineResultConsumer {
     private static final long WANTED_NS = 3_000_000_000L;
     private static final long PERIOD_NS = 200_000_000L;
+    // Spectrum (focus view): 10 readings a second, and the full-size image, while it's open.
+    private static final long VIEW_PERIOD_NS = 100_000_000L;
+    private volatile long viewUntilNs = 0;
+    private volatile byte[] jpeg = null;
 
     /** The latest measurement: grid is row-major, cell 4 is the centre. */
     @Json
@@ -73,6 +80,17 @@ public class FocusMeter implements CVPipelineResultConsumer {
                 g.clone(), g[4], best, width, height, (System.nanoTime() - measuredNs) / 1_000_000L);
     }
 
+    /**
+     * Spectrum (focus view): the latest measured image as a JPEG at the camera's full size, and keep
+     * making them (and measuring 10 times a second) for the next 3 s. Null until the first one.
+     */
+    public byte[] frameJpeg() {
+        long until = System.nanoTime() + WANTED_NS;
+        viewUntilNs = until;
+        wantedUntilNs = until;
+        return jpeg;
+    }
+
     public void resetBest() {
         best = 0;
     }
@@ -85,7 +103,8 @@ public class FocusMeter implements CVPipelineResultConsumer {
         if (frame == null || frame.colorImage == null) return;
         Mat src = frame.colorImage.getMat();
         if (src == null || src.empty()) return;
-        nextNs = now + PERIOD_NS;
+        boolean view = now < viewUntilNs;
+        nextNs = now + (view ? VIEW_PERIOD_NS : PERIOD_NS);
         Mat copy = new Mat();
         if (src.channels() == 1) src.copyTo(copy);
         else Imgproc.cvtColor(src, copy, Imgproc.COLOR_BGR2GRAY);
@@ -94,11 +113,23 @@ public class FocusMeter implements CVPipelineResultConsumer {
                 () -> {
                     try {
                         measure(copy);
+                        if (view) encode(copy);
                     } finally {
                         copy.release();
                         busy.set(false);
                     }
                 });
+    }
+
+    private void encode(Mat gray) {
+        MatOfByte buf = new MatOfByte();
+        try {
+            if (Imgcodecs.imencode(".jpg", gray, buf, new MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, 85))) {
+                jpeg = buf.toArray();
+            }
+        } finally {
+            buf.release();
+        }
     }
 
     private void measure(Mat gray) {

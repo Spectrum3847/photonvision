@@ -6,6 +6,9 @@
 import axios from "axios";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
+import CameraFocusDialog from "@/components/cameras/CameraFocusDialog.vue";
+
+const viewOpen = ref(false);
 
 interface Reading {
   grid: number[]; // row-major, cell 4 is the centre
@@ -61,10 +64,14 @@ const cells = computed(() =>
 </script>
 
 <template>
+  <CameraFocusDialog v-model="viewOpen" />
   <v-card color="surface" class="rounded-12 mt-3">
     <v-card-title class="d-flex align-center">
       Focus
       <v-spacer />
+      <v-btn class="mr-3" size="small" color="primary" variant="tonal" @click="viewOpen = true">
+        Open focus view
+      </v-btn>
       <v-switch v-model="on" label="Measure" color="primary" density="compact" hide-details class="flex-grow-0" />
     </v-card-title>
     <v-card-text v-if="!on" class="pt-0 text-body-2">
