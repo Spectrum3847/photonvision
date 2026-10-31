@@ -295,6 +295,32 @@ public class VisionSourceManager implements AutoCloseable {
         return config != null;
     }
 
+    /**
+     * SpectrumJetson (photonvision-88): closes this camera's VisionModule and builds a new one from
+     * the same configuration (a new VisionSource, so a new cscore camera), like deactivating and
+     * reactivating it but without marking it deactivated. For a camera whose cscore thread has
+     * stopped (USBFrameProvider). Not from the camera's own VisionRunner: closing joins it.
+     */
+    public synchronized boolean restartVisionSource(String uniqueName) {
+        var module =
+                vmm.getModules().stream().filter(m -> m.uniqueName().equals(uniqueName)).findFirst();
+        if (module.isEmpty()) {
+            logger.error("Could not find module " + uniqueName + " to restart");
+            return false;
+        }
+        var config = vmm.removeModule(module.get());
+        vmm.addSource(loadVisionSourceFromCamConfig(config));
+        logger.info("Restarted the VisionModule for " + config.nickname);
+
+        DataChangeService.getInstance()
+                .publishEvent(
+                        new OutgoingUIEvent<>(
+                                "fullsettings",
+                                UIPhotonConfiguration.programStateToUi(ConfigProvider.getInstance().getConfig())));
+        pushUiUpdate();
+        return true;
+    }
+
     public synchronized boolean deactivateVisionSource(String uniqueName) {
         // try to find the module. If we find it, remove it from the VMM
         var removedConfig =

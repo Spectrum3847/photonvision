@@ -91,6 +91,15 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     @Override
     public CapturedFrame getInputMat() {
+        if (restartIfCameraThreadDead()) {
+            // photonvision-88: the module is being rebuilt; don't grab from (or reset) this camera.
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+        }
         CapturedFrame frame = grabInputMat();
         boolean usable =
                 frame.captureTimestamp != 0
@@ -405,6 +414,11 @@ public class USBFrameProvider extends CpuImageProcessor {
      * </ul>
      */
     private void recoverUsb(String why, boolean devicePresent) {
+        if (setPath.running()) {
+            // photonvision-88: cscore hasn't finished reopening it after the last reset.
+            logger.warn("Not resetting the camera (" + why + "): cscore is still reopening it");
+            return;
+        }
         String port = usbPort();
         if (port == null) {
             logger.error("Can't reset the camera (" + why + "): its USB port isn't known");
@@ -488,7 +502,32 @@ public class USBFrameProvider extends CpuImageProcessor {
      */
     private static final long SETTLE_MS = 300;
 
+    /**
+     * SpectrumJetson (photonvision-88): cscore's SetPath waits, with no timeout, for the camera's
+     * cscore thread (UsbCameraImpl::CameraThreadMain) to answer. That thread ends for good when its
+     * select() fails, even with EINTR ("select(): Interrupted system call (UsbCameraImpl.cpp:479)",
+     * then "break; // XXX: is this the right thing to do here?" in WPILib 2027 alpha-8): any signal
+     * that lands on it while it waits for a frame stops it. It closes the device on the way out, so
+     * the camera reads as disconnected, the watchdog resets it, and SetPath then waited forever.
+     * Found on the bench 2026-10-31 with async-profiler (-e cpu, SIGPROF) attached: both cameras'
+     * threads ended 8 s apart, both VisionRunners hung in SetPath, and only a PhotonVision restart
+     * brought the cameras back. Now SetPath runs on its own thread; the VisionRunner waits at most
+     * {@link #SET_PATH_WAIT_MS} for it (a working camera thread answers in well under a second),
+     * and if it hasn't returned {@link #CAMERA_THREAD_DEAD_NS} later, the camera thread is gone and
+     * nothing on this UsbCamera can work again: this camera's VisionModule is rebuilt (a new
+     * UsbCamera, with a new cscore thread).
+     */
+    private static final long SET_PATH_WAIT_MS = 3000;
+
+    private static final long CAMERA_THREAD_DEAD_NS = 10_000_000_000L;
+    private final DetachedCall setPath = new DetachedCall(System::nanoTime);
+    private volatile boolean restartRequested = false;
+
     private void reopenCamera() {
+        if (setPath.running()) {
+            logger.warn("cscore is still reopening the camera from the last reset; not again");
+            return;
+        }
         String path = camera.getPath();
         long deadline = System.nanoTime() + 5_000_000_000L;
         try {
@@ -502,7 +541,66 @@ public class USBFrameProvider extends CpuImageProcessor {
             return;
         }
         // UsbCamera has no setPath in this WPILib; this is the call it would make.
-        org.wpilib.vision.camera.CameraServerJNI.setUsbCameraPath(camera.getHandle(), path);
+        int handle = camera.getHandle();
+        boolean finished;
+        try {
+            finished =
+                    setPath.run(
+                            "cscore SetPath - " + camera.getName(),
+                            () -> {
+                                try {
+                                    org.wpilib.vision.camera.CameraServerJNI.setUsbCameraPath(handle, path);
+                                } catch (Exception e) {
+                                    logger.error("cscore couldn't reopen the camera: " + e);
+                                }
+                            },
+                            SET_PATH_WAIT_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (!finished) {
+            logger.error(
+                    "cscore hasn't reopened the camera after "
+                            + SET_PATH_WAIT_MS / 1000
+                            + " s; not waiting for it. If it still hasn't in "
+                            + CAMERA_THREAD_DEAD_NS / 1_000_000_000L
+                            + " s, its cscore thread has stopped, and this camera is restarted.");
+        }
+    }
+
+    /**
+     * photonvision-88: rebuilds this camera's VisionModule when cscore's SetPath has been stuck for
+     * {@link #CAMERA_THREAD_DEAD_NS} (see {@link #SET_PATH_WAIT_MS}). True once a restart is under
+     * way; this provider then only hands out empty frames until it's released.
+     */
+    private boolean restartIfCameraThreadDead() {
+        if (restartRequested) return true;
+        if (setPath.runningNs() < CAMERA_THREAD_DEAD_NS) return false;
+        restartRequested = true;
+        String uniqueName = settables.getConfiguration().uniqueName;
+        problem = "cscore's camera thread stopped; restarting the camera";
+        logger.error(
+                "cscore still hasn't reopened the camera after "
+                        + CAMERA_THREAD_DEAD_NS / 1_000_000_000L
+                        + " s: its cscore thread has stopped (look for \"select(): ...\" from cscore"
+                        + " above), so nothing on this UsbCamera can work again. Restarting this camera's"
+                        + " VisionModule.");
+        // Not on this thread: closing the module stops (joins) this VisionRunner.
+        var t =
+                new Thread(
+                        () -> {
+                            try {
+                                org.photonvision.vision.processes.VisionSourceManager.getInstance()
+                                        .restartVisionSource(uniqueName);
+                            } catch (Exception e) {
+                                logger.error("Couldn't restart the camera", e);
+                            }
+                        },
+                        "Restart camera - " + camera.getName());
+        t.setDaemon(true);
+        t.start();
+        return true;
     }
 
     private CapturedFrame grabInputMat() {
