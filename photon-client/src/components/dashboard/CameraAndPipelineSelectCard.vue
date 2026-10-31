@@ -67,7 +67,11 @@ const cancelCameraNameEdit = () => {
 
 // Pipeline Name Edit
 const pipelineNamesWrapper = computed(() => {
-  const pipelineNames = useCameraSettingsStore().pipelineNames.map((name, index) => ({ name: name, value: index }));
+  // SpectrumJetson (photonvision-47): the number too, since profiles and Switch all go by number.
+  const pipelineNames = useCameraSettingsStore().pipelineNames.map((name, index) => ({
+    name: `${index}: ${name}`,
+    value: index
+  }));
 
   if (useCameraSettingsStore().isDriverMode) {
     pipelineNames.push({ name: "Driver Mode", value: WebsocketPipelineType.DriverMode.valueOf() });
@@ -121,16 +125,104 @@ const validNewPipelineTypes = computed(() => {
   }
   return pipelineTypes;
 });
+// SpectrumJetson (photonvision-46): start from a copy of any camera's pipeline, and create it on
+// every camera at once (for profiles like 0 = Event, 1 = Practice field).
+const newPipelineSource = ref<string>("blank");
+const newPipelineOnAllCameras = ref(false);
+const newPipelineBusy = ref(false);
+const newPipelineSourceItems = computed<SelectItem<string>[]>(() => [
+  { name: "Blank (the defaults)", value: "blank" },
+  ...Object.entries(useCameraSettingsStore().cameras).flatMap(([id, camera]) =>
+    (camera.pipelineNicknames ?? []).map((pipeline, index) => ({
+      name: `Copy of ${camera.nickname} / ${index}: ${pipeline}`,
+      value: JSON.stringify([id, index])
+    }))
+  )
+]);
 const showCreatePipelineDialog = () => {
   newPipelineName.value = "";
   newPipelineType.value = useCameraSettingsStore().currentWebsocketPipelineType;
+  newPipelineSource.value = "blank";
+  newPipelineOnAllCameras.value = false;
   showPipelineCreationDialog.value = true;
 };
-const createNewPipeline = () => {
+interface CreatePipelineResult {
+  created: { camera: string; index: number }[];
+  skipped: { camera: string; reason: string }[];
+}
+const describeCreated = (name: string, result: CreatePipelineResult): string => {
+  const byIndex = new Map<number, string[]>();
+  for (const c of result.created) byIndex.set(c.index, [...(byIndex.get(c.index) ?? []), c.camera]);
+  const parts = [...byIndex.entries()].map(([index, cameras]) => `as pipeline ${index} on ${cameras.join(", ")}`);
+  const created = parts.length ? `Created '${name}' ${parts.join("; ")}.` : "Created nothing.";
+  const skipped = result.skipped.map((s) => `${s.camera}: ${s.reason}`).join("; ");
+  return skipped ? `${created} Skipped ${skipped}.` : created;
+};
+const createNewPipeline = async () => {
   const type = newPipelineType.value;
-  if (type === WebsocketPipelineType.DriverMode || type === WebsocketPipelineType.Calib3d) return;
-  useCameraSettingsStore().createNewPipeline(newPipelineName.value, type);
-  showPipelineCreationDialog.value = false;
+  const blank = newPipelineSource.value === "blank";
+  if (blank && (type === WebsocketPipelineType.DriverMode || type === WebsocketPipelineType.Calib3d)) return;
+  const current = useStateStore().currentCameraUniqueName;
+  const [fromCamera, fromPipeline] = blank ? [undefined, undefined] : JSON.parse(newPipelineSource.value);
+  const name = newPipelineName.value;
+  newPipelineBusy.value = true;
+  try {
+    const response = await axios.post<CreatePipelineResult>("/settings/createPipeline", {
+      name,
+      type: blank ? type : undefined,
+      fromCamera,
+      fromPipeline,
+      cameras: newPipelineOnAllCameras.value ? Object.keys(useCameraSettingsStore().cameras) : [current],
+      switchCamera: current
+    });
+    showPipelineCreationDialog.value = false;
+    useStateStore().showSnackbarMessage({
+      message: describeCreated(name, response.data),
+      color: response.data.skipped.length ? "warning" : "success",
+      timeout: 8000
+    });
+  } catch (e) {
+    const data = axios.isAxiosError(e) ? e.response?.data : undefined;
+    useStateStore().showSnackbarMessage({
+      message: data?.skipped ? describeCreated(name, data) : `Couldn't create the pipeline: ${data || e}`,
+      color: "error",
+      timeout: 8000
+    });
+  } finally {
+    newPipelineBusy.value = false;
+  }
+};
+
+// SpectrumJetson (photonvision-46): every camera to the pipeline number shown here. Cameras without
+// that number stay where they are, as do cameras in driver mode or calibrating.
+const switchAllCameras = () => {
+  const store = useCameraSettingsStore();
+  const current = useStateStore().currentCameraUniqueName;
+  const index = store.currentCameraSettings.currentPipelineIndex;
+  const name = store.currentPipelineSettings.pipelineNickname;
+  const switched: string[] = [];
+  const skipped: string[] = [];
+  for (const [id, camera] of Object.entries(store.cameras)) {
+    if (id === current) continue;
+    if (camera.currentPipelineIndex === WebsocketPipelineType.DriverMode.valueOf()) {
+      skipped.push(`${camera.nickname} (driver mode)`);
+    } else if (
+      camera.currentPipelineIndex === WebsocketPipelineType.Calib3d.valueOf() ||
+      camera.currentPipelineIndex === WebsocketPipelineType.FocusCamera.valueOf()
+    ) {
+      skipped.push(`${camera.nickname} (calibrating or focusing)`);
+    } else if ((camera.pipelineNicknames?.length ?? 0) <= index) {
+      skipped.push(`${camera.nickname} (no pipeline ${index})`);
+    } else {
+      if (camera.currentPipelineIndex !== index) store.changeCurrentPipelineIndex(index, true, id);
+      const theirs = camera.pipelineNicknames[index];
+      switched.push(theirs === name ? camera.nickname : `${camera.nickname} (its ${index} is '${theirs}')`);
+    }
+  }
+  const message =
+    `Pipeline ${index}: ${switched.length ? `switched ${switched.join(", ")}` : "no other camera switched"}.` +
+    (skipped.length ? ` Not switched: ${skipped.join(", ")}.` : "");
+  useStateStore().showSnackbarMessage({ message, color: skipped.length ? "warning" : "success", timeout: 8000 });
 };
 const cancelPipelineCreation = () => {
   showPipelineCreationDialog.value = false;
@@ -396,6 +488,16 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
                 <pv-icon color="#c5c5c5" :right="true" icon-name="mdi-content-copy" tooltip="Duplicate pipeline" />
               </v-list-item-title>
             </v-list-item>
+            <v-list-item @click="switchAllCameras">
+              <v-list-item-title>
+                <pv-icon
+                  color="#c5c5c5"
+                  :right="true"
+                  icon-name="mdi-swap-horizontal"
+                  :tooltip="`Switch every camera to pipeline ${useCameraSettingsStore().currentCameraSettings.currentPipelineIndex}`"
+                />
+              </v-list-item-title>
+            </v-list-item>
             <v-list-item @click="openCopySettingsDialog">
               <v-list-item-title>
                 <pv-icon
@@ -510,12 +612,30 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
             :rules="[(v) => checkPipelineName(v)]"
           />
           <pv-select
+            v-model="newPipelineSource"
+            :select-cols="12 - 4"
+            label="Start from"
+            tooltip="Blank starts from the defaults. A copy takes every setting of that pipeline, including its type. From another camera, each camera keeps its own orientation, exposure limits, mask and, unless the video modes match, resolution."
+            :items="newPipelineSourceItems"
+          />
+          <pv-select
+            v-if="newPipelineSource === 'blank'"
             v-model="newPipelineType"
             :select-cols="12 - 4"
             label="Tracking Type"
             tooltip="Pipeline type, which changes the type of processing that will happen on input frames"
             :items="validNewPipelineTypes"
           />
+          <v-checkbox
+            v-model="newPipelineOnAllCameras"
+            density="compact"
+            hide-details
+            :label="`Create on every camera (${Object.keys(useCameraSettingsStore().cameras).length})`"
+          />
+          <p v-if="newPipelineOnAllCameras" class="text-caption pb-2">
+            Each camera gets it as its next pipeline number, so cameras with the same number of pipelines get the same
+            number. Only this camera switches to it.
+          </p>
         </v-card-text>
         <v-card-actions class="pr-5 pt-10px pb-5">
           <v-btn
@@ -528,7 +648,7 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
           <v-btn
             color="buttonActive"
             :variant="theme.global.current.value.dark ? 'outlined' : 'elevated'"
-            :disabled="checkPipelineName(newPipelineName) !== true"
+            :disabled="newPipelineBusy || checkPipelineName(newPipelineName) !== true"
             @click="createNewPipeline"
           >
             Create

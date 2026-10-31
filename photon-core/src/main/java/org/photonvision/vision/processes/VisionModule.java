@@ -19,6 +19,7 @@ package org.photonvision.vision.processes;
 
 import io.javalin.websocket.WsContext;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import org.opencv.core.Size;
 import org.photonvision.common.configuration.CameraConfiguration;
@@ -60,6 +62,7 @@ import org.photonvision.vision.frame.provider.USBFrameProvider;
 import org.photonvision.vision.pipeline.AdvancedPipelineSettings;
 import org.photonvision.vision.pipeline.CVPipelineSettings;
 import org.photonvision.vision.pipeline.OutputStreamPipeline;
+import org.photonvision.vision.pipeline.PipelineType;
 import org.photonvision.vision.pipeline.ReflectivePipelineSettings;
 import org.photonvision.vision.pipeline.UICalibrationData;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
@@ -780,6 +783,104 @@ public class VisionModule implements AutoCloseable {
         if (targetIndex == pipelineManager.getRequestedIndex()) setPipeline(targetIndex);
         saveAndBroadcastAll();
         return copied;
+    }
+
+    /**
+     * Fields that belong to the camera, not the pipeline: when a new pipeline starts from another
+     * camera's, it keeps this camera's own. SpectrumJetson (photonvision-46; the mask is
+     * photonvision-40's DetectionMask).
+     */
+    private static final Set<String> CAMERA_OWN_FIELDS =
+            Set.of(
+                    "inputImageRotationMode",
+                    "cameraMinExposureRaw",
+                    "cameraMaxExposureRaw",
+                    "detectionMask");
+
+    private static final io.avaje.jsonb.JsonType<CVPipelineSettings> pipelineJson =
+            io.avaje.jsonb.Jsonb.instance().type(CVPipelineSettings.class);
+
+    /** A deep copy through PhotonVision's own JSON: clone() would share the mask, HSV ranges, ... */
+    private static CVPipelineSettings deepCopy(CVPipelineSettings settings) {
+        return pipelineJson.fromJson(pipelineJson.toJson(settings));
+    }
+
+    /**
+     * SpectrumJetson (photonvision-46): adds a pipeline called {@code nickname}, blank ({@code
+     * source} null, of {@code type}) or starting from a copy of {@code source}. From this camera's
+     * own pipeline it's an exact copy (as Duplicate). From another camera's, this camera keeps its
+     * orientation, exposure limits and mask, and its resolution unless the video modes match.
+     *
+     * @return the new pipeline's index
+     */
+    public int createPipeline(
+            String nickname,
+            PipelineType type,
+            CVPipelineSettings source,
+            boolean sourceIsThisCamera,
+            boolean sameVideoModes,
+            boolean switchToIt) {
+        if (pipelineManager.getPipelineNicknames().contains(nickname)) {
+            throw new IllegalArgumentException("already has a pipeline called " + nickname);
+        }
+        // photonvision-63: this camera's own values come from the pipeline it runs now. Skipping
+        // them (as before) left the new pipeline's defaults: unrotated, unmasked, mode 0.
+        CVPipelineSettings own = null;
+        if (source != null && !sourceIsThisCamera) {
+            try {
+                own = deepCopy(pipelineManager.getCurrentPipelineSettings());
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("couldn't read this camera's pipeline: " + e.getMessage());
+            }
+        }
+        CVPipelineSettings copy = null;
+        if (source != null) {
+            try {
+                copy = deepCopy(source);
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("couldn't copy the pipeline: " + e.getMessage());
+            }
+        }
+        var added = pipelineManager.addPipeline(source == null ? type : source.pipelineType, nickname);
+        if (added == null) throw new IllegalArgumentException("can't make a " + type + " pipeline");
+        if (copy != null) {
+            for (var field : copy.getClass().getFields()) {
+                int mods = field.getModifiers();
+                if (Modifier.isStatic(mods) || Modifier.isFinal(mods)) continue;
+                String name = field.getName();
+                if (name.equals("pipelineIndex") || name.equals("pipelineNickname")) continue;
+                boolean keepOwn =
+                        !sourceIsThisCamera
+                                && (CAMERA_OWN_FIELDS.contains(name)
+                                        || (!sameVideoModes && name.equals("cameraVideoModeIndex")));
+                try {
+                    if (!keepOwn) {
+                        field.set(added, field.get(copy));
+                    } else if (own != null) {
+                        // From this camera's current pipeline, if it has the field (a mask, say,
+                        // only exists on some pipeline types); otherwise the new pipeline's default.
+                        try {
+                            field.set(added, own.getClass().getField(name).get(own));
+                        } catch (NoSuchFieldException e) {
+                            // keep the default
+                        }
+                    }
+                } catch (IllegalAccessException | IllegalArgumentException e) {
+                    logger.error("Could not copy " + name, e);
+                }
+            }
+        }
+        int index = pipelineManager.getPipelineNicknames().indexOf(nickname);
+        logger.info(
+                "Created pipeline "
+                        + index
+                        + " '"
+                        + nickname
+                        + "'"
+                        + (source == null ? " (blank " + type + ")" : " from '" + source.pipelineNickname + "'"));
+        if (switchToIt) setPipeline(index);
+        saveAndBroadcastAll();
+        return index;
     }
 
     boolean setPipeline(int index) {

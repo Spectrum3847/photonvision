@@ -1360,6 +1360,93 @@ public class RequestHandler {
         }
     }
 
+    @Json
+    record CreatePipelineRequest(
+            String name,
+            Integer type,
+            String fromCamera,
+            Integer fromPipeline,
+            java.util.List<String> cameras,
+            String switchCamera) {}
+
+    /**
+     * SpectrumJetson (photonvision-46): the new-pipeline dialog. Creates pipeline {@code name} on
+     * each of {@code cameras}: blank of {@code type} (the dashboard's pipeline type number), or
+     * starting from {@code fromCamera}'s pipeline {@code fromPipeline}. {@code switchCamera} (the one
+     * on the dashboard) switches to its new pipeline; the others stay on theirs. A camera that
+     * already has a pipeline with that name is skipped. Answers {created: [{camera, index}],
+     * skipped: [{camera, reason}]}.
+     */
+    public static void onCreatePipelineRequest(Context ctx) {
+        CreatePipelineRequest req;
+        try {
+            req = ctx.bodyAsClass(CreatePipelineRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Expected {name, type or fromCamera and fromPipeline, cameras, switchCamera}");
+            return;
+        }
+        var vmm = VisionSourceManager.getInstance().vmm;
+        if (req.name() == null
+                || req.name().isBlank()
+                || req.cameras() == null
+                || req.cameras().isEmpty()) {
+            ctx.status(400);
+            ctx.result("A name and at least one camera are needed");
+            return;
+        }
+        org.photonvision.vision.processes.VisionModule from = null;
+        org.photonvision.vision.pipeline.CVPipelineSettings source = null;
+        org.photonvision.vision.pipeline.PipelineType type = null;
+        if (req.fromCamera() != null) {
+            from = vmm.getModule(req.fromCamera());
+            source =
+                    from == null || req.fromPipeline() == null
+                            ? null
+                            : from.getPipelineSettingsAt(req.fromPipeline());
+            if (source == null) {
+                ctx.status(400);
+                ctx.result("Unknown camera or pipeline to start from");
+                return;
+            }
+        } else {
+            // The dashboard numbers types from -3 (FocusCamera); PipelineType starts there too.
+            var types = org.photonvision.vision.pipeline.PipelineType.values();
+            int t = req.type() == null ? -99 : req.type() + 3;
+            if (t < 0 || t >= types.length) {
+                ctx.status(400);
+                ctx.result("Unknown pipeline type " + req.type());
+                return;
+            }
+            type = types[t];
+        }
+        var created = new ArrayList<Map<String, Object>>();
+        var skipped = new ArrayList<Map<String, Object>>();
+        for (String id : req.cameras()) {
+            var to = id == null ? null : vmm.getModule(id);
+            if (to == null) {
+                skipped.add(Map.of("camera", String.valueOf(id), "reason", "no such camera"));
+                continue;
+            }
+            String nickname = to.getCameraConfiguration().nickname;
+            try {
+                int index =
+                        to.createPipeline(
+                                req.name(),
+                                type,
+                                source,
+                                to == from,
+                                from != null && from.videoModeList().equals(to.videoModeList()),
+                                id.equals(req.switchCamera()));
+                created.add(Map.of("camera", nickname, "index", index));
+            } catch (IllegalArgumentException e) {
+                skipped.add(Map.of("camera", nickname, "reason", String.valueOf(e.getMessage())));
+            }
+        }
+        ctx.status(created.isEmpty() ? 400 : 200);
+        ctx.json(Map.of("created", created, "skipped", skipped), Types.mapOf(Object.class));
+    }
+
     // ---- end of feature 13 part A ----
 
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.

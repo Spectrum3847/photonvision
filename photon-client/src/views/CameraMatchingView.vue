@@ -183,7 +183,7 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
                 </tr>
                 <tr>
                   <td>Pipelines</td>
-                  <td>{{ module.pipelineNicknames.join(", ") }}</td>
+                  <td>{{ module.pipelineNicknames.map((name, index) => `${index}: ${name}`).join(", ") }}</td>
                 </tr>
                 <tr>
                   <td>Calibrations</td>
@@ -293,7 +293,7 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
                 </tr>
                 <tr>
                   <td>Pipelines</td>
-                  <td>{{ module.pipelineNicknames.join(", ") }}</td>
+                  <td>{{ module.pipelineNicknames.map((name, index) => `${index}: ${name}`).join(", ") }}</td>
                 </tr>
                 <tr>
                   <td>Calibrations</td>
