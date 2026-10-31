@@ -2,28 +2,18 @@
 import PvSelect, { type SelectItem } from "@/components/common/pv-select.vue";
 import PvDeleteModal from "@/components/common/pv-delete-modal.vue";
 import PvNumberInput from "@/components/common/pv-number-input.vue";
-import PvSwitch from "@/components/common/pv-switch.vue";
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
 import { useStateStore } from "@/stores/StateStore";
 import { computed, ref, watchEffect } from "vue";
 import { type CameraSettingsChangeRequest, ValidQuirks } from "@/types/SettingTypes";
 import { useTheme } from "vuetify";
 import { axiosPost } from "@/lib/PhotonUtils";
-import { WebsocketPipelineType } from "@/types/WebsocketDataTypes";
 
 const theme = useTheme();
 
 const tempSettingsStruct = ref<CameraSettingsChangeRequest>({
   fov: useCameraSettingsStore().currentCameraSettings.fov.value,
   quirksToChange: Object.assign({}, useCameraSettingsStore().currentCameraSettings.cameraQuirks.quirks)
-});
-const focusMode = computed<boolean>({
-  get: () => useCameraSettingsStore().isFocusMode,
-  set: (v) =>
-    useCameraSettingsStore().changeCurrentPipelineIndex(
-      v ? WebsocketPipelineType.FocusCamera : useCameraSettingsStore().currentCameraSettings.lastPipelineIndex || 0,
-      true
-    )
 });
 const arducamSelectWrapper = computed<number>({
   get: () => {
@@ -167,11 +157,7 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
         ]"
         :select-cols="8"
       />
-      <pv-switch
-        v-model="focusMode"
-        tooltip="Enable Focus Mode to start focusing the lens on your camera"
-        label="Focus Mode"
-      ></pv-switch>
+      <!-- Spectrum: no upstream Focus Mode switch; the Focus card's focus view replaces it. -->
     </v-card-text>
     <v-card-text class="d-flex pt-0">
       <v-col cols="6" class="pa-0 pr-2">
