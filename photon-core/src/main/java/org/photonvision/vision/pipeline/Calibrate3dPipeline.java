@@ -292,13 +292,14 @@ public class Calibrate3dPipeline
 
     // Auto-capture: the board is still when its corners move less than this between frames...
     private static final double STILL_PX_PER_FRAME = 0.3;
-    // ...for this long
-    private static final long STILL_NS = 300_000_000L;
+    // ...for this many frames in a row (3 detections; 0.2 s at the 15 fps we calibrate at, as
+    // upstream's 3-frame stability window)
+    private static final int STILL_FRAMES = 2;
 
     private CalibrationSession session;
     private String sessionKey = "";
     private Map<Integer, Point> lastCorners = null;
-    private long stillSinceNs = 0;
+    private int stillFrames = 0;
     private double[] lastPose = {-1, -1};
     private boolean lastStill = false;
     private volatile Live live = null;
@@ -435,11 +436,11 @@ public class Calibrate3dPipeline
         long now = System.nanoTime();
         double motion = updateMotion(r);
         if (motion < STILL_PX_PER_FRAME) {
-            if (stillSinceNs == 0) stillSinceNs = now;
+            stillFrames++;
         } else {
-            stillSinceNs = 0;
+            stillFrames = 0;
         }
-        lastStill = stillSinceNs != 0 && now - stillSinceNs >= STILL_NS;
+        lastStill = stillFrames >= STILL_FRAMES;
         boolean viewing = now < viewUntilNs;
         if (!viewing && !settings.autoCalibrate) return;
 
@@ -556,7 +557,7 @@ public class Calibrate3dPipeline
     }
 
     /**
-     * In auto mode, takes a snapshot if the board adds coverage and has been still for 0.3 s
+     * In auto mode, takes a snapshot if the board adds coverage and has been still for 3 frames
      * (Spectrum, photonvision-91; upstream: moved 5% of the diagonal and steady for 3 frames). Also
      * updates the UI with a hint for when users ought to move the board.
      */
@@ -569,7 +570,7 @@ public class Calibrate3dPipeline
         } else {
             Point centroid = computeCentroid(findBoardResult.imagePoints.toList());
             // Spectrum (photonvision-91): a snapshot is taken when the corners have held still
-            // (< 0.3 px a frame for 0.3 s, see updateLive) and it adds coverage: corners in cells
+            // (< 0.3 px a frame over 3 detections, see updateLive) and it adds coverage: corners in cells
             // short of their target, or a far or tilted shot while those are short. Not when it's
             // a near-copy of one already taken. movedFarEnough: true = hold still, it's wanted;
             // false = move somewhere new.
@@ -586,7 +587,7 @@ public class Calibrate3dPipeline
 
                 captureSnapshot(findBoardResult, inputColorMat, true);
                 lastSnapshotCentroid = centroid;
-                stillSinceNs = 0;
+                stillFrames = 0;
 
                 logger.info("Automatically took calibration snapshot " + foundCornersList.size());
             }

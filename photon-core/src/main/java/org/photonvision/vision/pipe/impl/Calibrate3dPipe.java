@@ -403,18 +403,26 @@ public class Calibrate3dPipe
                 p.add(img.get(i));
             }
         }
-        if (o.size() < 4) {
+        // OpenCV's pose solve needs 6 points in general (DLT); with fewer used corners fall back to
+        // all of them, and a board of fewer than 6 (or a failed solve) gets a zero pose: its
+        // residuals come out large, so it can't drag the fit, and nothing throws.
+        if (o.size() < MIN_POSE_POINTS) {
             o = new ArrayList<>(obj);
             p = new ArrayList<>(img);
         }
+        var rvec = Mat.zeros(3, 1, CvType.CV_64F);
+        var tvec = Mat.zeros(3, 1, CvType.CV_64F);
+        if (o.size() < MIN_POSE_POINTS) return new Mat[] {rvec, tvec};
         var om = new MatOfPoint3f();
         var pm = new MatOfPoint2f();
         om.fromList(o);
         pm.fromList(p);
-        var rvec = new Mat();
-        var tvec = new Mat();
         try {
             Calib3d.solvePnP(om, pm, cameraMatrix, dist, rvec, tvec);
+        } catch (Exception e) {
+            logger.warn("Board pose solve failed: " + e.getMessage());
+            rvec.setTo(new Scalar(0));
+            tvec.setTo(new Scalar(0));
         } finally {
             om.release();
             pm.release();
@@ -449,6 +457,7 @@ public class Calibrate3dPipe
     private static final double READMIT_FLOOR_PX = 1.0;
     private static final double READMIT_SIGMAS = 5.0;
     private static final int MIN_CORNERS_IN_SOLVE = 6;
+    private static final int MIN_POSE_POINTS = 6;
 
     /**
      * Spectrum (photonvision-91): keep the edge corners mrcal threw away.

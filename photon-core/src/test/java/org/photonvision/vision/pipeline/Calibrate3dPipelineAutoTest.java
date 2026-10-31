@@ -132,10 +132,12 @@ public class Calibrate3dPipelineAutoTest {
             assertEquals(2, pipeline.foundCornersList.size());
             assertEquals(Boolean.FALSE, pipeline.getMovedFarEnough());
 
-            // Settle back at the original position -> snapshot
-            runFrame(pipeline, 0);
-            runFrame(pipeline, 0);
-            runFrame(pipeline, 0);
+            // Settle at a third position -> snapshot. Spectrum (photonvision-91): not back at the
+            // original one, which upstream took again (it only compared with the last snapshot);
+            // ours skips a near-copy of any snapshot already taken.
+            runFrame(pipeline, shift / 2);
+            runFrame(pipeline, shift / 2);
+            runFrame(pipeline, shift / 2);
             assertEquals(3, pipeline.foundCornersList.size());
             assertEquals(Boolean.FALSE, pipeline.getMovedFarEnough());
 
