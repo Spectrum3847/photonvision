@@ -46,7 +46,10 @@ public final class FarSearch {
     /** The settings: a copy, changed through {@link #update}. */
     public static final class Settings {
         /** photonvision-55: full-size searches for far tags while no camera has a good view. */
-        public boolean farSearch = true;
+        // Spectrum (2026-10-30): off by default. On JetPack 7 each full-size search took 5.9 ms
+        // (2.7 on JetPack 6), ~26 a second inside a camera's detect call: ~1 frame in 10 came back
+        // ~6 ms late. Switch it on from its Settings card once it's optimized.
+        public boolean farSearch = false;
 
         public double farSweepsPerSecond = 30;
     }
@@ -170,7 +173,7 @@ public final class FarSearch {
         try (Reader r = Files.newBufferedReader(settingsFile())) {
             var p = new Properties();
             p.load(r);
-            s.farSearch = Boolean.parseBoolean(p.getProperty("farSearch", "true"));
+            s.farSearch = Boolean.parseBoolean(p.getProperty("farSearch", "false"));
             s.farSweepsPerSecond =
                     clampSweeps(Double.parseDouble(p.getProperty("farSweepsPerSecond", "30")));
         } catch (IOException | RuntimeException e) {
