@@ -48,7 +48,7 @@ Robot code should be able to use upstream's PhotonLib, unchanged. So:
   topics of their own (`/photonvision/jetson/...`, each camera's `health/...`, Rewind's, the field
   map and clock topics), and robot code reads them with SpectrumVision (SpectrumJetson's
   `robot-vision/`), beside PhotonLib. The message format PhotonLib reads is never changed.
-- **If PhotonLib really has to change**, propose it upstream first; only carry it here until then.
+- **If PhotonLib really has to change**, we carry the change on this branch, and robot code uses the PhotonLib built from it.
 - **Until upstream publishes a PhotonLib for the WPILib we're on**, we build it from this branch,
   which is upstream's PhotonLib code, and switch robot code to upstream's vendordep as soon as
   there is one built from the same `photon-serde` (the message hashes must match the Jetson's).
@@ -127,26 +127,28 @@ is our own design), #2586, #2613, #2614, #2628, #2629, #2633. Recheck each when 
 
 Each line becomes one commit (or a few, if a feature is big), ported from the patches listed, rebuilt,
 and tested before the next. **Jetson** = only does anything on a Jetson; it must switch itself off
-where its hardware or library isn't there, so the same jar runs on the SystemCore. **Upstream?** =
-general enough to offer upstream as a PR, which shrinks what we carry.
+where its hardware or library isn't there, so the same jar runs on the SystemCore.
 
-| # | Feature | From patches | Jetson | Upstream? |
-| --- | --- | --- | --- | --- |
-| 1 | **CUDA AprilTag pipeline**: the `AprilTagCuda` pipeline, its UI tab, the detector JNI (FRC 4143: 17 commits, 20 files) | 4143 `d8c9e8e`, 01 | yes | no (needs our detector) |
-| 2 | **Capture and decode**: gray capture, direct MJPEG→gray decode, decode recovery, shared-gray video mode, mid-exposure timestamps | 02, 09, 13, 27, 37 | no (CPU; a big win on the SystemCore) | maybe 13 |
-| 3 | **Hardware JPEG decode** (NVJPG) | 18 | yes | no |
-| 4 | **Camera controls**: 8 distortion coefficients, team defaults, exposure in ms, extra sliders, gain, focus score, yaw sign, duration format | 03, 04, 06, 10, 28, 34, 36, 39, 54 | no | 04, 10, 36 |
-| 5 | **Camera reliability**: stuck-camera watchdog and real reopen, USB bandwidth and its page, quiet frame errors, startup and pipeline races, duplicate activation, dead camera, USB port-power recovery | 29, 31, 32, 33, 38, 43, 44, 66, 81, 84 | no (port power needs a hub that switches it) | 33, 38, 43, 44 |
-| 6 | **Thriftiest Cam**: quirks for saved cameras, serial identity, firmware card | 21 (our part), 86, 87 | no | 86 maybe |
-| 7 | **Rewind** and its vision log | 07, 75, 76, 77, 78, 79, 65 (Rewind timers) | no | no |
-| 8 | **Robot clock, diagnostics, logging**: robot clock, clock marks and source, log mirror to the robot, NT diagnostics | 08, 80, 82, 83, 85 | 08 no (off on the SystemCore: it *is* the robot clock); 82 partly | no |
-| 9 | **Jetson telemetry**: power, throttling, GPU chart, Device card | 16, 19, 20, 72 | yes | no |
-| 10 | **Robot state**: idle while disabled, idle switch, event profile, quiet mode, thermal limit, cooling | 49, 50, 51, 56, 57, 62?, 64, 65, 71 | 56, 57, 71 yes | no |
-| 11 | **Field and pose tools**: excluded tags, field calibration, detection mask, tag quality, field map from robot, mount estimate, calibration at low fps, Auto Snapshots | 17, 22, 23 (#2149 part), 30, 40, 61, 70, 74 | no | 70 |
-| 12 | **Far-tag search** | 55, 69 | yes (CUDA) | no |
-| 13 | **Operations UI**: Match Ready, settings snapshots, settings JSON, copy settings, tuning guide, theme, radio switches, stream-only-when-watched, setting broadcasts, switch-all, test hooks, UI state, dashboard guards | 05, 15, 24, 25, 26, 35, 41, 45, 46, 47, 48, 52, 53, 58, 59, 60, 67, 68, 73 | 52 (via health-check) | 15, 41, 48, 67, 73 |
-| 14 | **TensorRT object detection** | 14 | yes | no |
-| - | **Audit fixes**: split into the features above as they're ported | 63 | | |
+We don't send changes upstream as PRs: everything here stays ours. Once it's all working we may
+tell PhotonVision what we've done, but not one change at a time.
+
+| # | Feature | From patches | Jetson |
+| --- | --- | --- | --- |
+| 1 | **CUDA AprilTag pipeline**: the `AprilTagCuda` pipeline, its UI tab, the detector JNI (FRC 4143: 17 commits, 20 files) | 4143 `d8c9e8e`, 01 | yes |
+| 2 | **Capture and decode**: gray capture, direct MJPEG→gray decode, decode recovery, shared-gray video mode, mid-exposure timestamps | 02, 09, 13, 27, 37 | no (CPU; a big win on the SystemCore) |
+| 3 | **Hardware JPEG decode** (NVJPG) | 18 | yes |
+| 4 | **Camera controls**: 8 distortion coefficients, team defaults, exposure in ms, extra sliders, gain, focus score, yaw sign, duration format | 03, 04, 06, 10, 28, 34, 36, 39, 54 | no |
+| 5 | **Camera reliability**: stuck-camera watchdog and real reopen, USB bandwidth and its page, quiet frame errors, startup and pipeline races, duplicate activation, dead camera, USB port-power recovery | 29, 31, 32, 33, 38, 43, 44, 66, 81, 84 | no (port power needs a hub that switches it) |
+| 6 | **Thriftiest Cam**: quirks for saved cameras, serial identity, firmware card | 21 (our part), 86, 87 | no |
+| 7 | **Rewind** and its vision log | 07, 75, 76, 77, 78, 79, 65 (Rewind timers) | no |
+| 8 | **Robot clock, diagnostics, logging**: robot clock, clock marks and source, log mirror to the robot, NT diagnostics | 08, 80, 82, 83, 85 | 08 no (off on the SystemCore: it *is* the robot clock); 82 partly |
+| 9 | **Jetson telemetry**: power, throttling, GPU chart, Device card | 16, 19, 20, 72 | yes |
+| 10 | **Robot state**: idle while disabled, idle switch, event profile, quiet mode, thermal limit, cooling | 49, 50, 51, 56, 57, 62?, 64, 65, 71 | 56, 57, 71 yes |
+| 11 | **Field and pose tools**: excluded tags, field calibration, detection mask, tag quality, field map from robot, mount estimate, calibration at low fps, Auto Snapshots | 17, 22, 23 (#2149 part), 30, 40, 61, 70, 74 | no |
+| 12 | **Far-tag search** | 55, 69 | yes (CUDA) |
+| 13 | **Operations UI**: Match Ready, settings snapshots, settings JSON, copy settings, tuning guide, theme, radio switches, stream-only-when-watched, setting broadcasts, switch-all, test hooks, UI state, dashboard guards | 05, 15, 24, 25, 26, 35, 41, 45, 46, 47, 48, 52, 53, 58, 59, 60, 67, 68, 73 | 52 (via health-check) |
+| 14 | **TensorRT object detection** | 14 | yes |
+| - | **Audit fixes**: split into the features above as they're ported | 63 | |
 
 The CUDA detector (`bos-*`, `gpudetector-*` in SpectrumJetson) is a separate library and moves to its
 own fork of frc971/bos later; until then SpectrumJetson keeps building it.
