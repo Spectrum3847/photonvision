@@ -101,10 +101,20 @@ public class FindBoardCornersPipe
                             Objdetect.getPredefinedDictionary(params.tagFamily().getValue()));
             board.setLegacyPattern(params.useOldPattern());
             detector = new CharucoDetector(board);
-            detector.getDetectorParameters().set_adaptiveThreshConstant(10);
-            detector.getDetectorParameters().set_adaptiveThreshWinSizeMin(11);
-            detector.getDetectorParameters().set_adaptiveThreshWinSizeStep(40);
-            detector.getDetectorParameters().set_adaptiveThreshWinSizeMax(91);
+            // Spectrum (photonvision-91): the getters hand back copies, so upstream's settings here
+            // never reached the detector; set them back. And for boards hanging off the image (the
+            // only way to get corners into the image's corners): markers may sit 1 px from the
+            // edge (default 3), and the board layout recovers markers the first pass missed.
+            var dp = detector.getDetectorParameters();
+            dp.set_adaptiveThreshConstant(10);
+            dp.set_adaptiveThreshWinSizeMin(11);
+            dp.set_adaptiveThreshWinSizeStep(40);
+            dp.set_adaptiveThreshWinSizeMax(91);
+            dp.set_minDistanceToBorder(1);
+            detector.setDetectorParameters(dp);
+            var cp = detector.getCharucoParameters();
+            cp.set_tryRefineMarkers(true);
+            detector.setCharucoParameters(cp);
         } else {
             board = null;
             detector = null;
@@ -150,6 +160,54 @@ public class FindBoardCornersPipe
         long cornerCount = detectedCorners.total();
         long idCount = ids.total();
         return cornerCount >= 10 && cornerCount == idCount;
+    }
+
+    // Spectrum (photonvision-91): a board hanging off the image's corner shows only a few corners,
+    // and those are the ones calibrations lack. Fewer than 10 are kept when they're near the edge
+    // and span at least 2 rows and 2 columns of the board (not a line, which can't pin a pose).
+    static final int MIN_EDGE_CORNERS = 6;
+    static final double EDGE_FRACTION = 0.15;
+
+    /**
+     * Spectrum (photonvision-91): {@link #hasValidCharucoDetections(Mat, MatOfInt)}, or a partial
+     * board of at least {@value #MIN_EDGE_CORNERS} corners near the image edge that isn't a line.
+     *
+     * @param cornersPerRow inner corners per board row (squares wide - 1)
+     */
+    public static boolean hasValidCharucoDetections(
+            Mat detectedCorners, MatOfInt ids, int cornersPerRow, double width, double height) {
+        if (hasValidCharucoDetections(detectedCorners, ids)) return true;
+        if (detectedCorners == null || ids == null) return false;
+        int n = (int) detectedCorners.total();
+        if (n < MIN_EDGE_CORNERS || n != ids.total() || cornersPerRow <= 0) return false;
+        float[] xy = new float[n * 2];
+        var asFloat = new Mat();
+        detectedCorners.convertTo(asFloat, org.opencv.core.CvType.CV_32F);
+        asFloat.get(0, 0, xy);
+        asFloat.release();
+        return edgePartialOk(xy, ids.toArray(), cornersPerRow, width, height);
+    }
+
+    /** The test behind the partial-board rule, on plain arrays (x0, y0, x1, y1, ...). */
+    static boolean edgePartialOk(
+            float[] xy, int[] ids, int cornersPerRow, double width, double height) {
+        boolean nearEdge = false;
+        for (int i = 0; i < ids.length; i++) {
+            double x = xy[2 * i], y = xy[2 * i + 1];
+            if (x < EDGE_FRACTION * width
+                    || y < EDGE_FRACTION * height
+                    || x > (1 - EDGE_FRACTION) * width
+                    || y > (1 - EDGE_FRACTION) * height) {
+                nearEdge = true;
+            }
+        }
+        var rows = new java.util.HashSet<Integer>();
+        var cols = new java.util.HashSet<Integer>();
+        for (int id : ids) {
+            rows.add(id / cornersPerRow);
+            cols.add(id % cornersPerRow);
+        }
+        return nearEdge && rows.size() >= 2 && cols.size() >= 2;
     }
 
     /**
@@ -311,7 +369,13 @@ public class FindBoardCornersPipe
                     detectedCornersList.add(detectedCorners.row(i));
                 }
 
-                boardFound = hasValidCharucoDetections(detectedCorners, ids);
+                boardFound =
+                        hasValidCharucoDetections(
+                                detectedCorners,
+                                ids,
+                                params.boardWidth() - 1,
+                                inFrame.width(),
+                                inFrame.height());
 
                 if (!boardFound) {
                     // If we can't find a board, give up

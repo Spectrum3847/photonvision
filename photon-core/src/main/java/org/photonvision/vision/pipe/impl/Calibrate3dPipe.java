@@ -38,9 +38,15 @@ import org.photonvision.vision.calibration.BoardObservation;
 import org.photonvision.vision.calibration.CameraCalibrationCoefficients;
 import org.photonvision.vision.calibration.CameraCalibrationCoefficients.OptimizationInputs;
 import org.photonvision.vision.calibration.CameraLensModel;
+import org.photonvision.vision.calibration.CornerAlignment;
 import org.photonvision.vision.calibration.JsonMatOfDouble;
+import org.photonvision.vision.calibration.LensFoldCheck;
 import org.photonvision.vision.frame.FrameStaticProperties;
 import org.photonvision.vision.pipe.CVPipe;
+import org.wpilib.math.geometry.Pose3d;
+import org.wpilib.math.geometry.Rotation3d;
+import org.wpilib.math.geometry.Translation3d;
+import org.wpilib.math.linalg.VecBuilder;
 
 public class Calibrate3dPipe
         extends CVPipe<
@@ -83,6 +89,19 @@ public class Calibrate3dPipe
     private final Mat perViewErrors = new Mat();
 
     final MatOfPoint3f objectPoints = new MatOfPoint3f();
+
+    // Spectrum (photonvision-91): the last solve's fx standard deviation (pixels, NaN if the solver
+    // gave none) and which solver produced it, for the calibration view's quality readout.
+    private volatile double lastFxSigma = Double.NaN;
+    private volatile String lastSolver = "";
+
+    public double lastFxSigma() {
+        return lastFxSigma;
+    }
+
+    public String lastSolver() {
+        return lastSolver;
+    }
     private final MatOfPoint2f projectedMat = new MatOfPoint2f();
 
     /**
@@ -100,6 +119,8 @@ public class Calibrate3dPipe
 
         CameraCalibrationCoefficients ret;
         var start = System.nanoTime();
+        lastFxSigma = Double.NaN;
+        lastSolver = "";
 
         if (LoadJNI.hasLoaded(JNITypes.MRCAL) && params.useMrCal) {
             logger.debug("Calibrating with mrcal!");
@@ -179,7 +200,13 @@ public class Calibrate3dPipe
                     stdDeviationsIntrinsics,
                     stdDeviationsExtrinsics,
                     perViewErrors,
-                    Calib3d.CALIB_USE_LU + Calib3d.CALIB_USE_INTRINSIC_GUESS);
+                    // Spectrum (photonvision-91): 8 coefficients, as mrcal gives; 5 can't follow
+                    // our lenses out to the corners (SpectrumJetson tests/calibration-analysis)
+                    Calib3d.CALIB_USE_LU
+                            + Calib3d.CALIB_USE_INTRINSIC_GUESS
+                            + Calib3d.CALIB_RATIONAL_MODEL);
+            lastFxSigma = stdDeviationsIntrinsics.get(0, 0)[0];
+            lastSolver = "OpenCV";
         } catch (Exception e) {
             logger.error("Calibration failed!", e);
             e.printStackTrace();
@@ -285,24 +312,48 @@ public class Calibrate3dPipe
         JsonMatOfDouble distortionCoefficientsMat =
                 new JsonMatOfDouble(1, 8, CvType.CV_64FC1, Arrays.copyOfRange(result.intrinsics, 4, 12));
 
+        // Spectrum (photonvision-91): mrcal's cornersUsed is indexed by board corner id; put it on
+        // the detections (see CornerAlignment).
+        List<boolean[]> used = new ArrayList<>();
+        for (int i = 0; i < observationCorners.size(); i++) {
+            var obs = observationCorners.get(i);
+            used.add(
+                    CornerAlignment.perDetection(
+                            result.cornersUsed.get(i),
+                            obs.ids != null ? obs.ids.toArray() : null,
+                            (int) obs.imagePoints.total()));
+        }
+        lastSolver = "mrcal";
+
+        if (params.keepEdgeCorners) {
+            var refit =
+                    refitKeepingEdgeCorners(
+                            observationCorners,
+                            cameraMatrixMat,
+                            distortionCoefficientsMat,
+                            used,
+                            imageSavePath);
+            if (refit != null) {
+                cameraMatrixMat.release();
+                distortionCoefficientsMat.release();
+                return refit;
+            }
+        }
+
         // We get these from the JNI (retsult.optimizedPoses), but these are subtly different from the
-        // ones our code used to produce. To preserve consistency, continue to redo this math
+        // ones our code used to produce. To preserve consistency, continue to redo this math.
+        // Spectrum (photonvision-91): from the inliers only
         List<Mat> rvecs = new ArrayList<>();
         List<Mat> tvecs = new ArrayList<>();
-        for (var observation : observationCorners) {
-            var rvec = new Mat();
-            var tvec = new Mat();
-
-            Calib3d.solvePnP(
-                    observation.objectPoints,
-                    observation.imagePoints,
-                    cameraMatrixMat.getAsMatOfDouble(),
-                    distortionCoefficientsMat.getAsMatOfDouble(),
-                    rvec,
-                    tvec);
-
-            rvecs.add(rvec);
-            tvecs.add(tvec);
+        for (int i = 0; i < observationCorners.size(); i++) {
+            var rt =
+                    solvePose(
+                            observationCorners.get(i),
+                            used.get(i),
+                            cameraMatrixMat.getAsMatOfDouble(),
+                            distortionCoefficientsMat.getAsMatOfDouble());
+            rvecs.add(rt[0]);
+            tvecs.add(rt[1]);
         }
 
         List<BoardObservation> observations =
@@ -312,7 +363,7 @@ public class Calibrate3dPipe
                         distortionCoefficientsMat.getAsMatOfDouble(),
                         rvecs,
                         tvecs,
-                        result.cornersUsed,
+                        used,
                         new double[] {result.warp_x, result.warp_y},
                         imageSavePath);
 
@@ -331,6 +382,270 @@ public class Calibrate3dPipe
                 // If we only saved rvecs/tvecs (in our BoardObservations), it will break mrcal uncertainty
                 // calculation -- mrcal needs the optimization state vector at the solution. So save both
                 new OptimizationInputs(result.optimizedPoses));
+    }
+
+    /**
+     * Spectrum (photonvision-91): the board pose from the corners flagged used (all of them if fewer
+     * than 4 are). Returns {rvec, tvec}; the caller releases them.
+     */
+    private static Mat[] solvePose(
+            FindBoardCornersPipe.FindBoardCornersPipeResult obs,
+            boolean[] used,
+            Mat cameraMatrix,
+            MatOfDouble dist) {
+        var obj = obs.objectPoints.toList();
+        var img = obs.imagePoints.toList();
+        var o = new ArrayList<Point3>();
+        var p = new ArrayList<Point>();
+        for (int i = 0; i < img.size(); i++) {
+            if (used[i]) {
+                o.add(obj.get(i));
+                p.add(img.get(i));
+            }
+        }
+        if (o.size() < 4) {
+            o = new ArrayList<>(obj);
+            p = new ArrayList<>(img);
+        }
+        var om = new MatOfPoint3f();
+        var pm = new MatOfPoint2f();
+        om.fromList(o);
+        pm.fromList(p);
+        var rvec = new Mat();
+        var tvec = new Mat();
+        try {
+            Calib3d.solvePnP(om, pm, cameraMatrix, dist, rvec, tvec);
+        } finally {
+            om.release();
+            pm.release();
+        }
+        return new Mat[] {rvec, tvec};
+    }
+
+    /** Spectrum (photonvision-91): each detection's residual (pixels) under a pose and model. */
+    private static double[] residuals(
+            FindBoardCornersPipe.FindBoardCornersPipeResult obs,
+            Mat rvec,
+            Mat tvec,
+            Mat cameraMatrix,
+            MatOfDouble dist) {
+        var projected = new MatOfPoint2f();
+        try {
+            Calib3d.projectPoints(obs.objectPoints, rvec, tvec, cameraMatrix, dist, projected);
+            var pr = projected.toArray();
+            var img = obs.imagePoints.toArray();
+            double[] r = new double[img.length];
+            for (int i = 0; i < img.length; i++) {
+                r[i] = Math.hypot(pr[i].x - img[i].x, pr[i].y - img[i].y);
+            }
+            return r;
+        } finally {
+            projected.release();
+        }
+    }
+
+    // Spectrum (photonvision-91): re-admitting mrcal's outliers. A detection comes back in if its
+    // residual under the current model is within max(FLOOR, K x robust sigma).
+    private static final double READMIT_FLOOR_PX = 1.0;
+    private static final double READMIT_SIGMAS = 5.0;
+    private static final int MIN_CORNERS_IN_SOLVE = 6;
+
+    /**
+     * Spectrum (photonvision-91): keep the edge corners mrcal threw away.
+     *
+     * <p>mrcal's outlier rejection (inside the native solver, not adjustable from here) judges each
+     * corner against a model fitted mostly to the centre, where nearly all corners are. Edge and
+     * corner detections, which a model that folds near the edge fits worst, were the ones dropped:
+     * re-fitted with them kept, they come out at 0.23-0.43 px, and the result measured tags at the
+     * field better (median -0.23 px, p90 -40%; SpectrumJetson tests/calibration-analysis §4-5).
+     *
+     * <p>So: start from mrcal's solution, take back every corner within max(1 px, 5 sigma) of its
+     * model (sigma robust, from the median residual), refit the 8-coefficient model with OpenCV, and
+     * repeat the test against the refit. The refit is used unless it folds inside the image where
+     * mrcal's didn't. It has no board warp, and its covariance gives fx's spread for the quality
+     * readout.
+     *
+     * @return the refit calibration, or null to keep mrcal's
+     */
+    private CameraCalibrationCoefficients refitKeepingEdgeCorners(
+            List<FindBoardCornersPipe.FindBoardCornersPipeResult> obs,
+            JsonMatOfDouble mrcalK,
+            JsonMatOfDouble mrcalD,
+            List<boolean[]> mrcalUsed,
+            Path imageSavePath) {
+        Mat k = mrcalK.getAsMatOfDouble().clone();
+        MatOfDouble d = new MatOfDouble();
+        mrcalD.getAsMatOfDouble().copyTo(d);
+        List<boolean[]> used = mrcalUsed;
+        try {
+            int before = count(mrcalUsed);
+            for (int pass = 0; pass < 2; pass++) {
+                var res = new ArrayList<double[]>();
+                for (int i = 0; i < obs.size(); i++) {
+                    var rt = solvePose(obs.get(i), used.get(i), k, d);
+                    res.add(residuals(obs.get(i), rt[0], rt[1], k, d));
+                    rt[0].release();
+                    rt[1].release();
+                }
+                double thr = Math.max(READMIT_FLOOR_PX, READMIT_SIGMAS * robustSigma(res, used));
+                used = new ArrayList<>();
+                for (var r : res) {
+                    boolean[] u = new boolean[r.length];
+                    for (int j = 0; j < r.length; j++) u[j] = r[j] <= thr;
+                    used.add(u);
+                }
+                if (!calibrateSubset(obs, used, k, d)) {
+                    logger.warn("Edge-corner refit failed; keeping mrcal's solution");
+                    return null;
+                }
+                logger.info(
+                        "Edge-corner refit pass "
+                                + pass
+                                + ": threshold "
+                                + String.format("%.2f", thr)
+                                + " px, corners used "
+                                + count(used)
+                                + " (mrcal kept "
+                                + before
+                                + ")");
+            }
+
+            var size = obs.get(0).size;
+            double[] kArr = new double[9];
+            k.get(0, 0, kArr);
+            double[] dArr = d.toArray();
+            var foldRefit = LensFoldCheck.check(kArr, dArr, size.width, size.height);
+            var foldMrcal = LensFoldCheck.check(mrcalK.data, mrcalD.data, size.width, size.height);
+            if (foldRefit.folds() && !foldMrcal.folds()) {
+                logger.warn(
+                        "Edge-corner refit folds inside the image and mrcal's doesn't; keeping mrcal's");
+                return null;
+            }
+
+            // Final poses and residuals, with the final flags
+            List<Mat> rvecs = new ArrayList<>();
+            List<Mat> tvecs = new ArrayList<>();
+            List<Pose3d> poses = new ArrayList<>();
+            for (int i = 0; i < obs.size(); i++) {
+                var rt = solvePose(obs.get(i), used.get(i), k, d);
+                rvecs.add(rt[0]);
+                tvecs.add(rt[1]);
+                double[] r = new double[3], t = new double[3];
+                rt[0].get(0, 0, r);
+                rt[1].get(0, 0, t);
+                poses.add(
+                        new Pose3d(
+                                new Translation3d(t[0], t[1], t[2]),
+                                new Rotation3d(VecBuilder.fill(r[0], r[1], r[2]))));
+            }
+            var kJson = JsonMatOfDouble.fromMat(k);
+            var dJson = new JsonMatOfDouble(1, dArr.length, CvType.CV_64FC1, dArr);
+            var observations =
+                    createObservations(obs, k, d, rvecs, tvecs, used, new double[] {0, 0}, imageSavePath);
+            rvecs.forEach(Mat::release);
+            tvecs.forEach(Mat::release);
+            lastSolver =
+                    "mrcal, refit keeping edge corners ("
+                            + count(used)
+                            + " used, mrcal kept "
+                            + before
+                            + ")";
+            return new CameraCalibrationCoefficients(
+                    size,
+                    kJson,
+                    dJson,
+                    new double[] {0, 0},
+                    observations,
+                    new Size(params.boardWidth, params.boardHeight),
+                    params.squareSize,
+                    CameraLensModel.LENSMODEL_OPENCV,
+                    // mrcal's uncertainty is evaluated at this solution (no warp)
+                    new OptimizationInputs(poses));
+        } catch (Exception e) {
+            logger.error("Edge-corner refit failed; keeping mrcal's solution", e);
+            return null;
+        } finally {
+            k.release();
+            d.release();
+        }
+    }
+
+    private static int count(List<boolean[]> used) {
+        int n = 0;
+        for (var u : used) for (boolean b : u) if (b) n++;
+        return n;
+    }
+
+    /**
+     * Per-axis sigma from the median residual magnitude of the used corners (a 2D Gaussian's
+     * magnitude has median 1.1774 sigma), so a few bad corners don't inflate it.
+     */
+    static double robustSigma(List<double[]> res, List<boolean[]> used) {
+        var all = new ArrayList<Double>();
+        for (int i = 0; i < res.size(); i++) {
+            for (int j = 0; j < res.get(i).length; j++) if (used.get(i)[j]) all.add(res.get(i)[j]);
+        }
+        if (all.isEmpty()) return 0;
+        all.sort(Double::compare);
+        return all.get(all.size() / 2) / 1.1774;
+    }
+
+    /** OpenCV 8-coefficient refit from (k, d) on the used corners; updates k and d in place. */
+    private boolean calibrateSubset(
+            List<FindBoardCornersPipe.FindBoardCornersPipeResult> obs,
+            List<boolean[]> used,
+            Mat k,
+            MatOfDouble d) {
+        List<Mat> objs = new ArrayList<>();
+        List<Mat> imgs = new ArrayList<>();
+        for (int i = 0; i < obs.size(); i++) {
+            var o = obs.get(i).objectPoints.toList();
+            var p = obs.get(i).imagePoints.toList();
+            var oo = new ArrayList<Point3>();
+            var pp = new ArrayList<Point>();
+            for (int j = 0; j < p.size(); j++) {
+                if (used.get(i)[j]) {
+                    oo.add(o.get(j));
+                    pp.add(p.get(j));
+                }
+            }
+            if (oo.size() < MIN_CORNERS_IN_SOLVE) continue;
+            var om = new MatOfPoint3f();
+            om.fromList(oo);
+            var pm = new MatOfPoint2f();
+            pm.fromList(pp);
+            objs.add(om);
+            imgs.add(pm);
+        }
+        List<Mat> rvecs = new ArrayList<>();
+        List<Mat> tvecs = new ArrayList<>();
+        try {
+            if (objs.size() < 3) return false;
+            Calib3d.calibrateCameraExtended(
+                    objs,
+                    imgs,
+                    obs.get(0).size,
+                    k,
+                    d,
+                    rvecs,
+                    tvecs,
+                    stdDeviationsIntrinsics,
+                    stdDeviationsExtrinsics,
+                    perViewErrors,
+                    Calib3d.CALIB_USE_LU
+                            + Calib3d.CALIB_USE_INTRINSIC_GUESS
+                            + Calib3d.CALIB_RATIONAL_MODEL);
+            lastFxSigma = stdDeviationsIntrinsics.get(0, 0)[0];
+            return k.get(0, 0)[0] > 0 && k.get(1, 1)[0] > 0;
+        } catch (Exception e) {
+            logger.error("OpenCV refit failed", e);
+            return false;
+        } finally {
+            objs.forEach(Mat::release);
+            imgs.forEach(Mat::release);
+            rvecs.forEach(Mat::release);
+            tvecs.forEach(Mat::release);
+        }
     }
 
     private List<BoardObservation> createObservations(
@@ -408,14 +723,12 @@ public class Calibrate3dPipe
                 continue;
             }
 
-            // Calculate reprojection error for each point
+            // Calculate reprojection error for each point. Spectrum (photonvision-91): for every
+            // corner, outliers too, so reprojectionError[i] is corner i's (cornersUsed says which
+            // were used). Upstream skipped the outliers, and the list no longer lined up.
             var reprojectionError = new ArrayList<Point>();
             var projectedPoints = projectedMat.toList();
             for (int pointIdx = 0; pointIdx < projectedPoints.size(); pointIdx++) {
-                // Outliers are not part of the calibration, so don't calculate error for them
-                if (!cornersUsed.get(snapshotId)[pointIdx]) {
-                    continue;
-                }
 
                 // error = (measured - expected)
                 var measured = projectedPoints.get(pointIdx);
@@ -471,12 +784,26 @@ public class Calibrate3dPipe
 
         public boolean useMrCal;
 
+        // Spectrum (photonvision-91): re-admit mrcal's outliers that fit, and refit (see
+        // refitKeepingEdgeCorners)
+        public boolean keepEdgeCorners;
+
         public CalibratePipeParams(
                 int boardHeightSquares, int boardWidthSquares, double squareSize, boolean usemrcal) {
+            this(boardHeightSquares, boardWidthSquares, squareSize, usemrcal, false);
+        }
+
+        public CalibratePipeParams(
+                int boardHeightSquares,
+                int boardWidthSquares,
+                double squareSize,
+                boolean usemrcal,
+                boolean keepEdgeCorners) {
             this.boardHeight = boardHeightSquares - 1;
             this.boardWidth = boardWidthSquares - 1;
             this.squareSize = squareSize;
             this.useMrCal = usemrcal;
+            this.keepEdgeCorners = keepEdgeCorners;
         }
     }
 

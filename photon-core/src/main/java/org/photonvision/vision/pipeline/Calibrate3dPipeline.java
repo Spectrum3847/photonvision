@@ -19,16 +19,25 @@ package org.photonvision.vision.pipeline;
 
 import java.awt.Color;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
+import io.avaje.jsonb.Json;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
+import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfInt;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.photonvision.common.dataflow.DataChangeService;
 import org.photonvision.common.dataflow.events.OutgoingUIEvent;
@@ -37,6 +46,8 @@ import org.photonvision.common.logging.Logger;
 import org.photonvision.common.util.ColorHelper;
 import org.photonvision.common.util.SerializationUtils;
 import org.photonvision.vision.calibration.BoardObservation;
+import org.photonvision.vision.calibration.CalibrationQuality;
+import org.photonvision.vision.calibration.CalibrationSession;
 import org.photonvision.vision.calibration.CameraCalibrationCoefficients;
 import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.frame.FrameThresholdType;
@@ -71,14 +82,6 @@ public class Calibrate3dPipeline
 
     // Opacity of the red tint drawn over the exclusion zone's interior
     private static final double TINT_ALPHA = 0.3;
-
-    // Percentage of the image diagonal that the board can move for it to be considered stable
-    private static final double STABILITY_FRACTION = 0.01;
-
-    // Number of frames used to calculate stability
-    private static final int STABILITY_WINDOW = 3;
-
-    private final ArrayDeque<Point> recentCentroids = new ArrayDeque<>();
 
     private Point lastSnapshotCentroid = null;
 
@@ -116,7 +119,11 @@ public class Calibrate3dPipeline
 
         calibrate3dPipe.setParams(
                 new Calibrate3dPipe.CalibratePipeParams(
-                        settings.boardHeight, settings.boardWidth, settings.gridSize, settings.useMrCal));
+                        settings.boardHeight,
+                        settings.boardWidth,
+                        settings.gridSize,
+                        settings.useMrCal,
+                        settings.keepEdgeCorners));
     }
 
     @Override
@@ -146,17 +153,20 @@ public class Calibrate3dPipeline
         FindBoardCornersPipeResult findBoardResult =
                 findBoardCornersPipe.run(Pair.of(inputColorMat, outputColorCVMat.getMat())).output;
 
+        // Spectrum (photonvision-91): board motion, distance and tilt for the calibration view
+        // and auto-capture
+        updateLive(findBoardResult, frame);
+
         if (takeSnapshot) {
             // Set snapshot to false even if we don't find a board
             takeSnapshot = false;
 
             if (findBoardResult != null) {
-                captureSnapshot(findBoardResult, inputColorMat);
+                captureSnapshot(findBoardResult, inputColorMat, false);
 
                 if (settings.autoCalibrate) {
                     // Keep auto calibration from immediately re-capturing at this pose
                     lastSnapshotCentroid = computeCentroid(findBoardResult.imagePoints.toList());
-                    recentCentroids.clear();
                 }
             }
             broadcastState();
@@ -177,6 +187,8 @@ public class Calibrate3dPipeline
 
         var fpsResult = calculateFPSPipe.run(null);
         var fps = fpsResult.output;
+
+        offerViewFrame(inputColorMat);
 
         frame.release();
 
@@ -263,50 +275,318 @@ public class Calibrate3dPipeline
     }
 
     /** Adds a detected board to the snapshot list and updates the UI. */
-    private void captureSnapshot(FindBoardCornersPipeResult findBoardResult, Mat inputColorMat) {
+    private synchronized void captureSnapshot(
+            FindBoardCornersPipeResult findBoardResult, Mat inputColorMat, boolean auto) {
         // Only copy the image into the result when we absolutely must
         findBoardResult.inputImage = inputColorMat.clone();
 
+        // Spectrum (photonvision-91): the session first (it's rebuilt from the list if it changed)
+        var sess = session();
         foundCornersList.add(findBoardResult);
+        var xy = xyOf(findBoardResult);
+        var pose = boardPose(findBoardResult);
+        sess.add(xy[0], xy[1], pose[0], pose[1], auto);
+    }
+
+    // ---- Spectrum (photonvision-91): calibration view ------------------------------------------
+
+    // Auto-capture: the board is still when its corners move less than this between frames...
+    private static final double STILL_PX_PER_FRAME = 0.3;
+    // ...for this long
+    private static final long STILL_NS = 300_000_000L;
+
+    private CalibrationSession session;
+    private String sessionKey = "";
+    private Map<Integer, Point> lastCorners = null;
+    private long stillSinceNs = 0;
+    private double[] lastPose = {-1, -1};
+    private boolean lastStill = false;
+    private volatile Live live = null;
+    private volatile long liveNs = 0;
+    private volatile CalibrationQuality.Report lastQuality = null;
+
+    /** The live view's state, for GET /api/calibration/live. */
+    @Json
+    public record Live(
+            int width,
+            int height,
+            double[] corners, // x0, y0, x1, y1, ... of the board in view, or empty
+            double motionPx,
+            boolean still,
+            int gain,
+            double distanceM,
+            double tiltDeg,
+            boolean autoCalibrate,
+            boolean calibrating,
+            long ageMs,
+            CalibrationSession.Summary session) {}
+
+    /**
+     * The session for the current resolution and board, rebuilt from the snapshots if they changed.
+     */
+    private synchronized CalibrationSession session() {
+        var fsp = frameStaticProperties;
+        int w = fsp != null ? fsp.imageWidth : (int) settings.resolution.width;
+        int h = fsp != null ? fsp.imageHeight : (int) settings.resolution.height;
+        String key =
+                w + "x" + h + "/" + settings.boardWidth + "x" + settings.boardHeight + "/"
+                        + settings.gridSize;
+        if (session == null || !key.equals(sessionKey)) {
+            double fx = fsp != null ? fsp.horizontalFocalLength : 0;
+            session =
+                    new CalibrationSession(
+                            w,
+                            h,
+                            fx,
+                            settings.boardWidth * settings.gridSize,
+                            settings.boardHeight * settings.gridSize);
+            sessionKey = key;
+            for (var r : foundCornersList) {
+                var xy = xyOf(r);
+                var pose = boardPose(r);
+                session.add(xy[0], xy[1], pose[0], pose[1], false);
+            }
+        }
+        return session;
+    }
+
+    private static double[][] xyOf(FindBoardCornersPipeResult r) {
+        var pts = r.imagePoints.toArray();
+        double[] x = new double[pts.length], y = new double[pts.length];
+        for (int i = 0; i < pts.length; i++) {
+            x[i] = pts[i].x;
+            y[i] = pts[i].y;
+        }
+        return new double[][] {x, y};
     }
 
     /**
-     * In auto mode, takes a snapshot if the board has moved far enough from the last snapshot and has
-     * been stable over the last {@link #STABILITY_WINDOW} detections. Also updates the UI with a hint
-     * for when users ought to move the board.
+     * The board's distance (m) and tilt from facing the camera (degrees), from a pose solved with
+     * the camera's current (or generic) focal length and no distortion: rough, but plenty for the
+     * distance and tilt quotas. {-1, -1} if it can't be solved.
+     */
+    private double[] boardPose(FindBoardCornersPipeResult r) {
+        var fsp = frameStaticProperties;
+        if (fsp == null || r.objectPoints.total() < 4) return new double[] {-1, -1};
+        var k = new Mat(3, 3, CvType.CV_64F);
+        k.put(
+                0,
+                0,
+                fsp.horizontalFocalLength,
+                0,
+                fsp.centerX,
+                0,
+                fsp.verticalFocalLength,
+                fsp.centerY,
+                0,
+                0,
+                1);
+        var d = new MatOfDouble();
+        var rvec = new Mat();
+        var tvec = new Mat();
+        var rot = new Mat();
+        try {
+            if (!Calib3d.solvePnP(r.objectPoints, r.imagePoints, k, d, rvec, tvec)) {
+                return new double[] {-1, -1};
+            }
+            double[] t = new double[3];
+            tvec.get(0, 0, t);
+            Calib3d.Rodrigues(rvec, rot);
+            // The board's normal is the rotation's third column; facing the camera, it's along z
+            double nz = Math.abs(rot.get(2, 2)[0]);
+            double tilt = Math.toDegrees(Math.acos(Math.min(1, nz)));
+            return new double[] {Math.sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]), tilt};
+        } catch (Exception e) {
+            return new double[] {-1, -1};
+        } finally {
+            k.release();
+            d.release();
+            rvec.release();
+            tvec.release();
+            rot.release();
+        }
+    }
+
+    /** Corner motion since the last frame, by corner id (pixels, mean); infinite if unknown. */
+    private double updateMotion(FindBoardCornersPipeResult r) {
+        if (r == null) {
+            lastCorners = null;
+            return Double.POSITIVE_INFINITY;
+        }
+        var pts = r.imagePoints.toArray();
+        int[] ids = r.ids != null ? r.ids.toArray() : null;
+        var now = new HashMap<Integer, Point>();
+        for (int i = 0; i < pts.length; i++) now.put(ids != null ? ids[i] : i, pts[i]);
+        double sum = 0;
+        int n = 0;
+        if (lastCorners != null) {
+            for (var e : now.entrySet()) {
+                var p = lastCorners.get(e.getKey());
+                if (p == null) continue;
+                sum += Math.hypot(p.x - e.getValue().x, p.y - e.getValue().y);
+                n++;
+            }
+        }
+        lastCorners = now;
+        return n >= 4 ? sum / n : Double.POSITIVE_INFINITY;
+    }
+
+    private void updateLive(FindBoardCornersPipeResult r, Frame frame) {
+        long now = System.nanoTime();
+        double motion = updateMotion(r);
+        if (motion < STILL_PX_PER_FRAME) {
+            if (stillSinceNs == 0) stillSinceNs = now;
+        } else {
+            stillSinceNs = 0;
+        }
+        lastStill = stillSinceNs != 0 && now - stillSinceNs >= STILL_NS;
+        boolean viewing = now < viewUntilNs;
+        if (!viewing && !settings.autoCalibrate) return;
+
+        lastPose = r != null ? boardPose(r) : new double[] {-1, -1};
+        if (!viewing) return;
+        double[][] xy = r != null ? xyOf(r) : new double[][] {new double[0], new double[0]};
+        var sess = session();
+        int gain = r != null ? sess.gain(xy[0], xy[1]) : 0;
+        double[] flat = new double[xy[0].length * 2];
+        for (int i = 0; i < xy[0].length; i++) {
+            flat[2 * i] = xy[0][i];
+            flat[2 * i + 1] = xy[1][i];
+        }
+        live =
+                new Live(
+                        frame.frameStaticProperties.imageWidth,
+                        frame.frameStaticProperties.imageHeight,
+                        flat,
+                        Double.isFinite(motion) ? motion : -1,
+                        lastStill,
+                        gain,
+                        lastPose[0],
+                        lastPose[1],
+                        settings.autoCalibrate,
+                        calibrating,
+                        0,
+                        sess.summary());
+        liveNs = now;
+    }
+
+    /** The live state, and keep it (and the view's frames) coming for the next 3 s. */
+    public Live live() {
+        viewUntilNs = System.nanoTime() + VIEW_NS;
+        var l = live;
+        if (l == null) return null;
+        // Snapshots taken or deleted since the last frame show at once
+        var sess = session;
+        return new Live(
+                l.width(),
+                l.height(),
+                l.corners(),
+                l.motionPx(),
+                l.still(),
+                l.gain(),
+                l.distanceM(),
+                l.tiltDeg(),
+                l.autoCalibrate(),
+                calibrating,
+                (System.nanoTime() - liveNs) / 1_000_000L,
+                sess != null ? sess.summary() : l.session());
+    }
+
+    private static final long VIEW_NS = 3_000_000_000L;
+    private static final long VIEW_PERIOD_NS = 100_000_000L;
+    private volatile long viewUntilNs = 0;
+    private long nextViewNs = 0;
+    private volatile byte[] viewJpeg = null;
+    private final AtomicBoolean encoding = new AtomicBoolean(false);
+    private final ExecutorService viewWorker =
+            Executors.newSingleThreadExecutor(
+                    r -> {
+                        Thread t = new Thread(r, "CalibrationView");
+                        t.setDaemon(true);
+                        return t;
+                    });
+
+    /** The camera's image at full size, as a JPEG (null until the first), while the view is open. */
+    public byte[] viewJpeg() {
+        viewUntilNs = System.nanoTime() + VIEW_NS;
+        return viewJpeg;
+    }
+
+    private void offerViewFrame(Mat image) {
+        long now = System.nanoTime();
+        if (now > viewUntilNs || now < nextViewNs || encoding.get() || image.empty()) return;
+        nextViewNs = now + VIEW_PERIOD_NS;
+        Mat copy = image.clone();
+        encoding.set(true);
+        viewWorker.execute(
+                () -> {
+                    var buf = new MatOfByte();
+                    try {
+                        if (Imgcodecs.imencode(
+                                ".jpg", copy, buf, new MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, 85))) {
+                            viewJpeg = buf.toArray();
+                        }
+                    } finally {
+                        buf.release();
+                        copy.release();
+                        encoding.set(false);
+                    }
+                });
+    }
+
+    /** Grade a solved calibration (the view's quality readout and save gate). */
+    public CalibrationQuality.Report evaluate(CameraCalibrationCoefficients cal) {
+        List<org.opencv.core.Point3> uncertainty = null;
+        if (cal.optimizationInputs != null) {
+            try {
+                uncertainty = cal.estimateUncertainty();
+            } catch (Exception e) {
+                logger.warn("No uncertainty map for this calibration: " + e.getMessage());
+            }
+        }
+        var q =
+                CalibrationQuality.evaluate(
+                        cal, calibrate3dPipe.lastFxSigma(), calibrate3dPipe.lastSolver(), uncertainty);
+        lastQuality = q;
+        return q;
+    }
+
+    public CalibrationQuality.Report lastQuality() {
+        return lastQuality;
+    }
+
+    /**
+     * In auto mode, takes a snapshot if the board adds coverage and has been still for 0.3 s
+     * (Spectrum, photonvision-91; upstream: moved 5% of the diagonal and steady for 3 frames). Also
+     * updates the UI with a hint for when users ought to move the board.
      */
     private void autoTakeSnapshot(FindBoardCornersPipeResult findBoardResult, Mat inputColorMat) {
         Boolean newMovedFarEnough;
         boolean captured = false;
 
         if (findBoardResult == null) {
-            // No board visible -- don't let stale positions count towards stability
-            recentCentroids.clear();
             newMovedFarEnough = null;
         } else {
             Point centroid = computeCentroid(findBoardResult.imagePoints.toList());
-            double frameDiagonal = Math.hypot(findBoardResult.size.width, findBoardResult.size.height);
-
-            recentCentroids.addLast(centroid);
-            while (recentCentroids.size() > STABILITY_WINDOW) {
-                recentCentroids.removeFirst();
-            }
-
-            double minMovementPx = MIN_MOVEMENT_FRACTION * frameDiagonal;
-            boolean movedEnough =
-                    lastSnapshotCentroid == null || distance(centroid, lastSnapshotCentroid) >= minMovementPx;
-            if (!movedEnough) {
+            // Spectrum (photonvision-91): a snapshot is taken when the corners have held still
+            // (< 0.3 px a frame for 0.3 s, see updateLive) and it adds coverage: corners in cells
+            // short of their target, or a far or tilted shot while those are short. Not when it's
+            // a near-copy of one already taken. movedFarEnough: true = hold still, it's wanted;
+            // false = move somewhere new.
+            var xy = xyOf(findBoardResult);
+            boolean wanted = session().wants(xy[0], xy[1], lastPose[0], lastPose[1]);
+            if (!wanted) {
                 newMovedFarEnough = false;
-            } else if (!isStable(STABILITY_FRACTION * frameDiagonal)) {
+            } else if (!lastStill) {
                 newMovedFarEnough = true;
             } else {
                 newMovedFarEnough = false;
                 movedFarEnough = newMovedFarEnough;
                 captured = true;
 
-                captureSnapshot(findBoardResult, inputColorMat);
+                captureSnapshot(findBoardResult, inputColorMat, true);
                 lastSnapshotCentroid = centroid;
-                recentCentroids.clear();
+                stillSinceNs = 0;
 
                 logger.info("Automatically took calibration snapshot " + foundCornersList.size());
             }
@@ -321,31 +601,6 @@ public class Calibrate3dPipeline
         }
     }
 
-    /**
-     * True if the last {@link #STABILITY_WINDOW} centroids all sit within {@code maxDeviationPx} of
-     * their average.
-     */
-    private boolean isStable(double maxDeviationPx) {
-        if (recentCentroids.size() < STABILITY_WINDOW) {
-            return false;
-        }
-
-        Point mean = new Point(0, 0);
-        for (Point p : recentCentroids) {
-            mean.x += p.x;
-            mean.y += p.y;
-        }
-        mean.x /= recentCentroids.size();
-        mean.y /= recentCentroids.size();
-
-        for (Point p : recentCentroids) {
-            if (distance(p, mean) > maxDeviationPx) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private static Point computeCentroid(List<Point> points) {
         Point centroid = new Point(0, 0);
         for (Point p : points) {
@@ -357,10 +612,6 @@ public class Calibrate3dPipeline
         return centroid;
     }
 
-    private static double distance(Point a, Point b) {
-        return Math.hypot(a.x - b.x, a.y - b.y);
-    }
-
     Boolean getMovedFarEnough() {
         return movedFarEnough;
     }
@@ -369,7 +620,7 @@ public class Calibrate3dPipeline
         return foundCornersList.stream().map(it -> it.imagePoints.toList()).toList();
     }
 
-    public CameraCalibrationCoefficients tryCalibration(Path imageSavePath) {
+    public synchronized CameraCalibrationCoefficients tryCalibration(Path imageSavePath) {
         this.calibrating = true;
 
         /*
@@ -394,11 +645,13 @@ public class Calibrate3dPipeline
         return calibrationOutput.output.observations;
     }
 
-    public void finishCalibration() {
+    public synchronized void finishCalibration() {
         foundCornersList.forEach(it -> it.release());
         foundCornersList.clear();
+        if (session != null) session.clear();
+        lastQuality = null;
+        lastCorners = null;
 
-        recentCentroids.clear();
         lastSnapshotCentroid = null;
         movedFarEnough = null;
 
@@ -425,12 +678,17 @@ public class Calibrate3dPipeline
                 .publishEvent(OutgoingUIEvent.wrappedOf("calibrationData", state));
     }
 
-    public boolean removeSnapshot(int index) {
+    public synchronized boolean removeSnapshot(int index) {
         try {
+            // Spectrum (photonvision-91): the view's stats and coverage follow
+            var sess = session();
             var observation = foundCornersList.remove(index);
             observation.release();
+            sess.remove(index);
+            lastQuality = null;
+            broadcastState();
             return true;
-        } catch (ArrayIndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e) {
             logger.error("Could not remove snapshot at index " + index, e);
             return false;
         }
@@ -447,6 +705,7 @@ public class Calibrate3dPipeline
 
         findBoardCornersPipe.release();
         calibrate3dPipe.release();
+        viewWorker.shutdown();
         calculateFPSPipe.release();
         super.release();
     }

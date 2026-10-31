@@ -673,6 +673,16 @@ public class VisionModule implements AutoCloseable {
         return pendingCalibration;
     }
 
+    /** Spectrum (photonvision-91): the calibration pipeline, for the calibration view. */
+    public org.photonvision.vision.pipeline.Calibrate3dPipeline calibrationPipeline() {
+        return pipelineManager.calibration3dPipeline;
+    }
+
+    /** Spectrum (photonvision-91): whether this camera is calibrating now. */
+    public boolean isCalibrating() {
+        return pipelineManager.getCurrentPipelineIndex() == PipelineManager.CAL_3D_INDEX;
+    }
+
     /**
      * SpectrumJetson (photonvision-58): frames this camera has processed since PhotonVision started.
      */

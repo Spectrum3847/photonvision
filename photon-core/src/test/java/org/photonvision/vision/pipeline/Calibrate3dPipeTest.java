@@ -340,10 +340,13 @@ public class Calibrate3dPipeTest {
         double totalSquaredError = 0.0;
         long totalPoints = 0;
         for (var obs : cal.getObservations()) {
-            double sumErrorSq =
-                    obs.reprojectionErrors.stream().mapToDouble(d -> d.x * d.x + d.y * d.y).sum();
-            totalSquaredError += sumErrorSq;
-            totalPoints += obs.reprojectionErrors.size();
+            // Spectrum (photonvision-91): one residual per corner, outliers included; count inliers
+            for (int i = 0; i < obs.reprojectionErrors.size(); i++) {
+                if (!obs.cornersUsed[i]) continue;
+                var d = obs.reprojectionErrors.get(i);
+                totalSquaredError += d.x * d.x + d.y * d.y;
+                totalPoints++;
+            }
         }
         double rmsError = Math.sqrt(totalSquaredError / totalPoints);
         System.out.println("RMS Reprojection Error: " + rmsError);

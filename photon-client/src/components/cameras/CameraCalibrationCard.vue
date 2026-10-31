@@ -23,6 +23,7 @@ import {
   resolutionsAreEqual
 } from "@/lib/PhotonUtils";
 import CameraCalibrationInfoCard from "@/components/cameras/CameraCalibrationInfoCard.vue";
+import CameraCalibrationViewDialog from "@/components/cameras/CameraCalibrationViewDialog.vue";
 import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import { useTheme } from "vuetify";
 import TooltippedLabel from "@/components/common/pv-tooltipped-label.vue";
@@ -418,6 +419,9 @@ const hasEnoughImages = computed(() => useStateStore().calibrationData.imageCoun
 const hasGenericCalibration = computed(() =>
   useCameraSettingsStore().currentCameraSettings.completeCalibrations.some((c) => c.isGeneric === true)
 );
+
+// Spectrum (photonvision-91): the full-screen calibration view
+const calibrationViewOpen = ref(false);
 
 const showCalDialog = ref(false);
 const selectedVideoFormat = ref<VideoFormat | undefined>(undefined);
@@ -850,6 +854,24 @@ const setSelectedVideoFormat = (format: VideoFormat) => {
             </v-btn>
           </v-col>
         </div>
+        <!-- Spectrum (photonvision-91) -->
+        <div v-if="isCalibrating" class="pt-3">
+          <v-btn
+            size="small"
+            block
+            color="buttonActive"
+            :variant="theme.global.current.value.dark ? 'outlined' : 'elevated'"
+            @click="calibrationViewOpen = true"
+          >
+            <v-icon start class="calib-btn-icon" size="large">mdi-fullscreen</v-icon>
+            <span class="calib-btn-label">Full-screen calibration view</span>
+          </v-btn>
+          <p class="pt-2 text-caption">
+            Shows where the corners are still missing and where to hold the board next, takes snapshots when the board
+            is still and adds coverage, and checks the result before saving. Boards hanging off the edge count.
+          </p>
+        </div>
+        <CameraCalibrationViewDialog v-model="calibrationViewOpen" />
         <!-- SpectrumJetson (photonvision-26) -->
         <p v-if="isCalibrating" class="pt-3 text-caption">
           A long exposure (about 15 ms) is fine for calibrating because the board is held still. Don't copy it into the

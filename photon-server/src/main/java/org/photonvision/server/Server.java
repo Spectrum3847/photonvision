@@ -175,6 +175,12 @@ public class Server {
         app.post("/api/calibration/cancel", RequestHandler::onCalibrationCancelRequest);
         app.post("/api/calibration/importFromData", RequestHandler::onDataCalibrationImportRequest);
         app.post("/api/calibration/remove", RequestHandler::onCalibrationRemoveRequest);
+        // Spectrum (photonvision-91): the full-screen calibration view
+        app.get("/api/calibration/live", RequestHandler::onCalibrationLiveRequest);
+        app.get("/api/calibration/frame", RequestHandler::onCalibrationFrameRequest);
+        app.post("/api/calibration/solve", RequestHandler::onCalibrationSolveRequest);
+        app.get("/api/calibration/quality", RequestHandler::onCalibrationQualityRequest);
+        app.post("/api/calibration/removeSnapshot", RequestHandler::onCalibrationRemoveSnapshotRequest);
 
         // Object detection
         app.post("/api/objectdetection/import", RequestHandler::onImportObjectDetectionModelRequest);

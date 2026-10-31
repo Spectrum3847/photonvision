@@ -35,6 +35,8 @@ public class Calibration3dPipelineSettings extends AdvancedPipelineSettings {
     public boolean autoCalibrate = false;
     public boolean drawAllSnapshots;
     public boolean showExclusionZone = false;
+    // Spectrum (photonvision-91): re-admit the edge corners mrcal rejects (Calibrate3dPipe)
+    public boolean keepEdgeCorners = true;
 
     public Calibration3dPipelineSettings() {
         super();

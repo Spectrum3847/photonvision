@@ -1014,6 +1014,125 @@ public class RequestHandler {
         ctx.result(jpeg);
     }
 
+    // ---- Spectrum (photonvision-91): the full-screen calibration view ----
+
+    /**
+     * GET /api/calibration/live?camera=UNIQUE_NAME: the board in view (corners, motion, distance,
+     * tilt), the session's snapshots, coverage and guidance. 204 until the first frame; keeps the
+     * live state (and the frames below) coming for 3 s.
+     */
+    public static void onCalibrationLiveRequest(Context ctx) {
+        var m = moduleByUniqueName(ctx.queryParam("camera"));
+        if (m == null) {
+            ctx.status(404);
+            ctx.result("No camera " + ctx.queryParam("camera"));
+            return;
+        }
+        var live = m.calibrationPipeline().live();
+        if (live == null) {
+            ctx.status(204);
+            return;
+        }
+        ctx.header("Cache-Control", "no-store");
+        ctx.json(live);
+    }
+
+    /** GET /api/calibration/frame?camera=UNIQUE_NAME: the camera's image at full size, JPEG. */
+    public static void onCalibrationFrameRequest(Context ctx) {
+        var m = moduleByUniqueName(ctx.queryParam("camera"));
+        if (m == null) {
+            ctx.status(404);
+            ctx.result("No camera " + ctx.queryParam("camera"));
+            return;
+        }
+        byte[] jpeg = m.calibrationPipeline().viewJpeg();
+        if (jpeg == null) {
+            ctx.status(204);
+            return;
+        }
+        ctx.header("Cache-Control", "no-store");
+        ctx.contentType("image/jpeg");
+        ctx.result(jpeg);
+    }
+
+    /**
+     * POST /api/calibration/solve {"cameraUniqueName": ...}: solve from the snapshots so far (kept as
+     * the pending calibration, like /api/calibration/compute) and grade it: rms, coverage, fx and its
+     * spread, outliers, the fold check, and the save gate.
+     */
+    public static void onCalibrationSolveRequest(Context ctx) {
+        try {
+            CommonCameraUniqueName request = ctx.bodyAsClass(CommonCameraUniqueName.class);
+            var m = moduleByUniqueName(request.cameraUniqueName);
+            if (m == null) {
+                ctx.status(404);
+                ctx.result("No camera " + request.cameraUniqueName);
+                return;
+            }
+            var cal = m.computeCalibration();
+            if (cal == null) {
+                ctx.status(500);
+                ctx.result("The calibration solve failed (see the log)");
+                return;
+            }
+            ctx.json(m.calibrationPipeline().evaluate(cal));
+        } catch (IllegalStateException | JsonException e) {
+            ctx.status(400);
+            ctx.result(e.getMessage());
+        } catch (Exception e) {
+            ctx.status(500);
+            ctx.result("The calibration solve failed: " + e.getMessage());
+            logger.error("Calibration solve failed", e);
+        }
+    }
+
+    /** GET /api/calibration/quality?camera=UNIQUE_NAME: the last solve's grade, 204 if none. */
+    public static void onCalibrationQualityRequest(Context ctx) {
+        var m = moduleByUniqueName(ctx.queryParam("camera"));
+        if (m == null) {
+            ctx.status(404);
+            ctx.result("No camera " + ctx.queryParam("camera"));
+            return;
+        }
+        var q = m.calibrationPipeline().lastQuality();
+        if (q == null) {
+            ctx.status(204);
+            return;
+        }
+        ctx.json(q);
+    }
+
+    @Json
+    record CalibrationSnapshotRemoveRequest(String cameraUniqueName, int index) {}
+
+    /** POST /api/calibration/removeSnapshot {"cameraUniqueName": ..., "index": n}. */
+    public static void onCalibrationRemoveSnapshotRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(CalibrationSnapshotRemoveRequest.class);
+            var m = moduleByUniqueName(req.cameraUniqueName());
+            if (m == null) {
+                ctx.status(404);
+                ctx.result("No camera " + req.cameraUniqueName());
+                return;
+            }
+            if (!m.isCalibrating()) {
+                ctx.status(400);
+                ctx.result("The camera isn't calibrating");
+                return;
+            }
+            if (!m.calibrationPipeline().removeSnapshot(req.index())) {
+                ctx.status(404);
+                ctx.result("No snapshot " + req.index());
+                return;
+            }
+            ctx.status(200);
+            ctx.result("Removed snapshot " + req.index());
+        } catch (JsonException e) {
+            ctx.status(400);
+            ctx.result(e.getMessage());
+        }
+    }
+
     /**
      * GET /api/usb/bandwidth (photonvision-32): every USB camera's bandwidth, reserved and really
      * used, against the budget all USB 2.0 ports share. See UsbBandwidth.

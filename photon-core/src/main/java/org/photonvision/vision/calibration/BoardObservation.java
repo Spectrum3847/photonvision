@@ -20,7 +20,6 @@ package org.photonvision.vision.calibration;
 import io.avaje.jsonb.Json;
 import java.awt.Color;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
 import org.opencv.core.Core;
@@ -42,7 +41,9 @@ public final class BoardObservation implements Cloneable {
     // Observed location in pixel space
     public List<Point> locationInImageSpace;
 
-    // (measured location in pixels) - (expected from FK)
+    // (expected from FK) - (measured location in pixels). Spectrum (photonvision-91): one per
+    // corner in locationInImageSpace, outliers included (cornersUsed says which); calibrations from
+    // before the fix have a shorter list that doesn't line up (see residualsAligned()).
     public List<Point> reprojectionErrors;
 
     // Solver optimized board poses
@@ -75,12 +76,15 @@ public final class BoardObservation implements Cloneable {
         this.snapshotName = snapshotName;
         this.snapshotDataLocation = snapshotDataLocation;
 
-        // legacy migration -- we assume all points are inliers
-        if (cornersUsed == null) {
-            cornersUsed = new boolean[locationInObjectSpace.size()];
-            Arrays.fill(cornersUsed, true);
-        }
-        this.cornersUsed = cornersUsed;
+        // legacy migration -- we assume all points are inliers. Spectrum (photonvision-91): and
+        // board-indexed flags from a partial board (before the fix) are put back on their corners
+        this.cornersUsed =
+                CornerAlignment.normalizeLoaded(
+                        cornersUsed,
+                        cornerIds,
+                        locationInImageSpace != null
+                                ? locationInImageSpace.size()
+                                : locationInObjectSpace.size());
     }
 
     @Override
@@ -173,10 +177,32 @@ public final class BoardObservation implements Cloneable {
      * @return Mean reprojection error in pixels.
      */
     double meanReprojectionError() {
-        return reprojectionErrors.stream()
-                .filter(pt -> cornersUsed[reprojectionErrors.indexOf(pt)])
-                .mapToDouble(pt -> Math.hypot(pt.x, pt.y))
-                .average()
-                .orElse(0);
+        if (reprojectionErrors == null) return 0;
+        if (!residualsAligned()) {
+            // Before the fix the list held only the inliers (and not lined up with the corners)
+            return reprojectionErrors.stream()
+                    .mapToDouble(pt -> Math.hypot(pt.x, pt.y))
+                    .average()
+                    .orElse(0);
+        }
+        double sum = 0;
+        int n = 0;
+        for (int i = 0; i < reprojectionErrors.size(); i++) {
+            if (!cornersUsed[i]) continue;
+            var pt = reprojectionErrors.get(i);
+            sum += Math.hypot(pt.x, pt.y);
+            n++;
+        }
+        return n > 0 ? sum / n : 0;
+    }
+
+    /**
+     * Spectrum (photonvision-91): one residual per corner, so reprojectionErrors[i] is corner i's.
+     */
+    public boolean residualsAligned() {
+        return reprojectionErrors != null
+                && locationInImageSpace != null
+                && reprojectionErrors.size() == locationInImageSpace.size()
+                && cornersUsed.length == locationInImageSpace.size();
     }
 }

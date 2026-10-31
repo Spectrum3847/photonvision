@@ -447,6 +447,8 @@ export interface Calibration3dPipelineSettings extends PipelineSettings {
   drawAllSnapshots: boolean;
   showExclusionZone: boolean;
   autoCalibrate: boolean;
+  // Spectrum (photonvision-91): re-admit the edge corners mrcal rejects, and refit
+  keepEdgeCorners: boolean;
 }
 export type ConfigurableCalibration3dPipelineSettings = Partial<Omit<Calibration3dPipelineSettings, "pipelineType">> &
   ConfigurablePipelineSettings;
@@ -460,7 +462,8 @@ export const DefaultCalibration3dPipelineSettings: Calibration3dPipelineSettings
   cameraExposureRaw: 6,
   drawAllSnapshots: false,
   showExclusionZone: false,
-  autoCalibrate: false
+  autoCalibrate: false,
+  keepEdgeCorners: true
 };
 
 export type ActivePipelineSettings =
