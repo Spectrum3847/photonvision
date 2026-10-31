@@ -10,6 +10,7 @@ import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import { useStateStore } from "@/stores/StateStore";
 import { getResolutionString } from "@/lib/PhotonUtils";
 import { PVUsbCamera, type ExtraCameraControl } from "@/types/SettingTypes";
+import TuningGuide from "./TuningGuide.vue";
 import { useDisplay } from "vuetify";
 
 // Due to something with libcamera or something else IDK much about, the 90° rotations need to be disabled if the libcamera drivers are being used.
@@ -24,7 +25,7 @@ const exposureLabel = computed(() => {
 const exposureTooltip = computed(() =>
   useCameraSettingsStore().currentCameraSettings.matchedCameraInfo?.type !== PVUsbCamera
     ? "Directly controls how long the camera shutter remains open. Units are dependant on the underlying driver."
-    : "How long the shutter stays open, in units of 100 µs (the USB camera standard): 50 = 5 ms, 83 = 8.3 ms. Shorter means less motion blur but a darker image; exposure also caps the frame rate (10 ms or more cannot reach 100 fps)."
+    : "Recommended for AprilTags on a robot: 5 ms (50), as short as far tags still decode. How long the shutter stays open, in units of 100 µs (the USB camera standard): 50 = 5 ms, 83 = 8.3 ms. Shorter means less motion blur but a darker image (spinning at 3 rad/s smears a tag ~11 px at 5 ms, ~44 px at 20 ms). Exposure also caps the frame rate: 10 ms or more cannot reach 100 fps."
 );
 
 const cameraRotations = computed(() =>
@@ -129,6 +130,7 @@ const interactiveCols = computed(() =>
 
 <template>
   <div>
+    <tuning-guide />
     <v-alert
       data-testid="tag-contrast"
       density="compact"
@@ -152,7 +154,7 @@ const interactiveCols = computed(() =>
       v-model="useCameraSettingsStore().currentPipelineSettings.cameraAutoExposure"
       label="Auto Exposure"
       :switch-cols="interactiveCols"
-      tooltip="Enables or Disables camera automatic adjustment for current lighting conditions"
+      tooltip="Recommended: off on a robot. Auto exposure picks long exposures, which look great standing still and blur when the robot moves. It's fine for driver cameras."
       @update:modelValue="
         (args) => useCameraSettingsStore().changeCurrentPipelineSetting({ cameraAutoExposure: args }, false)
       "
@@ -173,6 +175,7 @@ const interactiveCols = computed(() =>
     <pv-slider
       v-model="useCameraSettingsStore().currentPipelineSettings.cameraBrightness"
       label="Brightness"
+      tooltip="Recommended: 100 with a short exposure, to make up for it. If tag edges wash out, the decision margin drops: back off."
       :min="0"
       :max="100"
       :slider-cols="interactiveCols"
@@ -205,7 +208,7 @@ const interactiveCols = computed(() =>
       v-if="useCameraSettingsStore().currentPipelineSettings.cameraGain >= 0"
       v-model="useCameraSettingsStore().currentPipelineSettings.cameraGain"
       label="Camera Gain"
-      tooltip="Controls camera gain, similar to brightness"
+      tooltip="Amplifies the sensor signal: brighter, but noisier. Thrifty Bot Thriftiest Cams report no gain control, so this may do nothing on them; test before relying on it."
       :min="0"
       :max="100"
       :slider-cols="interactiveCols"
@@ -269,7 +272,7 @@ const interactiveCols = computed(() =>
     <pv-select
       v-model="useCameraSettingsStore().currentPipelineSettings.cameraVideoModeIndex"
       label="Resolution"
-      tooltip="Resolution and FPS the camera should directly capture at"
+      tooltip="Recommended: 1280x800 at 120 FPS, MJPEG, the resolution the camera is calibrated at (YUYV only manages ~5 fps at this size). Resolution and FPS the camera should directly capture at."
       :items="cameraResolutions()"
       :select-cols="interactiveCols"
       @update:modelValue="(args) => handleResolutionChange(args)"
@@ -277,7 +280,7 @@ const interactiveCols = computed(() =>
     <pv-select
       v-model="currentStreamResolutionIndex"
       label="Stream Resolution"
-      tooltip="Resolution to which camera frames are downscaled for streaming to the dashboard"
+      tooltip="Recommended: the smallest. Resolution to which camera frames are downscaled for streaming to the dashboard; it doesn't affect detection, and bigger costs CPU."
       :items="streamResolutions"
       :select-cols="interactiveCols"
     />
