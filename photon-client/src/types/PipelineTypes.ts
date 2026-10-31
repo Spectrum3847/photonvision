@@ -37,6 +37,25 @@ export enum TargetModel {
   ReefscapeAlgae = 7
 }
 
+// SpectrumJetson (photonvision-40): areas a pipeline ignores, or the only areas it searches.
+// Boxes are fractions (0-1) of the image as displayed. mode: 0 off, 1 ignore inside the boxes,
+// 2 search only inside them. Edited with pv-mask-overlay (reusable) from the Mask tab.
+export enum DetectionMaskMode {
+  Off = 0,
+  IgnoreInside = 1,
+  OnlyInside = 2
+}
+export interface MaskBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+export interface DetectionMask {
+  mode: DetectionMaskMode;
+  boxes: MaskBox[];
+}
+
 export enum ContourSortMode {
   Largest = 0,
   Smallest = 1,
@@ -82,6 +101,7 @@ export enum ContourTargetOffsetPointEdge {
 }
 
 export interface PipelineSettings {
+  detectionMask?: DetectionMask; // photonvision-40; pipelines that support it (AdvancedPipelineSettings)
   offsetRobotOffsetMode: RobotOffsetPointMode;
   streamingFrameDivisor: number;
   offsetDualPointBArea: number;

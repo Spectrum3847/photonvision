@@ -112,7 +112,20 @@ public class ObjectDetectionPipeline
 
         frame.colorImage.getMat().copyTo(frame.processedImage.getMat());
 
-        var filterContoursResult = filterContoursPipe.run(neuralNetworkResult.output);
+        // SpectrumJetson (photonvision-40): drop detections whose centre the mask ignores.
+        var detections = neuralNetworkResult.output;
+        if (settings.detectionMask != null && settings.detectionMask.active()) {
+            double w = frame.colorImage.getMat().cols(), h = frame.colorImage.getMat().rows();
+            detections =
+                    detections.stream()
+                            .filter(
+                                    d ->
+                                            !settings.detectionMask.ignores(
+                                                    d.bbox().center.x / w, d.bbox().center.y / h))
+                            .toList();
+        }
+
+        var filterContoursResult = filterContoursPipe.run(detections);
         sumPipeNanosElapsed += filterContoursResult.nanosElapsed;
 
         CVPipeResult<List<PotentialTarget>> sortContoursResult =

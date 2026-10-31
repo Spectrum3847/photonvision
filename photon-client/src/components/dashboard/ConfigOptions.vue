@@ -14,6 +14,7 @@ import OutputTab from "@/components/dashboard/tabs/OutputTab.vue";
 import TargetsTab from "@/components/dashboard/tabs/TargetsTab.vue";
 import PnPTab from "@/components/dashboard/tabs/PnPTab.vue";
 import Map3DTab from "@/components/dashboard/tabs/Map3DTab.vue";
+import MaskTab from "@/components/dashboard/tabs/MaskTab.vue";
 import { PipelineType } from "@/types/PipelineTypes";
 import { WebsocketPipelineType } from "@/types/WebsocketDataTypes";
 import { useDisplay, useTheme } from "vuetify";
@@ -34,6 +35,7 @@ const allTabs = Object.freeze({
   arucoTab: { tabName: "ArUco", component: ArucoTab },
   objectDetectionTab: { tabName: "Object Detection", component: ObjectDetectionTab },
   outputTab: { tabName: "Output", component: OutputTab },
+  maskTab: { tabName: "Mask", component: MaskTab }, // photonvision-40
   targetsTab: { tabName: "Targets", component: TargetsTab },
   pnpTab: { tabName: "PnP", component: PnPTab },
   map3dTab: { tabName: "3D", component: Map3DTab }
@@ -55,7 +57,8 @@ const getTabGroups = (): ConfigOption[][] => {
         allTabs.apriltagCudaTab,
         allTabs.arucoTab,
         allTabs.objectDetectionTab,
-        allTabs.outputTab
+        allTabs.outputTab,
+        allTabs.maskTab
       ],
       [allTabs.targetsTab, allTabs.pnpTab, allTabs.map3dTab]
     ];
@@ -69,7 +72,8 @@ const getTabGroups = (): ConfigOption[][] => {
         allTabs.apriltagCudaTab,
         allTabs.arucoTab,
         allTabs.objectDetectionTab,
-        allTabs.outputTab
+        allTabs.outputTab,
+        allTabs.maskTab
       ],
       [allTabs.targetsTab, allTabs.pnpTab, allTabs.map3dTab]
     ];
@@ -83,7 +87,8 @@ const getTabGroups = (): ConfigOption[][] => {
         allTabs.apriltagCudaTab,
         allTabs.arucoTab,
         allTabs.objectDetectionTab,
-        allTabs.outputTab
+        allTabs.outputTab,
+        allTabs.maskTab
       ],
       [allTabs.targetsTab, allTabs.pnpTab, allTabs.map3dTab]
     ];
@@ -116,7 +121,8 @@ const tabGroups = computed<ConfigOption[][]>(() => {
           !(!isAprilTag && tabConfig.tabName === "AprilTag") && //Filter out apriltag unless we actually are doing AprilTags
           !(!isAprilTagCuda && tabConfig.tabName === "AprilCudaTag") && //Filter out apriltag unless we actually are doing AprilTags
           !(!isAruco && tabConfig.tabName === "ArUco") &&
-          !(!isObjectDetection && tabConfig.tabName === "Object Detection") //Filter out aruco unless we actually are doing Aruco
+          !(!isObjectDetection && tabConfig.tabName === "Object Detection") && //Filter out aruco unless we actually are doing Aruco
+          !(!isAprilTagCuda && !isObjectDetection && tabConfig.tabName === "Mask") // photonvision-40: pipelines with a mask
       )
     )
     .filter((it) => it.length); // Remove empty tab groups

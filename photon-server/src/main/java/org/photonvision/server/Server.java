@@ -147,6 +147,8 @@ public class Server {
         app.get("/api/rewind", RequestHandler::onRewindStatusRequest);
         app.post("/api/rewind", RequestHandler::onRewindSetRequest);
         app.get("/api/rewind/download", RequestHandler::onRewindDownloadRequest);
+        app.get("/api/excludedTags", RequestHandler::onExcludedTagsRequest); // SpectrumJetson (22)
+        app.post("/api/excludedTags", RequestHandler::onExcludedTagsSetRequest); // SpectrumJetson (22)
         app.get("/api/usb/bandwidth", RequestHandler::onUsbBandwidthRequest); // SpectrumJetson (32)
         app.post("/api/usb/bandwidth", RequestHandler::onUsbAllocationRequest);
         app.post("/api/utils/nukeConfigDirectory", RequestHandler::onNukeConfigDirectory);

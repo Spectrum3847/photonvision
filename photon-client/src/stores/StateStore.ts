@@ -36,6 +36,7 @@ interface StateStore {
   multitagResultBuffer: Record<string, MultitagResult[]>;
 
   colorPickingMode: boolean;
+  maskEditing: boolean; // photonvision-40: the Mask tab is drawing on the input stream
 
   calibrationData: {
     imageCount: number;
@@ -90,6 +91,7 @@ export const useStateStore = defineStore("state", {
       multitagResultBuffer: {},
 
       colorPickingMode: false,
+      maskEditing: false,
 
       calibrationData: {
         imageCount: 0,

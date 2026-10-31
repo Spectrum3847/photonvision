@@ -50,6 +50,13 @@ public class GpuDetectorJNI {
     public static native AprilTagDetection[] processimage(long handle, long p);
 
     /**
+     * SpectrumJetson (photonvision-40, bos-07): the detection mask. mode 0 off, 1 ignore inside the
+     * boxes, 2 search only inside them; rects: x, y, w, h fractions of the image, 4 per box. Takes
+     * effect on the next frame.
+     */
+    public static native void setMask(long handle, int mode, double[] rects);
+
+    /**
      * SpectrumJetson (photonvision-04): all 8 coefficients of the OpenCV rational model
      * PhotonVision's calibration produces (k1 k2 p1 p2 k3 k4 k5 k6). setparams() drops k4..k6. Only
      * the SpectrumJetson/bos build of lib971apriltag has this; callers fall back to setparams().

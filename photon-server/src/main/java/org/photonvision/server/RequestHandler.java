@@ -1196,6 +1196,45 @@ public class RequestHandler {
         }
     }
 
+    // SpectrumJetson (photonvision-22): tags left out of multi-tag on every camera.
+    @Json
+    record ExcludedTagsRequest(java.util.List<Integer> saved) {}
+
+    private static Map<String, Object> excludedTagsStatus() {
+        var et = org.photonvision.vision.target.ExcludedTags.getInstance();
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("saved", new ArrayList<>(new java.util.TreeSet<>(et.saved())));
+        m.put("robot", new ArrayList<>(new java.util.TreeSet<>(et.robot())));
+        m.put("active", new ArrayList<>(new java.util.TreeSet<>(et.active())));
+        return m;
+    }
+
+    /** GET /api/excludedTags: {saved, robot, active}. */
+    public static void onExcludedTagsRequest(Context ctx) {
+        ctx.json(excludedTagsStatus(), Types.mapOf(Object.class));
+    }
+
+    /** POST /api/excludedTags {"saved": [7, 12]}: replaces the list saved on the Jetson. */
+    public static void onExcludedTagsSetRequest(Context ctx) {
+        ExcludedTagsRequest req;
+        try {
+            req = ctx.bodyAsClass(ExcludedTagsRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Expected {\"saved\": [tag IDs]}");
+            return;
+        }
+        try {
+            org.photonvision.vision.target.ExcludedTags.getInstance()
+                    .setSaved(req.saved() == null ? java.util.List.of() : req.saved());
+        } catch (IOException e) {
+            ctx.status(500);
+            ctx.result("Could not save the excluded tags: " + e.getMessage());
+            return;
+        }
+        onExcludedTagsRequest(ctx);
+    }
+
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.
     @Json
     record ThriftiestFlashRequest(String port, String image) {}

@@ -306,6 +306,9 @@ public class Main implements Callable<Integer> {
         // SpectrumJetson Rewind (photonvision-07): robot code starts and stops recording over
         // NetworkTables
         org.photonvision.rewind.RewindManager.getInstance().start();
+        // SpectrumJetson (photonvision-22, 69): the tags left out of multi-tag, loaded now so the
+        // far-tag search has them even on a pipeline without multi-tag
+        org.photonvision.vision.target.ExcludedTags.getInstance();
         // SpectrumJetson (photonvision-08): set the Jetson's date from the robot's (no clock battery,
         // no internet); off on the SystemCore, which is the robot
         org.photonvision.common.util.RobotClockSync.start();

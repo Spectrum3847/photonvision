@@ -64,6 +64,14 @@ public class TrackedTarget implements Releasable {
 
     private int m_fiducialId = -1;
     private double m_poseAmbiguity = -1;
+    // SpectrumJetson (photonvision-30, 61): the AprilTag detector's decision margin, sent with each
+    // tag's quality (TagQuality). -1 if not a tag.
+    private double m_decisionMargin = -1;
+    // SpectrumJetson (photonvision-61): per-tag quality for the robot (TagQuality). NaN if unknown.
+    private double m_edgePx = Double.NaN;
+    private double m_undistortPx = Double.NaN;
+    private double m_reprojBestPx = Double.NaN;
+    private double m_reprojAltPx = Double.NaN;
 
     private Mat m_cameraRelativeTvec, m_cameraRelativeRvec;
 
@@ -85,6 +93,7 @@ public class TrackedTarget implements Releasable {
             AprilTagDetection tagDetection,
             AprilTagPoseEstimate tagPose,
             TargetCalculationParameters params) {
+        m_decisionMargin = tagDetection.getDecisionMargin();
         m_targetOffsetPoint = new Point(tagDetection.getCenterX(), tagDetection.getCenterY());
         m_robotOffsetPoint = new Point();
         var yawPitch =
@@ -257,6 +266,34 @@ public class TrackedTarget implements Releasable {
 
     public void setPoseAmbiguity(double ambiguity) {
         m_poseAmbiguity = ambiguity;
+    }
+
+    public double getDecisionMargin() {
+        return m_decisionMargin;
+    }
+
+    public void setTagQuality(
+            double edgePx, double undistortPx, double reprojBestPx, double reprojAltPx) {
+        m_edgePx = edgePx;
+        m_undistortPx = undistortPx;
+        m_reprojBestPx = reprojBestPx;
+        m_reprojAltPx = reprojAltPx;
+    }
+
+    public double getEdgePx() {
+        return m_edgePx;
+    }
+
+    public double getUndistortPx() {
+        return m_undistortPx;
+    }
+
+    public double getReprojBestPx() {
+        return m_reprojBestPx;
+    }
+
+    public double getReprojAltPx() {
+        return m_reprojAltPx;
     }
 
     public double getPoseAmbiguity() {

@@ -35,6 +35,9 @@ public class AdvancedPipelineSettings extends CVPipelineSettings {
         ledMode = true;
     }
 
+    // SpectrumJetson (photonvision-40): areas to ignore, or the only areas to search.
+    public DetectionMask detectionMask = new DetectionMask();
+
     public IntegerCouple hsvHue = new IntegerCouple(50, 180);
     public IntegerCouple hsvSaturation = new IntegerCouple(50, 255);
     public IntegerCouple hsvValue = new IntegerCouple(50, 255);
@@ -124,13 +127,15 @@ public class AdvancedPipelineSettings extends CVPipelineSettings {
                 && contourGroupingMode == that.contourGroupingMode
                 && contourIntersection == that.contourIntersection
                 && Objects.equals(targetModel, that.targetModel)
-                && cornerDetectionStrategy == that.cornerDetectionStrategy;
+                && cornerDetectionStrategy == that.cornerDetectionStrategy
+                && Objects.equals(detectionMask, that.detectionMask);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
                 super.hashCode(),
+                detectionMask,
                 hsvHue,
                 hsvSaturation,
                 hsvValue,
