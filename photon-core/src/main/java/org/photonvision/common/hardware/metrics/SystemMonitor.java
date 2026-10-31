@@ -106,6 +106,8 @@ public class SystemMonitor {
                 instance = new SystemMonitorQCS6490();
             } else if (Platform.isWindows()) {
                 instance = new SystemMonitorWindows();
+            } else if (SystemMonitorJetson.isJetson()) {
+                instance = new SystemMonitorJetson(); // SpectrumJetson (photonvision-20): throttle reason
             } else {
                 instance = new SystemMonitor();
             }
@@ -207,7 +209,8 @@ public class SystemMonitor {
                         this.getIpAddress(),
                         this.getUptime(),
                         nt.sentBitRate,
-                        nt.recvBitRate);
+                        nt.recvBitRate,
+                        this.getGpuUsage());
 
         metricPublisher.set(metrics);
 
@@ -225,6 +228,7 @@ public class SystemMonitor {
         sb.append(String.format("CPU Usage: %.2f%%, ", metrics.cpuUtil()));
         sb.append(String.format("CPU Temperature: %.2f °C, ", metrics.cpuTemp()));
         sb.append(String.format("NPU Usage: %s, ", Arrays.toString(metrics.npuUsage())));
+        sb.append(String.format("GPU Usage: %.1f%%, ", metrics.gpuUtil()));
         sb.append(String.format("Used Disk: %.2f%%, ", metrics.diskUtilPct()));
         sb.append(String.format("Usable Disk Space: %.0f MiB, ", metrics.diskUsableSpace() / mebi));
         sb.append(String.format("Memory: %.0f / %.0f MiB, ", metrics.ramUtil(), metrics.ramMem()));
@@ -435,6 +439,21 @@ public class SystemMonitor {
      */
     public double[] getNpuUsage() {
         return new double[0];
+    }
+
+    // SpectrumJetson (photonvision-19): the Jetson GPU driver's load file, found once (JetsonSysfs).
+    private static final Path JETSON_GPU_LOAD = JetsonSysfs.gpuLoad();
+
+    /**
+     * SpectrumJetson (photonvision-19): returns the GPU usage in percent, if available (Jetson only).
+     * The driver's load is per mille, averaged by the kernel over a short window (the same number
+     * tegrastats shows as GR3D_FREQ).
+     *
+     * @return the GPU usage, or -1.0 if not available on this platform.
+     */
+    public double getGpuUsage() {
+        Double load = JetsonSysfs.number(JETSON_GPU_LOAD);
+        return load == null ? -1.0 : load / 10.0;
     }
 
     /**

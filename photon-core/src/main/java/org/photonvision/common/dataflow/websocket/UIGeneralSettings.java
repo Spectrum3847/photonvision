@@ -59,4 +59,6 @@ public class UIGeneralSettings {
     public String wpilibArch;
     public boolean conflictingHostname;
     public String conflictingCameras;
+    // SpectrumJetson (photonvision-72): what the Jetson's GPU does (GpuStatus); "" off a Jetson.
+    public String spectrumGpu = "";
 }

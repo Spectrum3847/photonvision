@@ -192,7 +192,12 @@ const generalMetrics = computed<MetricItem[]>(() => {
     { header: "Image Version", value: useSettingsStore().general.imageVersion || "Unknown" },
     { header: "Hardware Model", value: useSettingsStore().general.hardwareModel || "Unknown" },
     { header: "Platform", value: useSettingsStore().general.hardwarePlatform || "Unknown" },
-    { header: "GPU Acceleration", value: useSettingsStore().general.gpuAcceleration || "None detected" }
+    // SpectrumJetson (photonvision-72): on a Jetson, what the CUDA detector and NVJPG do; upstream's
+    // field is the Raspberry Pi's camera path, so it said "None detected" there.
+    {
+      header: "GPU Acceleration",
+      value: useSettingsStore().general.gpuAcceleration || useSettingsStore().general.spectrumGpu || "None detected"
+    }
   ];
 
   if (!useSettingsStore().network.networkingDisabled) {
@@ -275,6 +280,9 @@ const platformMetrics = computed<MetricItem[]>(() => {
 });
 
 const cpuUsageData = ref<{ time: number; value: number }[]>([]);
+// SpectrumJetson: GPU usage (photonvision-19); the chart shows only where the GPU reports it
+const gpuUsageData = ref<{ time: number; value: number }[]>([]);
+const hasGpuUsage = computed(() => (useSettingsStore().metrics.gpuUtil ?? -1) >= 0);
 const cpuMemoryUsageData = ref<{ time: number; value: number }[]>([]);
 const cpuTempData = ref<{ time: number; value: number }[]>([]);
 const networkUsageData = ref<{ time: number; value: number }[]>([]);
@@ -283,6 +291,10 @@ watch(metricsHistorySnapshot, () => {
   cpuUsageData.value = metricsHistorySnapshot.value.map((entry) => ({
     time: entry.time,
     value: entry.metrics.cpuUtil ?? 0
+  }));
+  gpuUsageData.value = metricsHistorySnapshot.value.map((entry) => ({
+    time: entry.time,
+    value: Math.max(entry.metrics.gpuUtil ?? 0, 0)
   }));
   cpuMemoryUsageData.value = metricsHistorySnapshot.value.map((entry) => ({
     time: entry.time,
@@ -450,6 +462,17 @@ watch(metricsHistorySnapshot, () => {
           <Suspense>
             <!-- Allows us to import echarts when it's actually needed  -->
             <MetricsChart id="chart" :data="cpuUsageData" type="percentage" :min="0" :max="100" color="blue" />
+            <template #fallback> Loading... </template>
+          </Suspense>
+        </v-card-text>
+        <v-card-text v-if="hasGpuUsage" class="pt-0 flex-0-0 pb-2">
+          <div class="d-flex justify-space-between pb-3 pt-3">
+            <span>GPU Usage</span>
+            <span>{{ Math.round(gpuUsageData.at(-1)?.value ?? 0) }}%</span>
+          </div>
+          <Suspense>
+            <!-- Allows us to import echarts when it's actually needed  -->
+            <MetricsChart id="chart" :data="gpuUsageData" type="percentage" :min="0" :max="100" color="orange" />
             <template #fallback> Loading... </template>
           </Suspense>
         </v-card-text>

@@ -42,6 +42,7 @@ import org.photonvision.common.dataflow.websocket.UICameraConfiguration;
 import org.photonvision.common.dataflow.websocket.UIDataPublisher;
 import org.photonvision.common.dataflow.websocket.UIPhotonConfiguration;
 import org.photonvision.common.hardware.HardwareManager;
+import org.photonvision.common.hardware.metrics.JetsonTelemetry;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
 import org.photonvision.common.util.SerializationUtils;
@@ -186,6 +187,9 @@ public class VisionModule implements AutoCloseable {
         resultConsumers.add(
                 (result) ->
                         lastPipelineResultBestTarget = result.hasTargets() ? result.targets.get(0) : null);
+        // SpectrumJetson (photonvision-16): the Jetson's health on NetworkTables; this camera's is the
+        // CameraHealthPublisher below.
+        JetsonTelemetry.start();
         resultConsumers.addAll(extraConsumers);
         // SpectrumJetson: this camera's health on NetworkTables (from photonvision-16's camera half):
         // recoveries (photonvision-29), problem (-31), state and lastFrameAgeMs (-81).
@@ -1057,6 +1061,11 @@ public class VisionModule implements AutoCloseable {
 
     public String uniqueName() {
         return this.visionSource.cameraConfiguration.uniqueName;
+    }
+
+    /** SpectrumJetson (photonvision-72): for GpuStatus on the Device card. */
+    public CVPipelineSettings getCurrentPipelineSettings() {
+        return pipelineManager.getCurrentPipelineSettings();
     }
 
     public CameraConfiguration getCameraConfiguration() {

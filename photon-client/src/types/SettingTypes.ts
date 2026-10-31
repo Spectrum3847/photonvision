@@ -7,6 +7,8 @@ export interface GeneralSettings {
   version?: string;
   imageVersion?: string;
   gpuAcceleration?: string;
+  // SpectrumJetson (photonvision-72): what the Jetson's GPU does ("" off a Jetson)
+  spectrumGpu?: string;
   hardwareModel?: string;
   hardwarePlatform?: string;
   wpilibArch?: string;
@@ -42,6 +44,8 @@ export interface MetricData {
   uptime?: number;
   sentBitRate?: number;
   recvBitRate?: number;
+  // SpectrumJetson: percent, -1 if not available (photonvision-19)
+  gpuUtil?: number;
 }
 
 export enum NetworkConnectionType {

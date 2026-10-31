@@ -35,6 +35,9 @@ public record DeviceMetrics(
         String ipAddress,
         double uptime,
         double sentBitRate,
-        double recvBitRate) {
+        double recvBitRate,
+        // SpectrumJetson: GPU usage in percent, -1 if not available (photonvision-19). Settings page
+        // only: not in the NetworkTables protobuf (robot code reads /photonvision/jetson/gpuLoadPct).
+        double gpuUtil) {
     public static final DeviceMetricsProto proto = new DeviceMetricsProto();
 }

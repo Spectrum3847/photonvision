@@ -7,6 +7,7 @@ import { useTheme } from "vuetify";
 // purple -  154, 100, 180   (r: 167, g: 104, b: 196)
 // green  -   65, 181, 127   (r:  75, g: 209, b: 147)
 // red    -  238, 102, 102   (r: 238, g: 102, b: 102)
+// orange -  245, 158,  11   (SpectrumJetson: GPU usage, photonvision-19)
 const colors = {
   "blue-light": { r: 255, g: 216, b: 67 },
   "blue-dark": { r: 92, g: 154, b: 255 },
@@ -15,7 +16,9 @@ const colors = {
   "red-light": { r: 255, g: 216, b: 67 },
   "red-dark": { r: 238, g: 102, b: 102 },
   "green-light": { r: 255, g: 216, b: 67 },
-  "green-dark": { r: 75, g: 209, b: 147 }
+  "green-dark": { r: 75, g: 209, b: 147 },
+  "orange-light": { r: 255, g: 216, b: 67 },
+  "orange-dark": { r: 245, g: 158, b: 11 }
 };
 const DEFAULT_COLOR = "blue";
 
@@ -195,7 +198,7 @@ const props = defineProps<{
   type: keyof typeof typeLabels;
   min?: number;
   max?: number;
-  color?: "red" | "green" | "blue" | "purple";
+  color?: "red" | "green" | "blue" | "purple" | "orange";
 }>();
 
 onMounted(async () => {

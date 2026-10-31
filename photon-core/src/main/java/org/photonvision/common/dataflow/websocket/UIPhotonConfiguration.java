@@ -44,6 +44,19 @@ public class UIPhotonConfiguration {
     }
 
     public static UIPhotonConfiguration programStateToUi(PhotonConfiguration c) {
+        var ui = programStateToUiUpstream(c);
+        // SpectrumJetson (photonvision-72): what the Jetson's GPU does, for the Device card.
+        try {
+            ui.settings.general.spectrumGpu =
+                    org.photonvision.common.hardware.GpuStatus.describe(
+                            VisionSourceManager.getInstance().getVisionModules());
+        } catch (Exception e) {
+            // the Device card just shows less
+        }
+        return ui;
+    }
+
+    private static UIPhotonConfiguration programStateToUiUpstream(PhotonConfiguration c) {
         return new UIPhotonConfiguration(
                 new UIProgramSettings(
                         new UINetConfig(

@@ -115,7 +115,8 @@ export const useSettingsStore = defineStore("settings", {
       ipAddress: undefined,
       uptime: undefined,
       sentBitRate: undefined,
-      recvBitRate: undefined
+      recvBitRate: undefined,
+      gpuUtil: undefined
     },
     currentFieldLayout: {
       "field-dimensions": {
@@ -149,7 +150,9 @@ export const useSettingsStore = defineStore("settings", {
         ipAddress: data.ipAddress || undefined,
         uptime: data.uptime || undefined,
         sentBitRate: data.sentBitRate || undefined,
-        recvBitRate: data.recvBitRate || undefined
+        recvBitRate: data.recvBitRate || undefined,
+        // SpectrumJetson (photonvision-19): ?? not ||: an idle GPU (0%) is a real reading
+        gpuUtil: data.gpuUtil ?? undefined
       };
       if (metricsHistoryBuffer.update({ time: Date.now(), metrics: this.metrics })) {
         metricsHistorySnapshot.value = metricsHistoryBuffer.getHistory();
@@ -163,6 +166,7 @@ export const useSettingsStore = defineStore("settings", {
         hardwarePlatform: data.general.hardwarePlatform || undefined,
         wpilibArch: data.general.wpilibArch || undefined,
         gpuAcceleration: data.general.gpuAcceleration || undefined,
+        spectrumGpu: data.general.spectrumGpu || undefined, // SpectrumJetson (photonvision-72)
         mrCalWorking: data.general.mrCalWorking,
         availableModels: data.general.availableModels || undefined,
         supportedBackends: data.general.supportedBackends || [],

@@ -54,7 +54,8 @@ public class DeviceMetricsProto implements Protobuf<DeviceMetrics, ProtobufDevic
                 msg.getIpAddress(),
                 msg.getUptime(),
                 msg.getSentBitRate(),
-                msg.getRecvBitRate());
+                msg.getRecvBitRate(),
+                -1.0); // SpectrumJetson (photonvision-19): gpuUtil isn't in the protobuf
     }
 
     @Override
