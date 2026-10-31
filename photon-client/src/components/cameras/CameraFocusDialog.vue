@@ -29,6 +29,38 @@ const centrePct = computed(() => (reading.value ? 100 * share(reading.value.cent
 const cells = computed(() =>
   (reading.value?.grid ?? Array(9).fill(0)).map((v, i) => Math.round(100 * share(v, cellBest.value[i])))
 );
+// The centre score's last 10 s (10 a second), for the graph and the trend arrow.
+const history = ref<number[]>([]);
+const HISTORY = 100;
+// Rising or falling over the last second, by more than 2% of the best a second; else steady.
+const trend = computed<"up" | "down" | "steady">(() => {
+  const h = history.value.slice(-10);
+  const best = reading.value?.best ?? 0;
+  if (h.length < 6 || best <= 0) return "steady";
+  const n = h.length;
+  const mx = (n - 1) / 2;
+  const my = h.reduce((a, b) => a + b, 0) / n;
+  let num = 0,
+    den = 0;
+  h.forEach((y, x) => {
+    num += (x - mx) * (y - my);
+    den += (x - mx) * (x - mx);
+  });
+  const perSecond = (num / den) * 10;
+  return perSecond > 0.02 * best ? "up" : perSecond < -0.02 * best ? "down" : "steady";
+});
+const sparkline = computed(() => {
+  const h = history.value;
+  const top = Math.max(reading.value?.best ?? 0, ...h, 1);
+  return h.map((v, i) => `${(i / (HISTORY - 1)) * 300},${48 - (v / top) * 44}`).join(" ");
+});
+// A cell with much less detail than the most detailed one measures mostly noise.
+const noDetail = computed(() => {
+  const g = reading.value?.grid ?? [];
+  const most = Math.max(...g, 0);
+  return g.map((v) => most > 0 && v < 0.15 * most);
+});
+
 const tint = (pct: number) => (pct >= 97 ? "76, 175, 80" : pct >= 85 ? "255, 193, 7" : "244, 67, 54");
 const status = computed(() => {
   if (!reading.value) return "Measuring…";
@@ -62,14 +94,27 @@ const draw = () => {
   cells.value.forEach((pct, i) => {
     const cx = x0 + ((i % 3) * w) / 3,
       cy = y0 + (Math.floor(i / 3) * h) / 3;
-    ctx.fillStyle = `rgba(${tint(pct)}, 0.12)`;
-    ctx.fillRect(cx, cy, w / 3, h / 3);
-    ctx.strokeStyle = `rgba(${tint(pct)}, 0.9)`;
-    ctx.lineWidth = Math.max(2, h / 300);
-    ctx.strokeRect(cx, cy, w / 3, h / 3);
+    if (noDetail.value[i]) {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.lineWidth = Math.max(1, h / 400);
+      ctx.strokeRect(cx, cy, w / 3, h / 3);
+    } else {
+      ctx.fillStyle = `rgba(${tint(pct)}, 0.12)`;
+      ctx.fillRect(cx, cy, w / 3, h / 3);
+      ctx.strokeStyle = `rgba(${tint(pct)}, 0.9)`;
+      ctx.lineWidth = Math.max(2, h / 300);
+      ctx.strokeRect(cx, cy, w / 3, h / 3);
+    }
     if (i === 4) return; // the loupe and the big number cover the centre
     ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
     ctx.fillRect(cx + w / 6 - font * 1.6, cy + h / 6 - font * 0.65, font * 3.2, font * 1.3);
+    if (noDetail.value[i]) {
+      ctx.fillStyle = "#bbb";
+      ctx.font = `600 ${Math.round(font * 0.45)}px sans-serif`;
+      ctx.fillText("no detail", cx + w / 6, cy + h / 6);
+      ctx.font = `600 ${font}px sans-serif`;
+      return;
+    }
     ctx.fillStyle = `rgb(${tint(pct)})`;
     ctx.fillText(`${pct}%`, cx + w / 6, cy + h / 6);
   });
@@ -104,6 +149,7 @@ const tick = async () => {
       axios.get(`/focus/frame?camera=${cam}`, { responseType: "blob" })
     ]);
     reading.value = r.status === 200 ? r.data : null;
+    if (reading.value) history.value = [...history.value, reading.value.centre].slice(-HISTORY);
     if (reading.value) cellBest.value = cellBest.value.map((b, i) => Math.max(b, reading.value!.grid[i]));
     if (f.status === 200) {
       const next = await createImageBitmap(f.data as Blob);
@@ -119,6 +165,7 @@ const tick = async () => {
 
 const reset = async () => {
   cellBest.value = Array(9).fill(0);
+  history.value = [];
   try {
     await axios.get(`/focus?camera=${encodeURIComponent(camera.value)}&reset=1`);
   } catch {
@@ -162,6 +209,18 @@ onBeforeUnmount(() => {
           <div class="label">Sharpest so far</div>
           <div class="mid">{{ reading ? Math.round(reading.best) : "" }}</div>
         </div>
+        <div class="mr-6 text-center" style="width: 150px">
+          <div class="arrow" :class="trend">{{ trend === "up" ? "▲" : trend === "down" ? "▼" : "■" }}</div>
+          <div class="label">
+            {{ trend === "up" ? "getting sharper" : trend === "down" ? "getting softer" : "steady" }}
+          </div>
+        </div>
+        <!-- The centre over the last 10 s: turn through the hump, then back to its top. -->
+        <svg class="mr-6" width="300" height="50" viewBox="0 0 300 50" preserveAspectRatio="none">
+          <rect x="0" y="0" width="300" height="50" fill="rgba(255,255,255,0.06)" />
+          <line x1="0" y1="4" x2="300" y2="4" stroke="rgba(255,255,255,0.5)" stroke-dasharray="4 4" />
+          <polyline :points="sparkline" fill="none" stroke="#D8C6FE" stroke-width="2.5" />
+        </svg>
         <div class="flex-grow-1 mr-6">
           <div class="label">{{ status }}</div>
           <!-- Peak hold: the bar is now, the mark at the right end is the best so far. -->
@@ -214,6 +273,19 @@ onBeforeUnmount(() => {
 .fill {
   height: 100%;
   transition: width 0.1s linear;
+}
+.arrow {
+  font-size: 40px;
+  line-height: 1;
+}
+.arrow.up {
+  color: #4caf50;
+}
+.arrow.down {
+  color: #f44336;
+}
+.arrow.steady {
+  color: #999;
 }
 .peak {
   position: absolute;

@@ -48,7 +48,14 @@ public class FocusMeter implements CVPipelineResultConsumer {
     private static final long WANTED_NS = 3_000_000_000L;
     private static final long PERIOD_NS = 200_000_000L;
     // Spectrum (focus view): 10 readings a second, and the full-size image, while it's open.
-    private static final long VIEW_PERIOD_NS = 100_000_000L;
+    private static final long VIEW_PERIOD_NS = 33_000_000L;
+    // Spectrum (focus view): one frame's Laplacian variance jumps with sensor noise, JPEG and the
+    // hand on the lens (the view's numbers bounced ~10% with the lens still). Each cell is averaged
+    // over ~0.3 s (exponential, weighted by the time since the last reading), and the best is taken
+    // from the averaged values, so one lucky frame can't set it.
+    private static final double SMOOTH_S = 0.3;
+    private double[] smooth = null;
+    private long smoothNs = 0;
     private volatile long viewUntilNs = 0;
     private volatile byte[] jpeg = null;
 
@@ -148,11 +155,17 @@ public class FocusMeter implements CVPipelineResultConsumer {
                     cell.release();
                 }
             }
+            long now = System.nanoTime();
+            double dt = smooth == null ? 1 : (now - smoothNs) / 1e9;
+            if (smooth == null || dt > 2) smooth = g.clone();
+            double a = 1 - Math.exp(-dt / SMOOTH_S);
+            for (int i = 0; i < 9; i++) smooth[i] += a * (g[i] - smooth[i]);
+            smoothNs = now;
             width = w;
             height = h;
-            grid = g;
-            best = Math.max(best, g[4]);
-            measuredNs = System.nanoTime();
+            grid = smooth.clone();
+            best = Math.max(best, smooth[4]);
+            measuredNs = now;
         } finally {
             lap.release();
             mean.release();
