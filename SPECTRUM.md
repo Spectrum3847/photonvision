@@ -153,6 +153,13 @@ tell PhotonVision what we've done, but not one change at a time.
 The CUDA detector (`bos-*`, `gpudetector-*` in SpectrumJetson) is a separate library and moves to its
 own fork of frc971/bos later; until then SpectrumJetson keeps building it.
 
+## Later
+
+- **Quick centre-only calibration** (2026-10-30): a camera model's generic calibration gets fx, fy and
+  distortion about right, but the image centre varies per unit (two Thriftiest Cams: cy 418 vs 370,
+  up to ~2 deg of pitch). Refit only cx, cy from 10-15 board snapshots, keeping the model's other
+  values: minutes per camera instead of a full calibration.
+
 ## How to port a feature
 
 1. Read the feature's patches in SpectrumJetson (and its docs: `README.md`, `docs/TECHNICAL.md`).
