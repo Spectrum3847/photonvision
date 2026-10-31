@@ -77,7 +77,7 @@ const getOptions = (data: ChartData[] = []) => {
       splitLine: {
         show: true,
         lineStyle: {
-          color: "#ffffff18"
+          color: theme.global.name.value === "LightTheme" ? "#00000018" : "#ffffff18"
         }
       },
       splitNumber: 4,
@@ -89,7 +89,7 @@ const getOptions = (data: ChartData[] = []) => {
       },
       axisLabel: {
         align: "left",
-        color: theme.global.current.value.dark ? "#ddd" : "#fff",
+        color: theme.global.current.value.dark ? "#ddd" : "#444",
         formatter: (value: number) => {
           const date = new Date(value);
           return date.toLocaleTimeString([], {
@@ -118,11 +118,11 @@ const getOptions = (data: ChartData[] = []) => {
       splitLine: {
         show: true,
         lineStyle: {
-          color: "#ffffff18"
+          color: theme.global.current.value.dark ? "#ffffff18" : "#00000018"
         }
       },
       axisLabel: {
-        color: theme.global.current.value.dark ? "#ddd" : "#fff"
+        color: theme.global.current.value.dark ? "#ddd" : "#444"
       }
     },
     series: getSeries(data),

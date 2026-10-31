@@ -24,10 +24,13 @@ const renderCompact = computed<boolean>(() => compact.value || !mdAndUp.value);
 
 <template>
   <v-navigation-drawer permanent :rail="renderCompact" color="sidebar">
-    <v-list nav color="primary">
+    <v-list nav color="accent">
       <v-list-item class="pr-0 pl-0" style="display: flex; justify-content: center">
         <template #prepend>
-          <img v-if="!renderCompact" class="logo" src="@/assets/images/logoLarge.svg" alt="large logo" />
+          <div v-if="!renderCompact" class="logo-row">
+            <img class="dino" src="@/assets/images/dino.webp" alt="Spectrum dino" />
+            <img class="logo" src="@/assets/images/logoLarge.svg" alt="large logo" />
+          </div>
           <img v-else class="logo" src="@/assets/images/logoSmallTransparent.svg" alt="small logo" />
         </template>
       </v-list-item>
@@ -151,6 +154,25 @@ const renderCompact = computed<boolean>(() => compact.value || !mdAndUp.value);
   width: 100%;
   height: 70px;
   object-fit: contain;
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.logo-row .logo {
+  flex: 1;
+  min-width: 0;
+}
+
+.dino {
+  height: 56px;
+  flex-shrink: 0;
+  /* mirrored so the dino faces the PhotonVision logo */
+  transform: scaleX(-1);
 }
 
 .cameraicon {

@@ -14,7 +14,7 @@ html {
 }
 
 .v-row-group__header {
-  background: #005281 !important;
+  background: #4e3a8c !important;
 }
 .v-table
   > .v-table__wrapper
@@ -71,4 +71,45 @@ html {
 
 .rounded-12 {
   border-radius: 12px;
+}
+
+// Light theme: white cards. Many components hard-code white text for the old blue cards, so
+// inside cards and dialogs that text follows the theme's text colour instead.
+.v-theme--LightTheme {
+  .v-card,
+  &.v-card {
+    .text-white,
+    [style*="color: white"],
+    .v-table th,
+    .v-table td,
+    .metric-item {
+      color: rgb(var(--v-theme-on-surface)) !important;
+    }
+    .v-icon[style*="rgb(197, 197, 197)"] {
+      color: rgba(var(--v-theme-on-surface), 0.6) !important;
+    }
+    // Camera Matching's status words and stream links (bright green / yellow)
+    .active-status {
+      color: #2e7d32 !important;
+    }
+    .stream-link {
+      color: rgb(var(--v-theme-primary)) !important;
+    }
+    .mismatch-status {
+      color: #b26a00 !important;
+    }
+    .v-btn.v-btn--disabled {
+      background-color: #e6e1f0 !important;
+    }
+    .v-divider,
+    .metrics-table {
+      border-color: rgba(var(--v-theme-on-surface), 0.25) !important;
+    }
+  }
+  .v-row-group__header {
+    color: white;
+  }
+  .v-table > .v-table__wrapper > table > tbody > tr:hover {
+    background: rgba(107, 82, 181, 0.1) !important;
+  }
 }

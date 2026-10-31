@@ -11,7 +11,7 @@
     <g>
       <g transform="translate(80,50)">
         <g transform="rotate(0)">
-          <circle class="loader-circle" fill-opacity="1" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="1" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -34,7 +34,7 @@
       </g>
       <g transform="translate(71.21320343559643,71.21320343559643)">
         <g transform="rotate(45)">
-          <circle class="loader-circle" fill-opacity="0.875" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.875" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -57,7 +57,7 @@
       </g>
       <g transform="translate(50,80)">
         <g transform="rotate(90)">
-          <circle class="loader-circle" fill-opacity="0.75" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.75" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -80,7 +80,7 @@
       </g>
       <g transform="translate(28.786796564403577,71.21320343559643)">
         <g transform="rotate(135)">
-          <circle class="loader-circle" fill-opacity="0.625" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.625" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -103,7 +103,7 @@
       </g>
       <g transform="translate(20,50.00000000000001)">
         <g transform="rotate(180)">
-          <circle class="loader-circle" fill-opacity="0.5" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.5" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -126,7 +126,7 @@
       </g>
       <g transform="translate(28.78679656440357,28.786796564403577)">
         <g transform="rotate(225)">
-          <circle class="loader-circle" fill-opacity="0.375" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.375" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -149,7 +149,7 @@
       </g>
       <g transform="translate(49.99999999999999,20)">
         <g transform="rotate(270)">
-          <circle class="loader-circle" fill-opacity="0.25" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.25" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"
@@ -172,7 +172,7 @@
       </g>
       <g transform="translate(71.21320343559643,28.78679656440357)">
         <g transform="rotate(315)">
-          <circle class="loader-circle" fill-opacity="0.125" fill="#ffd943" r="6" cy="0" cx="0">
+          <circle class="loader-circle" fill-opacity="0.125" fill="#d8c6fe" r="6" cy="0" cx="0">
             <animateTransform
               repeatCount="indefinite"
               dur="0.9345794392523364s"

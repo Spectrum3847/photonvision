@@ -3,13 +3,16 @@ void import("@mdi/font/css/materialdesignicons.css");
 import type { ThemeDefinition } from "vuetify";
 import { createVuetify } from "vuetify";
 
+// Spectrum's purple, taken from the dino mascot (assets/images/dino.webp)
 const CommonColors = {
-  photonBlue: "#006492",
-  photonYellow: "#FFD843",
-  lightBlue: "#39A4D5",
-  darkGray: "#151515",
-  gray: "#1c232c",
-  lightGray: "#232C37"
+  pastelPurple: "#D8C6FE",
+  bowPurple: "#996AFF",
+  purple: "#6B52B5",
+  deepPurple: "#4E3A8C",
+  darkGray: "#151219",
+  gray: "#221C2E",
+  paleLavender: "#F4F0FF",
+  white: "#FFFFFF"
 };
 
 export const DarkTheme: ThemeDefinition = {
@@ -19,17 +22,17 @@ export const DarkTheme: ThemeDefinition = {
     sidebar: CommonColors.darkGray,
 
     surface: CommonColors.gray,
-    primary: CommonColors.lightBlue,
-    secondary: CommonColors.photonYellow,
-    accent: CommonColors.photonBlue,
+    primary: CommonColors.pastelPurple,
+    secondary: CommonColors.bowPurple,
+    accent: CommonColors.purple,
 
-    toggle: CommonColors.photonBlue,
+    toggle: CommonColors.purple,
     logsBackground: CommonColors.darkGray,
 
-    buttonActive: CommonColors.photonYellow,
-    buttonPassive: CommonColors.lightBlue,
+    buttonActive: CommonColors.pastelPurple,
+    buttonPassive: CommonColors.bowPurple,
 
-    "surface-variant": "#485b70",
+    "surface-variant": "#5a4a7a",
     "on-surface-variant": "#f0f0f0",
 
     error: "#ff2e2e",
@@ -42,28 +45,28 @@ export const DarkTheme: ThemeDefinition = {
 export const LightTheme: ThemeDefinition = {
   dark: false,
   colors: {
-    background: CommonColors.lightGray,
-    sidebar: CommonColors.photonBlue,
+    background: CommonColors.paleLavender,
+    sidebar: CommonColors.deepPurple,
 
-    surface: CommonColors.photonBlue,
-    primary: CommonColors.photonYellow,
-    secondary: CommonColors.lightBlue,
-    accent: CommonColors.photonYellow,
+    surface: CommonColors.white,
+    primary: CommonColors.purple,
+    secondary: CommonColors.bowPurple,
+    accent: CommonColors.pastelPurple,
 
-    toggle: CommonColors.lightBlue,
-    logsBackground: CommonColors.lightGray,
+    toggle: CommonColors.bowPurple,
+    logsBackground: CommonColors.white,
 
-    buttonActive: CommonColors.photonYellow,
-    buttonPassive: CommonColors.lightBlue,
+    buttonActive: CommonColors.purple,
+    buttonPassive: CommonColors.pastelPurple,
 
-    "surface-variant": "#8f8f8fff",
+    "surface-variant": "#5a4a7a",
+    "on-surface-variant": "#f0f0f0",
 
     error: "#b80000",
     info: "#2196F3",
     success: "#4CAF50",
     warning: "#FFC107"
-  },
-  variables: { "medium-emphasis-opacity": 1, "high-emphasis-opacity": 1 }
+  }
 };
 
 export default createVuetify({

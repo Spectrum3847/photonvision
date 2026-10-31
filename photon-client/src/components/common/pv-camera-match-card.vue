@@ -100,6 +100,6 @@ const { saved, current } = defineProps<{ saved: PVCameraInfo; current: PVCameraI
 
 <style scoped>
 .mismatch {
-  background: #39a4d546 !important;
+  background: #996aff46 !important;
 }
 </style>

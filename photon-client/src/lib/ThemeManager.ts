@@ -26,8 +26,9 @@ export const setThemeColor = (theme: ThemeInstance, color: string, value: string
 };
 
 export const toggleTheme = (theme: ThemeInstance) => {
-  const currentTheme = localStorage.getItem("theme");
-  localStorage.setItem("theme", currentTheme === "LightTheme" ? "DarkTheme" : "LightTheme");
+  // From the theme showing, not localStorage: before the first toggle nothing is stored, and the
+  // first click used to store "LightTheme" (the default) and change nothing.
+  localStorage.setItem("theme", theme.global.name.value === "LightTheme" ? "DarkTheme" : "LightTheme");
 
   restoreThemeConfig(theme);
 };
