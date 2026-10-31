@@ -1069,7 +1069,7 @@ public class RequestHandler {
 
     // SpectrumJetson (photonvision-50): Settings > Robot state: idle mode (49, 50), the event
     // profile (51), the far-tag search (55), quiet mode (56), the thermal limit (57), the cooling
-    // (71), and the robot's state as PhotonVision sees it.
+    // (71), the clock throttle (90), and the robot's state as PhotonVision sees it.
     @Json
     record RobotStateRequest(
             Boolean idleWhileDisabled,
@@ -1081,6 +1081,7 @@ public class RequestHandler {
             Double farSweepsPerSecond,
             Boolean quietAfterMatch,
             Integer quietAfterDisabledSeconds,
+            Integer throttleClocksAfterDisabledSeconds,
             String fanMode) {}
 
     public static void onRobotStateRequest(Context ctx) {
@@ -1096,7 +1097,7 @@ public class RequestHandler {
             ctx.result(
                     "Expected {idleWhileDisabled, idleFps, eventProfileOnFms, eventPipeline, switchNow,"
                             + " farSearch, farSweepsPerSecond, quietAfterMatch, quietAfterDisabledSeconds,"
-                            + " fanMode}: "
+                            + " throttleClocksAfterDisabledSeconds, fanMode}: "
                             + e.getMessage());
             return;
         }
@@ -1106,7 +1107,8 @@ public class RequestHandler {
                 req.eventProfileOnFms(),
                 req.eventPipeline(),
                 req.quietAfterMatch(),
-                req.quietAfterDisabledSeconds());
+                req.quietAfterDisabledSeconds(),
+                req.throttleClocksAfterDisabledSeconds());
         // photonvision-55: the far search keeps its own settings (FarSearch), shown here as in 2026.
         if (req.farSearch() != null || req.farSweepsPerSecond() != null) {
             org.photonvision.vision.processes.FarSearch.update(req.farSearch(), req.farSweepsPerSecond());

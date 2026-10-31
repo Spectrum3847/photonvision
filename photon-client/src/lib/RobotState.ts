@@ -35,6 +35,14 @@ export interface RobotState {
   quietError: string;
   quietHelper: boolean;
   quietLastLeaveMs: number;
+  // photonvision-90: lower clocks while disabled (absent without the spectrum-clocks helper)
+  throttleClocksAfterDisabledSeconds: number;
+  clocksHelper?: boolean;
+  clocksThrottled?: boolean;
+  clocksReason?: string;
+  clocksMode?: "auto" | "full";
+  clocksLastFullMs?: number;
+  clocksError?: string;
   // photonvision-57
   thermalLimitNow: boolean;
   thermalLimitFps: number;
@@ -56,6 +64,7 @@ export interface RobotStateChange {
   farSweepsPerSecond?: number;
   quietAfterMatch?: boolean;
   quietAfterDisabledSeconds?: number;
+  throttleClocksAfterDisabledSeconds?: number;
   fanMode?: CoolingMode;
 }
 

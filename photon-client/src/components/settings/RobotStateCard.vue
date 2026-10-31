@@ -198,6 +198,31 @@ onBeforeUnmount(() => clearInterval(timer));
         not on this device.
       </p>
       <v-divider class="my-3" />
+      <template v-if="robotState.clocksHelper">
+        <pv-slider
+          :model-value="robotState.throttleClocksAfterDisabledSeconds"
+          :disabled="busy"
+          label="Lower clocks after disabled for (s)"
+          tooltip="Lower the CPU and GPU clocks (about 3 W less, a cooler chip) once the robot has been disabled this long, or no robot is connected (the bench). Back to full clocks the moment the robot is enabled. At least 10 s, so never in the gap between auto and teleop. 0 = never."
+          :min="0"
+          :max="600"
+          :step="10"
+          :slider-cols="8"
+          @update:model-value="(v) => set({ throttleClocksAfterDisabledSeconds: v })"
+        />
+        <p class="text-caption pb-1" data-testid="clocks-status">
+          <template v-if="robotState.clocksMode === 'full'"
+            >Always full clocks: mode full (sudo spectrum-clocks mode auto to undo).</template
+          >
+          <template v-else-if="robotState.clocksThrottled">Lower clocks now ({{ robotState.clocksReason }}).</template>
+          <template v-else>Full clocks.</template>
+          <template v-if="(robotState.clocksLastFullMs ?? -1) >= 0">
+            Last switch back to full took {{ robotState.clocksLastFullMs }} ms.</template
+          >
+          <template v-if="robotState.clocksError"> Problem: {{ robotState.clocksError }}</template>
+        </p>
+        <v-divider class="my-3" />
+      </template>
       <pv-switch
         :model-value="robotState.eventProfileOnFms"
         :disabled="busy"

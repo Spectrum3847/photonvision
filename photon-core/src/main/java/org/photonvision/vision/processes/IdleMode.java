@@ -75,6 +75,12 @@ public final class IdleMode {
 
         /** ...or after this long disabled (0 = never). */
         public int quietAfterDisabledSeconds = 60;
+
+        /**
+         * photonvision-90: lower the CPU/GPU clocks after this long disabled or with no robot (0 =
+         * never; {@link ClockThrottle}).
+         */
+        public int throttleClocksAfterDisabledSeconds = 20;
     }
 
     // On a Jetson, /opt/photonvision/spectrum-robot-state.json is bound from the settings partition
@@ -119,6 +125,9 @@ public final class IdleMode {
             s.quietAfterMatch = j.extract("quietAfterMatch", s.quietAfterMatch);
             s.quietAfterDisabledSeconds =
                     j.extract("quietAfterDisabledSeconds", s.quietAfterDisabledSeconds);
+            s.throttleClocksAfterDisabledSeconds =
+                    j.extract(
+                            "throttleClocksAfterDisabledSeconds", s.throttleClocksAfterDisabledSeconds);
         } catch (IOException | RuntimeException e) {
             logger.error("Couldn't read " + file + "; using the defaults", e);
             return new Settings();
@@ -141,7 +150,8 @@ public final class IdleMode {
                 .add("eventProfileOnFms", s.eventProfileOnFms)
                 .add("eventPipeline", s.eventPipeline)
                 .add("quietAfterMatch", s.quietAfterMatch)
-                .add("quietAfterDisabledSeconds", s.quietAfterDisabledSeconds);
+                .add("quietAfterDisabledSeconds", s.quietAfterDisabledSeconds)
+                .add("throttleClocksAfterDisabledSeconds", s.throttleClocksAfterDisabledSeconds);
         try {
             Files.writeString(file, json.toJson(j));
         } catch (IOException e) {
@@ -164,7 +174,8 @@ public final class IdleMode {
             Boolean eventProfileOnFms,
             Integer eventPipeline,
             Boolean quietAfterMatch,
-            Integer quietAfterDisabledSeconds) {
+            Integer quietAfterDisabledSeconds,
+            Integer throttleClocksAfterDisabledSeconds) {
         var old = settings;
         var s = new Settings();
         s.idleWhileDisabled = idleWhileDisabled != null ? idleWhileDisabled : old.idleWhileDisabled;
@@ -176,9 +187,17 @@ public final class IdleMode {
                 quietAfterDisabledSeconds != null
                         ? Math.max(0, Math.min(3600, quietAfterDisabledSeconds))
                         : old.quietAfterDisabledSeconds;
+        // At least 10 s: never in the ~3 s between auto and teleop.
+        s.throttleClocksAfterDisabledSeconds =
+                throttleClocksAfterDisabledSeconds != null
+                        ? (throttleClocksAfterDisabledSeconds <= 0
+                                ? 0
+                                : Math.max(10, Math.min(3600, throttleClocksAfterDisabledSeconds)))
+                        : old.throttleClocksAfterDisabledSeconds;
         settings = s;
         idlePeriodNanos = period(s);
         save(s);
+        ClockThrottle.wake(); // photonvision-90: a changed setting applies now
         logger.info(
                 s.idleWhileDisabled
                         ? "Idle mode on: " + s.idleFps + " fps per camera while the robot is disabled"
@@ -295,6 +314,8 @@ public final class IdleMode {
         m.put("quietAfterMatch", s.quietAfterMatch);
         m.put("quietAfterDisabledSeconds", s.quietAfterDisabledSeconds);
         m.putAll(QuietMode.status());
+        m.put("throttleClocksAfterDisabledSeconds", s.throttleClocksAfterDisabledSeconds);
+        m.putAll(ClockThrottle.status()); // photonvision-90
         // photonvision-71: the cooling mode.
         m.put("fanAvailable", FanMode.available());
         m.put("fanMode", FanMode.mode());
@@ -314,6 +335,7 @@ public final class IdleMode {
         if (ds == null) return;
         listening = true;
         QuietMode.start(); // photonvision-56
+        ClockThrottle.start(); // photonvision-90
         logger.info(
                 idlePeriodNanos > 0
                         ? "Idle mode: " + settings.idleFps + " fps per camera while the robot is disabled"
