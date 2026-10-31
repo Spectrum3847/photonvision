@@ -148,10 +148,21 @@ public class FocusMeter implements CVPipelineResultConsumer {
             double[] g = new double[9];
             for (int r = 0; r < 3; r++) {
                 for (int c = 0; c < 3; c++) {
-                    Mat cell = lap.submat(new Rect(c * w / 3, r * h / 3, w / 3, h / 3));
+                    Rect roi = new Rect(c * w / 3, r * h / 3, w / 3, h / 3);
+                    Mat cell = lap.submat(roi);
                     Core.meanStdDev(cell, mean, std);
                     double s = std.toArray()[0];
-                    g[r * 3 + c] = s * s;
+                    // Spectrum (focus view): relative to the cell's own contrast. Under mains light
+                    // a 120 fps camera with a short exposure beats against the 120 Hz flicker, and
+                    // the plain score swung 500-620 about once a second with the lens still. The
+                    // Laplacian's variance over the image's variance cancels brightness and gain;
+                    // what's left is how sharp the edges are. x1000 to keep numbers readable.
+                    Mat img = gray.submat(roi);
+                    Core.meanStdDev(img, mean, std);
+                    double v = std.toArray()[0];
+                    // Under ~6 grey levels of contrast there is nothing to focus on: 0 ("no detail").
+                    g[r * 3 + c] = v >= 6 ? 1000 * s * s / (v * v) : 0;
+                    img.release();
                     cell.release();
                 }
             }
