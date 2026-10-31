@@ -38,6 +38,10 @@ const renderCompact = computed<boolean>(() => compact.value || !mdAndUp.value);
       <v-list-item link to="/dashboard" prepend-icon="mdi-view-dashboard">
         <v-list-item-title>Dashboard</v-list-item-title>
       </v-list-item>
+      <!-- SpectrumJetson (photonvision-52) -->
+      <v-list-item link to="/ready" prepend-icon="mdi-check-decagram">
+        <v-list-item-title>Match Ready</v-list-item-title>
+      </v-list-item>
       <v-list-item link to="/settings" prepend-icon="mdi-cog">
         <v-list-item-title>Settings</v-list-item-title>
       </v-list-item>

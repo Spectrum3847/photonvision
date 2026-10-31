@@ -193,6 +193,9 @@ public class VisionModule implements AutoCloseable {
         resultConsumers.add(
                 (result) ->
                         lastPipelineResultBestTarget = result.hasTargets() ? result.targets.get(0) : null);
+        // SpectrumJetson (photonvision-58): frames processed since start, for the test suite to tell
+        // which cameras are streaming (the change between two reads a second apart).
+        resultConsumers.add((result) -> framesProcessed.incrementAndGet());
         // SpectrumJetson (photonvision-16): the Jetson's health on NetworkTables; this camera's is the
         // CameraHealthPublisher below.
         JetsonTelemetry.start();
@@ -668,6 +671,20 @@ public class VisionModule implements AutoCloseable {
 
     public CameraCalibrationCoefficients getPendingCalibration() {
         return pendingCalibration;
+    }
+
+    /**
+     * SpectrumJetson (photonvision-58): frames this camera has processed since PhotonVision started.
+     */
+    public final java.util.concurrent.atomic.AtomicLong framesProcessed =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    /**
+     * SpectrumJetson (photonvision-45): every saved pipeline's settings, in order, for
+     * /api/spectrum/uiState (read-only: the settings themselves, not copies).
+     */
+    public List<CVPipelineSettings> uiStatePipelineSettings() {
+        return List.copyOf(pipelineManager.userPipelineSettings);
     }
 
     /** SpectrumJetson (photonvision-48): whether each stream has a viewer, for tests/ui. */

@@ -55,7 +55,15 @@ const checkNumberRange = (v: string): boolean => {
 </script>
 
 <template>
-  <div class="d-flex">
+  <div
+    class="d-flex"
+    data-pv-control="range"
+    :data-pv-label="label"
+    :data-pv-min="min"
+    :data-pv-max="max"
+    :data-pv-step="step"
+  >
+    <!-- SpectrumJetson (photonvision-45): data-pv-* name the control for tests/ui -->
     <v-col :cols="12 - sliderCols" class="d-flex align-center pl-0">
       <tooltipped-label :tooltip="tooltip" :label="label" />
     </v-col>

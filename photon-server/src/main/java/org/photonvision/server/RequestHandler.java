@@ -2150,4 +2150,125 @@ public class RequestHandler {
             return;
         }
     }
+
+    // ---- SpectrumJetson operations UI, part B (photonvision-52, 45, 58, 60) ----
+
+    // SpectrumJetson (photonvision-52): the Match ready page runs scripts/jetson/health-check.sh, the
+    // same checks as over SSH, through /opt/photonvision/health-check.sh (a link to the repo's copy,
+    // made by 06-install-fork-jar.sh; SPECTRUM_HEALTH_CHECK overrides). One run at a time, 60 s at
+    // most; a request within 3 s of the last run gets that run. The script reads the other Spectrum
+    // endpoints itself (robotState, tagContrast, usb/bandwidth, spectrum/uiState).
+    private static final Object healthLock = new Object();
+    private static Map<String, Object> lastHealth = null;
+    private static long lastHealthNanos = 0;
+
+    public static void onHealthCheckRequest(Context ctx) {
+        Map<String, Object> result;
+        synchronized (healthLock) {
+            // photonvision-65: monotonic (the date can jump: RobotClockSync).
+            if (lastHealth != null && System.nanoTime() - lastHealthNanos < 3_000_000_000L) {
+                result = lastHealth;
+            } else {
+                result = runHealthCheck();
+                lastHealth = result;
+                lastHealthNanos = System.nanoTime();
+            }
+        }
+        ctx.json(result, Types.mapOf(Object.class));
+    }
+
+    private static final java.util.regex.Pattern kCheckLine =
+            java.util.regex.Pattern.compile("^\\s*(PASS|WARN|FAIL)\\s+(.*)$");
+
+    private static Map<String, Object> runHealthCheck() {
+        String env = System.getenv("SPECTRUM_HEALTH_CHECK");
+        String script = env != null && !env.isBlank() ? env : "/opt/photonvision/health-check.sh";
+        var sections = new ArrayList<Map<String, Object>>();
+        var out = new HashMap<String, Object>();
+        String verdict = "";
+        long startNanos = System.nanoTime();
+        var raw = new StringBuilder();
+        try {
+            if (!new File(script).exists()) {
+                throw new IOException(script + " not found (run 06-install-fork-jar.sh)");
+            }
+            var proc =
+                    new ProcessBuilder("timeout", "60", "bash", script).redirectErrorStream(true).start();
+            java.util.List<Map<String, Object>> items = null;
+            try (var reader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    raw.append(line).append('\n');
+                    var m = kCheckLine.matcher(line);
+                    if (line.startsWith("== ")) {
+                        items = new ArrayList<>();
+                        sections.add(Map.of("name", line.substring(3).trim(), "items", items));
+                    } else if (m.matches() && items != null) {
+                        items.add(Map.of("level", m.group(1), "text", m.group(2)));
+                    } else if (line.startsWith("READY") || line.startsWith("NOT READY")) {
+                        verdict = line.trim();
+                    } else if (!line.isBlank() && items != null) {
+                        items.add(Map.of("level", "INFO", "text", line.trim()));
+                    }
+                }
+            }
+            if (!proc.waitFor(65, java.util.concurrent.TimeUnit.SECONDS)) proc.destroyForcibly();
+            if (verdict.isEmpty()) verdict = "NOT READY: the health check didn't finish";
+        } catch (IOException | InterruptedException e) {
+            verdict = "NOT READY: couldn't run the health check: " + e.getMessage();
+        }
+        out.put("verdict", verdict);
+        out.put("sections", sections);
+        out.put("seconds", (System.nanoTime() - startNanos) / 1e9);
+        out.put("ranAt", System.currentTimeMillis()); // wall clock, for the page's "checked N s ago"
+        out.put("raw", raw.toString());
+        return out;
+    }
+
+    /**
+     * The backend's own copy of what each camera's dashboard shows (current pipeline and its
+     * settings), so tests/ui can check a control really changed the backend, not only the page.
+     * Read-only. SpectrumJetson (photonvision-45), with framesProcessed (58) and unmatchedCameras
+     * (60). health-check.sh reads cameras[].nickname and pipelineNicknames.
+     */
+    public static void onUiStateRequest(Context ctx) {
+        var jsonb = io.avaje.jsonb.Jsonb.instance();
+        var tree = jsonb.type(Object.class);
+        var settingsType = jsonb.type(org.photonvision.vision.pipeline.CVPipelineSettings.class);
+        var cameras = new ArrayList<Map<String, Object>>();
+        for (var module : VisionSourceManager.getInstance().vmm.getModules()) {
+            var ui = module.toUICameraConfig();
+            var camera = new HashMap<String, Object>();
+            camera.put("uniqueName", ui.uniqueName);
+            camera.put("nickname", ui.nickname);
+            camera.put("currentPipelineIndex", ui.currentPipelineIndex);
+            camera.put("pipelineNicknames", ui.pipelineNicknames);
+            // As the dashboard gets it (enums as numbers), so tests compare like with like.
+            camera.put("currentPipelineSettings", ui.currentPipelineSettings);
+            camera.put("extraControls", ui.extraControls);
+            camera.put("streamViewers", module.streamViewers()); // photonvision-48
+            camera.put("framesProcessed", module.framesProcessed.get()); // photonvision-58
+            // Every pipeline's saved settings, not only the running one's (photonvision-46), as
+            // saved: avaje's form, with its "type" property (2026's had Jackson's ["type", {...}]
+            // wrapper, which 45 stripped).
+            var pipelines = new ArrayList<Object>();
+            for (var settings : module.uiStatePipelineSettings()) {
+                try {
+                    pipelines.add(tree.fromJson(settingsType.toJson(settings)));
+                } catch (RuntimeException e) {
+                    pipelines.add(Map.of("error", String.valueOf(e.getMessage())));
+                }
+            }
+            camera.put("pipelines", pipelines);
+            cameras.add(camera);
+        }
+        // photonvision-60: connected cameras not in use yet, in the form assignUnmatchedCamera takes
+        // (each written as a PVCameraInfo, so its "type" property comes along).
+        var unmatched = new ArrayList<Object>();
+        var infoType = jsonb.type(PVCameraInfo.class);
+        for (var info : VisionSourceManager.getInstance().unmatchedConnectedCameras()) {
+            unmatched.add(tree.fromJson(infoType.toJson(info)));
+        }
+        ctx.json(Map.of("cameras", cameras, "unmatchedCameras", unmatched), Types.mapOf(Object.class));
+    }
 }

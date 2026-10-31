@@ -4,6 +4,7 @@
 // photonvision-07, with 75 (file names), 78 (record through disconnects) and 65 (why a delete failed).
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import axios from "axios";
+import { oneAtATime, POLL_TIMEOUT_MS } from "@/lib/Poll";
 import PvSwitch from "@/components/common/pv-switch.vue";
 import { useStateStore } from "@/stores/StateStore";
 import { useTheme } from "vuetify";
@@ -33,20 +34,14 @@ const status = ref<RewindStatus | null>(null);
 const busy = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
-// photonvision-67 (feature 13's Poll.ts, not ported yet): one request in flight, with a timeout,
-// so a slow or dropped link doesn't pile requests up on the Jetson.
-let loading = false;
-const load = async () => {
-  if (loading) return;
-  loading = true;
+// photonvision-67: one request in flight, with a timeout (Poll.ts).
+const load = oneAtATime(async () => {
   try {
-    status.value = (await axios.get("/rewind", { timeout: 10_000 })).data;
+    status.value = (await axios.get("/rewind", { timeout: POLL_TIMEOUT_MS })).data;
   } catch {
     status.value = null;
-  } finally {
-    loading = false;
   }
-};
+});
 const post = async (body: object, message: string) => {
   busy.value = true;
   try {

@@ -850,6 +850,11 @@ const setSelectedVideoFormat = (format: VideoFormat) => {
             </v-btn>
           </v-col>
         </div>
+        <!-- SpectrumJetson (photonvision-26) -->
+        <p v-if="isCalibrating" class="pt-3 text-caption">
+          A long exposure (about 15 ms) is fine for calibrating because the board is held still. Don't copy it into the
+          vision pipelines: on a moving robot they need a short one (see the Input tab's tuning guide).
+        </p>
         <div v-if="isCalibrating" class="pt-3">
           <v-btn
             size="small"

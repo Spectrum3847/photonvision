@@ -194,6 +194,11 @@ public class Server {
         app.post("/api/thriftiest/firmware/delete", RequestHandler::onThriftiestFirmwareDeleteRequest);
         app.post("/api/thriftiest/firmware/flash", RequestHandler::onThriftiestFirmwareFlashRequest);
 
+        // ---- SpectrumJetson operations UI, part B ----
+        app.get("/api/healthCheck", RequestHandler::onHealthCheckRequest); // SpectrumJetson (52)
+        // Read-only view of what each camera's dashboard shows, for tests/ui (SpectrumJetson 45)
+        app.get("/api/spectrum/uiState", RequestHandler::onUiStateRequest);
+
         /* Testing API Events */
 
         app.post("/api/test/resetBackend", TestRequestHandler::handleResetRequest);

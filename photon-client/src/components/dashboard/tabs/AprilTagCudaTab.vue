@@ -36,7 +36,7 @@ const interactiveCols = computed(() =>
       v-model="currentPipelineSettings.decisionMargin"
       :slider-cols="interactiveCols"
       label="Decision Margin Cutoff"
-      tooltip="Tags with a 'margin' (decoding quality score) less than this will be rejected. Lower it if tags flicker at short exposures; raise it to reduce false positives"
+      tooltip="Recommended: 15 at 5 ms exposure. Tags with a 'margin' (decoding quality score) below this are rejected. Set it a little below what real tags score at your longest distance; lower it if tags flicker at short exposures, raise it if false tags appear"
       :min="0"
       :max="250"
       @update:modelValue="

@@ -4,6 +4,7 @@ import type { FieldTag, Quaternion } from "@/types/PhotonTrackingTypes";
 import { toDeg } from "@/lib/MathUtils";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import axios from "axios";
+import { oneAtATime, POLL_TIMEOUT_MS } from "@/lib/Poll";
 import { useStateStore } from "@/stores/StateStore";
 import { useTheme } from "vuetify";
 const { Euler, Quaternion: ThreeQuat } = await import("three");
@@ -16,14 +17,15 @@ const excluded = ref<ExcludedTags | null>(null);
 const excludedText = ref("");
 const excludedBusy = ref(false);
 const excludedTextValid = (text: string) => /^[\d,\s]*$/.test(text);
-const loadExcluded = async (updateText = false) => {
+// photonvision-67: one request in flight, with a timeout (Poll.ts).
+const loadExcluded = oneAtATime(async (updateText: boolean = false) => {
   try {
-    excluded.value = (await axios.get("/excludedTags")).data;
+    excluded.value = (await axios.get("/excludedTags", { timeout: POLL_TIMEOUT_MS })).data;
     if (updateText && excluded.value) excludedText.value = excluded.value.saved.join(", ");
   } catch {
     excluded.value = null;
   }
-};
+});
 const saveExcluded = async () => {
   excludedBusy.value = true;
   try {
