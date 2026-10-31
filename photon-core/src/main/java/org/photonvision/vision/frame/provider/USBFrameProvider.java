@@ -23,6 +23,7 @@ import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
 import org.photonvision.jni.CscoreExtras;
 import org.photonvision.jni.GpuDetectorJNI;
+import org.photonvision.rewind.RewindRecorder;
 import org.photonvision.vision.frame.FrameThresholdType;
 import org.photonvision.vision.opencv.CVMat;
 import org.photonvision.vision.processes.IdleMode;
@@ -54,6 +55,10 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     private long lastTime = 0;
 
+    // SpectrumJetson Rewind (photonvision-07): its own cscore sink and thread, apart from the
+    // capture path above (decoder thread, direct decode, watchdog, frame limiting).
+    private RewindRecorder rewind;
+
     @SuppressWarnings("SpellCheckingInspection")
     public USBFrameProvider(
             UsbCamera camera, VisionSourceSettables visionSettables, Runnable connectedCallback) {
@@ -69,6 +74,9 @@ public class USBFrameProvider extends CpuImageProcessor {
         this.settables = visionSettables;
 
         this.connectedCallback = connectedCallback;
+
+        // SpectrumJetson Rewind: records this camera's own MJPEG frames when robot code asks.
+        this.rewind = new RewindRecorder(camera, () -> settables.getConfiguration().nickname);
     }
 
     final double CSCORE_DEFAULT_FRAME_TIMEOUT = 1.0 / 4.0;
@@ -961,6 +969,10 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     @Override
     public void release() {
+        if (rewind != null) {
+            rewind.stop();
+            rewind = null;
+        }
         synchronized (decodedLock) {
             if (decoder != null) decoder.interrupt();
         }

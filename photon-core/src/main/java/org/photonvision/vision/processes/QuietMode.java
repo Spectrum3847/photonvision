@@ -55,10 +55,10 @@ import org.wpilib.networktables.StringPublisher;
  * helper (the SystemCore, a Jetson set up without 10-data-partition.sh) quiet mode never starts:
  * only {@code quietNow} (false) is published.
  *
- * <p>Rewind (feature 7) isn't ported yet. When it is, it plugs in at two hook points: it calls
- * {@link #setRecordingRequested} with its RewindManager.recordingRequested, and its 5 Hz tick
- * neither records nor tidies old recordings while {@link #quiet()} (2026's photonvision-56 and 65
- * changes to RewindManager, which wait for it).
+ * <p>Rewind (feature 7) plugs in at two hook points: RewindManager.start calls {@link
+ * #setRecordingRequested} with RewindManager.recordingRequested, and its 5 Hz tick neither records
+ * nor tidies old recordings while {@link #quiet()} (2026's photonvision-56 and 65 changes to
+ * RewindManager).
  */
 public final class QuietMode {
     private static final Logger logger = new Logger(QuietMode.class, LogGroup.General);
@@ -89,7 +89,7 @@ public final class QuietMode {
     }
 
     // Hook for Rewind (feature 7): whether someone wants a recording right now (the web UI's Record
-    // now, field calibration, or robot code's /photonvision/rewind/record). Nothing until then.
+    // now, field calibration, or robot code's /photonvision/rewind/record). RewindManager sets it.
     private static volatile BooleanSupplier recordingRequested = () -> false;
 
     /**

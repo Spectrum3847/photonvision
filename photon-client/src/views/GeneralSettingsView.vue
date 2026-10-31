@@ -7,6 +7,7 @@ import ApriltagControlCard from "@/components/settings/ApriltagControlCard.vue";
 import DeviceCard from "@/components/settings/DeviceCard.vue";
 import ThriftiestFirmwareCard from "@/components/settings/ThriftiestFirmwareCard.vue";
 import RobotStateCard from "@/components/settings/RobotStateCard.vue";
+import RewindCard from "@/components/settings/RewindCard.vue";
 </script>
 
 <template>
@@ -15,6 +16,7 @@ import RobotStateCard from "@/components/settings/RobotStateCard.vue";
     <GlobalSettingsCard />
     <ThriftiestFirmwareCard />
     <RobotStateCard />
+    <RewindCard />
     <ObjectDetectionCard v-if="useSettingsStore().general.supportedBackends.length > 0" />
     <LightingControlCard v-if="useSettingsStore().lighting.supported" />
     <Suspense>

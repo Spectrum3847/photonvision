@@ -175,10 +175,13 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
     }
 
     public void updateCameraNickname(String newCameraNickname) {
+        rewindCamera = org.photonvision.rewind.RewindManager.safeName(newCameraNickname);
         removeEntries();
         ts.subTable = rootTable.getSubTable(newCameraNickname);
         updateEntries();
     }
+
+    private String rewindCamera; // photonvision-79: the camera's Rewind folder name
 
     @Override
     public void accept(CVPipelineResult result) {
@@ -212,6 +215,7 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         }
 
         var offsetNanos = NetworkTablesManager.getInstance().getOffset();
+        var nowNanos = NetworkTablesJNI.now();
 
         // Transform the metadata timestamps from the local wpi::nt::Now timebase to the Time Sync
         // Server's timebase. Timestamps are published in nanoseconds.
@@ -219,13 +223,15 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
                 new PhotonPipelineResult(
                         acceptedResult.sequenceID,
                         result.getImageCaptureTimestampNanos() + offsetNanos,
-                        NetworkTablesJNI.now() + offsetNanos,
+                        nowNanos + offsetNanos,
                         NetworkTablesManager.getInstance().getTimeSinceLastPong(),
                         TrackedTarget.simpleFromTrackedTargets(acceptedResult.targets),
                         acceptedResult.multiTagResult);
 
         // random guess at size of the array
         ts.resultPublisher.set(simplified, 1024);
+        // photonvision-79: the same result into the open Rewind recording's vision log.
+        org.photonvision.rewind.VisionLog.result(rewindCamera, simplified, nowNanos);
         if (ConfigProvider.getInstance().getConfig().getNetworkConfig().shouldPublishProto) {
             ts.protoResultPublisher.set(simplified);
         }

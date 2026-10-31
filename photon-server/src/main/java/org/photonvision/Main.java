@@ -303,6 +303,9 @@ public class Main implements Callable<Integer> {
         // SpectrumJetson (photonvision-74): the robot's field map (the saved one first, before the
         // cameras start)
         org.photonvision.fieldmap.FieldMapNT.start();
+        // SpectrumJetson Rewind (photonvision-07): robot code starts and stops recording over
+        // NetworkTables
+        org.photonvision.rewind.RewindManager.getInstance().start();
         // SpectrumJetson (photonvision-08): set the Jetson's date from the robot's (no clock battery,
         // no internet); off on the SystemCore, which is the robot
         org.photonvision.common.util.RobotClockSync.start();

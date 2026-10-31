@@ -59,6 +59,7 @@ import org.photonvision.common.networking.NetworkManager;
 import org.photonvision.common.util.ShellExec;
 import org.photonvision.common.util.TimedTaskManager;
 import org.photonvision.common.util.file.ProgramDirectoryUtilities;
+import org.photonvision.rewind.RewindManager;
 import org.photonvision.tflite.TFLiteJNI.TFLiteSource;
 import org.photonvision.vision.calibration.CameraCalibrationCoefficients;
 import org.photonvision.vision.camera.CameraQuirk;
@@ -1125,6 +1126,74 @@ public class RequestHandler {
                     idle.eventPipeline, "Switch now (Settings)");
         }
         onRobotStateRequest(ctx);
+    }
+
+    // SpectrumJetson Rewind (photonvision-07). POST body, all optional:
+    // {"manual": true|false, "fps": 30, "quotaGB": 100, "minFreeGB": 15,
+    //  "recordThroughDisconnects": true|false, "delete": "<session>"}
+    @Json
+    record RewindRequest(
+            Boolean manual,
+            Double fps,
+            Double quotaGB,
+            Double minFreeGB,
+            Boolean recordThroughDisconnects,
+            String delete) {}
+
+    public static void onRewindStatusRequest(Context ctx) {
+        ctx.json(RewindManager.getInstance().status(), Types.mapOf(Object.class));
+    }
+
+    public static void onRewindSetRequest(Context ctx) {
+        RewindRequest req;
+        try {
+            req = ctx.bodyAsClass(RewindRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400);
+            ctx.result(
+                    "Expected {\"manual\": true|false, \"fps\": n, \"quotaGB\": n, \"minFreeGB\": n,"
+                            + " \"recordThroughDisconnects\": true|false, \"delete\": name}");
+            return;
+        }
+        var rm = RewindManager.getInstance();
+        if (req.fps() != null
+                || req.quotaGB() != null
+                || req.minFreeGB() != null
+                || req.recordThroughDisconnects() != null) {
+            rm.updateSettings(req.fps(), req.quotaGB(), req.minFreeGB(), req.recordThroughDisconnects());
+        }
+        if (req.manual() != null) rm.setManual(req.manual());
+        // photonvision-65: why a delete failed (still recording, quiet mode, files left over).
+        String why = req.delete() != null ? rm.deleteSession(req.delete()) : null;
+        if (why != null) {
+            ctx.status(400);
+            ctx.result("Couldn't delete " + req.delete() + ": " + why);
+            return;
+        }
+        onRewindStatusRequest(ctx);
+    }
+
+    /** GET /api/rewind/download?session=NAME: the recording as a zip of AVIs, built as it streams. */
+    public static void onRewindDownloadRequest(Context ctx) {
+        String name = ctx.queryParam("session");
+        var dir = RewindManager.sessionDir(name);
+        if (dir == null) {
+            ctx.status(404);
+            ctx.result("No such recording");
+            return;
+        }
+        logger.info("Rewind: sending recording " + name + " to " + ctx.ip());
+        ctx.contentType("application/zip");
+        ctx.header("Content-Disposition", "attachment; filename=\"" + name + ".zip\"");
+        // A match is ~1 GB: run the copy below the vision threads' priority.
+        RewindManager.setThreadNice(10, logger);
+        try {
+            org.photonvision.rewind.RewindExport.writeZip(dir, ctx.outputStream());
+        } catch (IOException e) {
+            logger.warn("Rewind: download of " + name + " stopped: " + e.getMessage());
+        } finally {
+            RewindManager.setThreadNice(0, logger);
+        }
     }
 
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.
