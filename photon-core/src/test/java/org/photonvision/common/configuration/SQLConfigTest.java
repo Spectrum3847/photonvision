@@ -343,7 +343,8 @@ public class SQLConfigTest {
         var provider = new ConfigProvider(tmpDir.resolve("field-absent"));
         provider.load();
 
-        assertEquals(Field.loadField(Fields.DEFAULT_FIELD), provider.getConfig().getFieldLayout());
+        assertEquals(
+                Field.loadField(ConfigProvider.DEFAULT_FIELD), provider.getConfig().getFieldLayout());
     }
 
     @Test

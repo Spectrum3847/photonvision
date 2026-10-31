@@ -432,11 +432,17 @@ public class ConfigProvider {
         return configObj;
     }
 
+    /**
+     * SpectrumJetson: the field until the robot sends its map (photonvision-74). The AndyMark field,
+     * the one we plan for; WPILib's default is the welded one.
+     */
+    public static final Fields DEFAULT_FIELD = Fields.FRC_2026_REBUILT_ANDY_MARK;
+
     private Field fieldDefault() {
         Field field;
         try {
-            field = Field.loadField(Fields.DEFAULT_FIELD);
-            logger.info("Loaded " + Fields.DEFAULT_FIELD.toString() + " field");
+            field = Field.loadField(DEFAULT_FIELD);
+            logger.info("Loaded " + DEFAULT_FIELD.toString() + " field");
         } catch (UncheckedIOException e) {
             logger.error("Error loading WPILib field", e);
             logger.info("Creating an empty field");
