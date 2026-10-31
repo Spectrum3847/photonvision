@@ -319,7 +319,7 @@ public class Calibrate3dPipeline
             boolean autoCalibrate,
             boolean calibrating,
             long ageMs,
-            CalibrationSession.Summary session) {}
+            CalibrationSession.SessionSummary session) {}
 
     /**
      * The session for the current resolution and board, rebuilt from the snapshots if they changed.

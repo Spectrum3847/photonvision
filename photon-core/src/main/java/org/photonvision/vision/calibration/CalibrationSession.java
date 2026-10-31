@@ -79,7 +79,7 @@ public final class CalibrationSession {
             String text) {}
 
     @Json
-    public record Summary(
+    public record SessionSummary(
             CalibrationCoverage.Summary coverage,
             List<SnapshotStats> snapshots,
             int far,
@@ -250,12 +250,12 @@ public final class CalibrationSession {
         return v + "-" + hz + " corner of the image";
     }
 
-    public synchronized Summary summary() {
+    public synchronized SessionSummary summary() {
         double min =
                 stats.stream().mapToDouble(SnapshotStats::distanceM).filter(d -> d > 0).min().orElse(-1);
         double max =
                 stats.stream().mapToDouble(SnapshotStats::distanceM).filter(d -> d > 0).max().orElse(-1);
-        return new Summary(
+        return new SessionSummary(
                 coverage.summary(),
                 List.copyOf(stats),
                 farCount(),
