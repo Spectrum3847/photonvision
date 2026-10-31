@@ -18,35 +18,28 @@
 package org.photonvision.vision.pipe.impl;
 
 import org.photonvision.vision.pipe.CVPipe;
-import org.wpilib.math.filter.LinearFilter;
 import org.wpilib.system.Timer;
 
 public class CalculateFPSPipe
         extends CVPipe<Void, Integer, CalculateFPSPipe.CalculateFPSPipeParams> {
-    private final LinearFilter fpsFilter = LinearFilter.movingAverage(20);
-
-    // roll my own Timer, since this is so trivial
-    double lastTime = -1;
+    // Spectrum: frames counted over time, not a moving average of 1/dt. Averaging 1/dt over-reads
+    // whenever frames arrive unevenly (4 ms then 12 ms apart average to 167 fps, though 2 frames in
+    // 16 ms is 125): the dashboard showed 130-160 fps from a camera that sends 122. This is the
+    // last 30 intervals' frames over their duration, so it can't exceed the real rate.
+    private static final int WINDOW = 30;
+    private final double[] times = new double[WINDOW + 1];
+    private int count = 0, next = 0;
 
     @Override
     protected Integer process(Void in) {
-        if (lastTime < 0) {
-            lastTime = Timer.getMonotonicTimestamp();
-        }
-
-        var now = Timer.getMonotonicTimestamp();
-        var dtSeconds = now - lastTime;
-        lastTime = now;
-
-        // If < 1 uS between ticks, something is probably wrong
-        int fps;
-        if (dtSeconds < 1e-6) {
-            fps = 0;
-        } else {
-            fps = (int) fpsFilter.calculate(1 / dtSeconds);
-        }
-
-        return fps;
+        double now = Timer.getMonotonicTimestamp();
+        times[next] = now;
+        next = (next + 1) % times.length;
+        if (count < times.length) count++;
+        if (count < 2) return 0;
+        double oldest = times[(next - count + times.length) % times.length];
+        double span = now - oldest;
+        return span < 1e-6 ? 0 : (int) Math.round((count - 1) / span);
     }
 
     public static class CalculateFPSPipeParams {}
