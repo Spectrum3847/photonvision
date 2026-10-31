@@ -131,7 +131,8 @@ public final class IdleMode {
         // The 2026 file may hold fields this one doesn't (farSearch): kept as they were.
         JsonObject j = JsonObject.create();
         try {
-            if (Files.exists(file)) j = json.fromJsonObject(Files.readString(file));
+            // a copy: parsed avaje nodes are read-only (add() would throw)
+            if (Files.exists(file)) json.fromJsonObject(Files.readString(file)).elements().forEach(j::add);
         } catch (IOException | RuntimeException e) {
             j = JsonObject.create();
         }

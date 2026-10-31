@@ -138,10 +138,13 @@ public final class ThriftiestFirmware {
         var out = JsonObject.create();
         var names = nicknames();
         try {
-            var cams = json.fromJsonArray(tool("variant", "--json"));
-            for (var c : cams.elements()) {
-                var cam = (JsonObject) c;
+            // Parsed avaje nodes are read-only (add() throws, with no message): copy each one.
+            var cams = JsonArray.create();
+            for (var c : json.fromJsonArray(tool("variant", "--json")).elements()) {
+                var cam = JsonObject.create();
+                ((JsonObject) c).elements().forEach(cam::add);
                 cam.add("camera", names.getOrDefault(cam.extract("port", ""), ""));
+                cams.add(cam);
             }
             out.add("cameras", cams);
         } catch (IOException | RuntimeException e) {
@@ -185,7 +188,8 @@ public final class ThriftiestFirmware {
             if (bytes.length > MAX_IMAGE_BYTES)
                 throw new IOException("Too big for the camera's 512 KiB flash");
             Files.write(tmp, bytes);
-            var check = json.fromJsonObject(tool("check-image", "--json", tmp.toString()));
+            var check = JsonObject.create(); // a copy: parsed avaje nodes are read-only
+            json.fromJsonObject(tool("check-image", "--json", tmp.toString())).elements().forEach(check::add);
             if (!check.extract("error", "").isEmpty()) throw new IOException(check.extract("error", ""));
             Files.move(tmp, store().resolve(name), StandardCopyOption.REPLACE_EXISTING);
             check.add("file", name); // not the temporary name
