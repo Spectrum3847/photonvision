@@ -203,6 +203,10 @@ public class VisionRunner implements AutoCloseable {
     // Spectrum: where each loop's time goes, logged every 10 s (frame = grab incl. decode,
     // pipeline = pipeline.run, consumers = pipelineResultConsumer: NT, UI, health, ...).
     private long tSettings, tFrame, tPipeline, tConsumers, tLoops, tLoggedNs = System.nanoTime();
+    // Spectrum: capture-to-published latency of each frame in the window (mid-exposure to after the
+    // consumers sent it), for its median, p95 and max: averages hide the jitter we tune for.
+    private long[] latNs = new long[4096];
+    private int latCount;
 
     private void logLoopTiming() {
         long now = System.nanoTime();
@@ -210,14 +214,25 @@ public class VisionRunner implements AutoCloseable {
         logger.info(
                 String.format(
                         "Loop timing over %d frames: settings %.2f ms, frame %.2f ms, pipeline %.2f ms,"
-                                + " consumers %.2f ms",
+                                + " consumers %.2f ms; latency %s",
                         tLoops,
                         tSettings / 1e6 / tLoops,
                         tFrame / 1e6 / tLoops,
                         tPipeline / 1e6 / tLoops,
-                        tConsumers / 1e6 / tLoops));
+                        tConsumers / 1e6 / tLoops,
+                        latencySummary()));
         tSettings = tFrame = tPipeline = tConsumers = tLoops = 0;
+        latCount = 0;
         tLoggedNs = now;
+    }
+
+    private String latencySummary() {
+        if (latCount == 0) return "n/a";
+        long[] s = java.util.Arrays.copyOf(latNs, latCount);
+        java.util.Arrays.sort(s);
+        return String.format(
+                "median %.2f p95 %.2f max %.2f ms",
+                s[s.length / 2] / 1e6, s[(int) (s.length * 0.95)] / 1e6, s[s.length - 1] / 1e6);
     }
 
     private void update() {
@@ -319,6 +334,11 @@ public class VisionRunner implements AutoCloseable {
                         try {
                             pipelineResultConsumer.accept(pipelineResult);
                             long n4 = System.nanoTime();
+                            long captured = pipelineResult.getImageCaptureTimestampNanos();
+                            if (captured > 0 && latCount < latNs.length) {
+                                latNs[latCount++] =
+                                        org.wpilib.networktables.NetworkTablesJNI.now() - captured;
+                            }
                             tSettings += n1 - n0;
                             tFrame += n2 - n1;
                             tPipeline += n3 - n2;
