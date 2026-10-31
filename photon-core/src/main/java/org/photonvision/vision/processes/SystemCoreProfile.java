@@ -37,7 +37,7 @@ import org.photonvision.common.logging.Logger;
  *       for the loop, as in IdleMode).
  * </ul>
  *
- * <p>On when this is a SystemCore (a QCS6490 that isn't a Rubik Pi) or a Raspberry Pi, or with
+ * <p>On when this is a Raspberry Pi (the SystemCore is a Raspberry Pi Compute Module 5), or with
  * SPECTRUM_SYSTEMCORE_PROFILE=1; SPECTRUM_SYSTEMCORE_PROFILE=0 turns it off. Off on the Jetson,
  * where nothing changes. The pipeline's saved settings aren't changed, only what runs.
  */
@@ -60,7 +60,11 @@ public final class SystemCoreProfile {
         }
     }
 
-    /** The SystemCore: a QCS6490 that isn't a Rubik Pi (the same test as RobotClockSync's). */
+    /**
+     * TODO(SystemCore): wrong test, kept until the real marker is known. The SystemCore is a
+     * Raspberry Pi CM5, not a QCS6490 (that's the Rubik Pi), so this never matches it; the
+     * Platform.isRaspberryPi() branch is what turns the profile on there (and on any Pi).
+     */
     static boolean isSystemCore() {
         if (!Platform.isQCS6490()) return false;
         try {
