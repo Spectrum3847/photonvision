@@ -354,6 +354,10 @@ public class VisionRunner implements AutoCloseable {
                         frame.release();
                     }
                     loopCount++;
+                } else {
+                    // SpectrumJetson (photonvision-12): the pipeline changed while we grabbed this
+                    // frame; it is thrown away, so free it (upstream leaks it, once per pipeline switch).
+                    frame.release();
                 }
             } catch (VirtualMachineError e) {
                 throw e;

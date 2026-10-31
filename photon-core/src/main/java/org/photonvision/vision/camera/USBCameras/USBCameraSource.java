@@ -69,18 +69,19 @@ public class USBCameraSource extends VisionSource {
         // TODO - why do we delegate this to USBCameraSource? Quirks are part of the CameraConfig??
         // also TODO - is the config's saved usb info a reasonable guess for quirk detection? seems like
         // yes to me...
+        int vid =
+                (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo)
+                        ? cameraInfo.vendorId
+                        : -1;
+        int pid =
+                (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo)
+                        ? cameraInfo.productId
+                        : -1;
         if (getCameraConfiguration().cameraQuirks == null) {
-            int vid =
-                    (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo)
-                            ? cameraInfo.vendorId
-                            : -1;
-            int pid =
-                    (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo)
-                            ? cameraInfo.productId
-                            : -1;
-
             getCameraConfiguration().cameraQuirks =
                     QuirkyCamera.getQuirkyCamera(vid, pid, config.matchedCameraInfo.name());
+        } else {
+            addNewlyKnownQuirks(vid, pid, config);
         }
 
         if (getCameraConfiguration().cameraQuirks.hasQuirks()) {
@@ -161,6 +162,37 @@ public class USBCameraSource extends VisionSource {
         }
 
         return settables;
+    }
+
+    /**
+     * SpectrumJetson (photonvision-21): quirks are detected only when a camera is first seen, so a
+     * camera saved before PhotonVision's table knew about it (our Thriftiest Cams, before upstream
+     * #2478) never gets them. This adds whatever the table now lists for the camera, except
+     * MJPEGOnly: that removes video modes, which would shift the video-mode index every saved
+     * pipeline stores. Cameras added from now on get all of them. Existing quirks are never removed.
+     */
+    private void addNewlyKnownQuirks(int vid, int pid, CameraConfiguration config) {
+        var saved = getCameraConfiguration().cameraQuirks;
+        var known = QuirkyCamera.getQuirkyCamera(vid, pid, config.matchedCameraInfo.name());
+        var added = new ArrayList<CameraQuirk>();
+        for (var e : known.quirks.entrySet()) {
+            if (e.getValue() && e.getKey() != CameraQuirk.MJPEGOnly && !saved.hasQuirk(e.getKey())) {
+                added.add(e.getKey());
+            }
+        }
+        if (added.isEmpty()) return;
+        // A fresh object: never modify a QuirkyCamera that might be shared.
+        var merged = new EnumMap<CameraQuirk, Boolean>(CameraQuirk.class);
+        merged.putAll(saved.quirks);
+        for (var q : added) merged.put(q, true);
+        getCameraConfiguration().cameraQuirks =
+                new QuirkyCamera(saved.baseName, saved.usbVid, saved.usbPid, saved.displayName, merged);
+        logger.info(
+                "Added camera quirks "
+                        + added
+                        + " to saved camera "
+                        + config.nickname
+                        + " (known for this camera now; MJPEGOnly applies only to newly added cameras)");
     }
 
     /**

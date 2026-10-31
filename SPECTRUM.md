@@ -113,8 +113,8 @@ Checked 2026-10-30 against upstream `main` (`git log upstream/main --grep "(#N)"
 | --- | --- | --- |
 | 00 upstream v2026.3.4 | the merge itself | gone: `main` is newer |
 | 11 `setEnabled` | #2484, #2499 | in `main` |
-| 12 OpenCV leaks | #2511, #2356 | in `main`; our two extra leaks still to check |
-| 21 Thriftiest Cam support | #2478 | in `main`; our addition (saved cameras get the new quirks) still to port |
+| 12 OpenCV leaks | #2511, #2356 | in `main`; our extras (AprilTag pipelines' dropped targets, the frame thrown away on a pipeline switch) ported on `spectrum-2027` |
+| 21 Thriftiest Cam support | #2478 | in `main`; our addition (saved cameras get the new quirks, except MJPEGOnly) ported on `spectrum-2027` |
 | 23 calibration | #2437, #2479, #2480 | in `main`; #2149 (Auto Snapshots) still ours |
 | 42 video format undefined | #2617 | in `main` |
 | 62 2027 control word | #2566 (WPILib alpha-7) | check: may be covered |
@@ -137,7 +137,7 @@ tell PhotonVision what we've done, but not one change at a time.
 | 1 | **CUDA AprilTag pipeline**: the `AprilTagCuda` pipeline, its UI tab, the detector JNI (FRC 4143: 17 commits, 20 files) | 4143 `d8c9e8e`, 01 | yes |
 | 2 | **Capture and decode**: gray capture, direct MJPEG→gray decode, decode recovery, shared-gray video mode, mid-exposure timestamps | 02, 09, 13, 27, 37 | no (CPU; a big win on the SystemCore) |
 | 3 | **Hardware JPEG decode** (NVJPG) | 18 | yes |
-| 4 | **Camera controls**: 8 distortion coefficients, team defaults, exposure in ms, extra sliders, gain, focus score, yaw sign, duration format | 03, 04, 06, 10, 28, 34, 36, 39, 54 | no |
+| 4 | **Camera controls**: 8 distortion coefficients, team defaults, exposure in ms, extra sliders, gain, focus score, yaw sign, duration format | 03, 04, 06, 10, 28, 34, 36 (done: 2027 still computes yaw positive right, so the doc fix and Targets-tab labels are ported; PhotonTrackedTarget's comments left as upstream's), 39, 54 | no |
 | 5 | **Camera reliability**: stuck-camera watchdog and real reopen, USB bandwidth and its page, quiet frame errors, startup and pipeline races, duplicate activation, dead camera, USB port-power recovery | 29, 31, 32, 33, 38, 43, 44, 66, 81, 84 | no (port power needs a hub that switches it) |
 | 6 | **Thriftiest Cam**: quirks for saved cameras, serial identity, firmware card | 21 (our part), 86, 87 | no |
 | 7 | **Rewind** and its vision log | 07, 75, 76, 77, 78, 79, 65 (Rewind timers) | no |
@@ -148,7 +148,7 @@ tell PhotonVision what we've done, but not one change at a time.
 | 12 | **Far-tag search** | 55, 69 | yes (CUDA) |
 | 13 | **Operations UI**: Match Ready, settings snapshots, settings JSON, copy settings, tuning guide, theme, radio switches, stream-only-when-watched, setting broadcasts, switch-all, test hooks, UI state, dashboard guards | 05, 15, 24, 25, 26, 35, 41, 45, 46, 47, 48, 52, 53, 58, 59, 60, 67, 68, 73 | 52 (via health-check) |
 | 14 | **TensorRT object detection** | 14 | yes |
-| - | **Audit fixes**: split into the features above as they're ported | 63 | |
+| - | **Audit fixes**: split into the features above as they're ported. 2026-10-31: all ported except the hunks of unported features (CameraFocusCard: feature 4; FieldCalibrationView, CameraSettingsTuner: feature 11, patch 30), which go in with those | 63 | |
 
 The CUDA detector (`bos-*`, `gpudetector-*` in SpectrumJetson) is a separate library and moves to its
 own fork of frc971/bos later; until then SpectrumJetson keeps building it.

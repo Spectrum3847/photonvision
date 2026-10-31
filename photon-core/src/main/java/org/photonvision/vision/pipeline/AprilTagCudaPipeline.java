@@ -200,7 +200,10 @@ public class AprilTagCudaPipeline
 
         // Do single-tag pose estimation
         if (settings.solvePNPEnabled) {
-            // Clear target list that was used for multitag so we can add target transforms
+            // Clear target list that was used for multitag so we can add target transforms.
+            // SpectrumJetson (photonvision-12): release them first; their contour Mats were left
+            // for the GC.
+            targetList.forEach(TrackedTarget::release);
             targetList.clear();
             // TODO global state again ew
             var field = frameLayout;
@@ -263,6 +266,7 @@ public class AprilTagCudaPipeline
         if (targetList.size() > Packet.MAX_ARRAY_LEN) {
             logger.error(
                     "We have " + targetList.size() + " targets! Arbitrarily dropping some on the floor");
+            targetList.subList(Packet.MAX_ARRAY_LEN, targetList.size()).forEach(TrackedTarget::release);
             targetList = targetList.subList(0, Packet.MAX_ARRAY_LEN);
         }
 
