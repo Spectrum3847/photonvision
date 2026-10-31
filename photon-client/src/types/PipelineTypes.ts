@@ -207,7 +207,7 @@ export const DefaultPipelineSettings: Omit<
   cameraMinExposureRaw: 1,
   cameraMaxExposureRaw: 2,
   crosshair: true,
-  blockForFrames: true,
+  blockForFrames: false,
   cameraContrast: -1,
   cameraGamma: -1,
   cameraSharpness: -1,

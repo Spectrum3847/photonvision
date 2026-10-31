@@ -46,7 +46,10 @@ public abstract class CpuImageProcessor extends FrameProvider {
     private final RotateImagePipe m_rImagePipe = new RotateImagePipe();
     private final GrayscalePipe m_grayPipe = new GrayscalePipe();
     FrameThresholdType m_processType;
-    boolean m_blockForFrames = true;
+    // Spectrum: Low Latency Mode (blockForFrames) is never on. It waits for the next frame after
+    // each one is processed, so a camera at 120 fps delivers every other frame: ~95 fps where it
+    // should be 122 (SpectrumJetson README, "Performance"). requestBlockForFrames ignores it.
+    boolean m_blockForFrames = false;
 
     private final Object m_mutex = new Object();
 
@@ -124,8 +127,9 @@ public abstract class CpuImageProcessor extends FrameProvider {
 
     @Override
     public void requestBlockForFrames(boolean blockForFrames) {
+        // Spectrum: always off, whatever a pipeline's saved settings or robot code ask for.
         synchronized (m_mutex) {
-            this.m_blockForFrames = blockForFrames;
+            this.m_blockForFrames = false;
         }
     }
 }

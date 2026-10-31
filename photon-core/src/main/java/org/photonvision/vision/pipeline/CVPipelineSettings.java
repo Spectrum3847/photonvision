@@ -58,7 +58,9 @@ public class CVPipelineSettings implements Cloneable {
     public boolean cameraAutoWhiteBalance = false;
     public double cameraWhiteBalanceTemp = 4000;
 
-    public boolean blockForFrames = true;
+    // Spectrum: never on (CpuImageProcessor.requestBlockForFrames ignores it); false so the UI and
+    // exported settings say what really happens.
+    public boolean blockForFrames = false;
 
     // SpectrumJetson (photonvision-28): camera controls the stock UI doesn't show. -1 = the camera's
     // own default (re-applied on pipeline switch, so pipelines stay independent).
