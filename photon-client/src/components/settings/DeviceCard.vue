@@ -202,8 +202,23 @@ const generalMetrics = computed<MetricItem[]>(() => {
   return stats;
 });
 
-// @ts-expect-error This uses Intl.DurationFormat which is newly implemented and not available in TS.
-const durationFormatter = new Intl.DurationFormat("en", { style: "narrow" });
+// Intl.DurationFormat is new (Chrome 129+, Firefox 136+). Constructing it unconditionally threw
+// on older browsers and blanked the whole Device Control card (restart/import/export buttons),
+// so fall back to a simple "2h 39m 7s" formatter when it's missing.
+type DurationParts = { days: number; hours: number; minutes: number; seconds: number };
+const IntlDurationFormat = (
+  Intl as unknown as {
+    DurationFormat?: new (locale: string, options: object) => { format: (d: DurationParts) => string };
+  }
+).DurationFormat;
+const durationFormatter = IntlDurationFormat
+  ? new IntlDurationFormat("en", { style: "narrow" })
+  : {
+      format: ({ days, hours, minutes, seconds }: DurationParts) =>
+        [days ? `${days}d` : "", hours ? `${hours}h` : "", minutes ? `${minutes}m` : "", `${seconds}s`]
+          .filter(Boolean)
+          .join(" ")
+    };
 const platformMetrics = computed<MetricItem[]>(() => {
   const metrics = useSettingsStore().metrics;
   const stats = [

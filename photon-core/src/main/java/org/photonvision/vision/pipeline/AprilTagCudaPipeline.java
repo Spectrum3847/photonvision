@@ -39,6 +39,7 @@ import org.photonvision.vision.pipe.impl.CalculateFPSPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe.MultiTargetPNPPipeParams;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
+import org.photonvision.vision.target.TagContrast;
 import org.photonvision.vision.target.TrackedTarget;
 import org.photonvision.vision.target.TrackedTarget.TargetCalculationParameters;
 import org.wpilib.math.geometry.CoordinateSystem;
@@ -127,6 +128,8 @@ public class AprilTagCudaPipeline
         }
     }
 
+    private long lastContrastNanos = 0;
+
     @Override
     protected CVPipelineResult process(Frame frame, AprilTagCudaPipelineSettings settings) {
         long sumPipeNanosElapsed = 0L;
@@ -164,6 +167,11 @@ public class AprilTagCudaPipeline
 
             targetList.add(target);
         }
+
+        // SpectrumJetson (photonvision-54): the tags' white margin and black border, a few times a
+        // second, so a bad exposure or brightness shows as a reason (TagContrast).
+        var contrast = TagContrast.measure(frame.processedImage.getMat(), usedDetections, lastContrastNanos);
+        if (contrast != null) lastContrastNanos = contrast.atNanos();
 
         // Do multi-tag pose estimation
         Optional<MultiTargetPNPResult> multiTagResult = Optional.empty();
@@ -243,8 +251,11 @@ public class AprilTagCudaPipeline
         var fpsResult = calculateFPSPipe.run(null);
         var fps = fpsResult.output;
 
-        return new CVPipelineResult(
-                frame.sequenceID, sumPipeNanosElapsed, fps, targetList, multiTagResult, frame);
+        var result =
+                new CVPipelineResult(
+                        frame.sequenceID, sumPipeNanosElapsed, fps, targetList, multiTagResult, frame);
+        result.tagContrast = contrast;
+        return result;
     }
 
     @Override

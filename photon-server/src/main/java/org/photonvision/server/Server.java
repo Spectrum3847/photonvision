@@ -137,6 +137,8 @@ public class Server {
         app.get("/api/utils/getImageSnapshots", RequestHandler::onImageSnapshotsRequest);
         app.get("/api/utils/getCalSnapshot", RequestHandler::onCalibrationSnapshotRequest);
         app.get("/api/utils/getCalibrationJSON", RequestHandler::onCalibrationExportRequest);
+        app.get("/api/focus", RequestHandler::onFocusRequest); // SpectrumJetson (34)
+        app.get("/api/tagContrast", RequestHandler::onTagContrastRequest); // SpectrumJetson (54)
         app.post("/api/utils/nukeConfigDirectory", RequestHandler::onNukeConfigDirectory);
         app.post("/api/utils/nukeOneCamera", RequestHandler::onNukeOneCamera);
         app.post("/api/utils/activateMatchedCamera", RequestHandler::onActivateMatchedCameraRequest);

@@ -5,6 +5,7 @@ import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
 import { computed } from "vue";
 import CamerasView from "@/components/cameras/CamerasView.vue";
 import CameraControlCard from "@/components/cameras/CameraControlCard.vue";
+import CameraFocusCard from "@/components/cameras/CameraFocusCard.vue";
 import { useStateStore } from "@/stores/StateStore";
 
 const cameraViewType = computed<number[]>({
@@ -51,6 +52,7 @@ const cameraViewType = computed<number[]>({
       </v-col>
       <v-col class="pl-md-3 pt-3 pt-md-0" cols="12" md="5">
         <CamerasView v-model="cameraViewType" />
+        <CameraFocusCard />
       </v-col>
     </v-row>
   </div>

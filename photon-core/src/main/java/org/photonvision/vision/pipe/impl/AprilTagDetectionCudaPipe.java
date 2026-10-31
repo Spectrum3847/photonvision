@@ -64,13 +64,30 @@ public class AprilTagDetectionCudaPipe
             var cy = cameraMatrix.get(1, 2)[0];
             var fx = cameraMatrix.get(0, 0)[0];
             var fy = cameraMatrix.get(1, 1)[0];
-            var k1 = distCoeffs.get(0, 0)[0];
-            var k2 = distCoeffs.get(0, 1)[0];
-            var k3 = distCoeffs.get(0, 4)[0];
-            var p1 = distCoeffs.get(0, 2)[0];
-            var p2 = distCoeffs.get(0, 3)[0];
+            // SpectrumJetson (photonvision-04): OpenCV order k1 k2 p1 p2 k3 [k4 k5 k6]. Read as a
+            // flat array so a 1x8 or 8x1 Mat both work.
+            double[] d = new double[(int) distCoeffs.total()];
+            distCoeffs.get(0, 0, d);
+            double k1 = d.length > 0 ? d[0] : 0, k2 = d.length > 1 ? d[1] : 0;
+            double p1 = d.length > 2 ? d[2] : 0, p2 = d.length > 3 ? d[3] : 0;
+            double k3 = d.length > 4 ? d[4] : 0;
 
-            m_cudadetector.setparams(handle, fx, cx, fy, cy, k1, k2, p1, p2, k3);
+            boolean sent = false;
+            if (d.length >= 8) {
+                // Pass the full rational model; setparams() drops k4..k6, which biases the
+                // detector's edge refinement toward the image edges.
+                try {
+                    m_cudadetector.setparams8(
+                            handle, fx, cx, fy, cy, k1, k2, p1, p2, k3, d[5], d[6], d[7]);
+                    sent = true;
+                } catch (UnsatisfiedLinkError e) {
+                    System.out.println(
+                            "lib971apriltag has no setparams8; sending 5 of 8 distortion coefficients");
+                }
+            }
+            if (!sent) {
+                m_cudadetector.setparams(handle, fx, cx, fy, cy, k1, k2, p1, p2, k3);
+            }
         }
 
         super.setParams(newParams);

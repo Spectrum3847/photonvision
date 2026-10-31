@@ -357,6 +357,76 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
         return videoModes;
     }
 
+    // SpectrumJetson (photonvision-28): contrast, gamma, sharpness and backlight compensation, which
+    // the stock UI doesn't show. {pipeline setting, UVC control, label}.
+    private static final String[][] EXTRA_CONTROLS = {
+        {"cameraContrast", "contrast", "Contrast"},
+        {"cameraGamma", "gamma", "Gamma"},
+        {"cameraSharpness", "sharpness", "Sharpness"},
+        {"cameraBacklightCompensation", "backlight_compensation", "Backlight Compensation"}
+    };
+
+    /** The control's property, preferring cscore's raw_* (the camera's own units). */
+    private VideoProperty rawProperty(String name) {
+        VideoProperty prop = camera.getProperty("raw_" + name);
+        return prop.getKind() != VideoProperty.Kind.NONE ? prop : camera.getProperty(name);
+    }
+
+    /** Sets a control in the camera's own units; a value below 0 restores its default. */
+    private void setRawControl(String name, int value) {
+        try {
+            VideoProperty prop = rawProperty(name);
+            if (prop.getKind() == VideoProperty.Kind.NONE) return;
+            int v = value < 0 ? prop.getDefault() : Math.clamp(value, prop.getMin(), prop.getMax());
+            prop.set(v);
+        } catch (VideoException e) {
+            logger.error("Failed to set " + name + " for " + camera.getName(), e);
+        }
+    }
+
+    @Override
+    public void setContrast(int value) {
+        setRawControl("contrast", value);
+    }
+
+    @Override
+    public void setGamma(int value) {
+        setRawControl("gamma", value);
+    }
+
+    @Override
+    public void setSharpness(int value) {
+        setRawControl("sharpness", value);
+    }
+
+    @Override
+    public void setBacklightCompensation(int value) {
+        setRawControl("backlight_compensation", value);
+    }
+
+    @Override
+    public List<java.util.Map<String, Object>> getExtraControls() {
+        var out = new ArrayList<java.util.Map<String, Object>>();
+        for (String[] c : EXTRA_CONTROLS) {
+            try {
+                VideoProperty prop = rawProperty(c[1]);
+                if (prop.getKind() == VideoProperty.Kind.NONE) continue;
+                var m = new java.util.LinkedHashMap<String, Object>();
+                m.put("key", c[0]);
+                m.put("label", c[2]);
+                m.put("min", prop.getMin());
+                m.put("max", prop.getMax());
+                m.put("step", Math.max(1, prop.getStep()));
+                m.put("default", prop.getDefault());
+                m.put("value", prop.get());
+                out.add(m);
+            } catch (Exception e) {
+                // Camera unplugged; the list refreshes on the next UI update.
+            }
+        }
+        return out;
+    }
+
     /**
      * Forgiving "set this property" action. Produces a debug message but skips properties if they
      * aren't supported Errors if the property exists but the set fails.
@@ -384,6 +454,18 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
      * @param options
      * @return
      */
+    /**
+     * SpectrumJetson (photonvision-54): the quirks list says the Thrifty OV9281 (1bcf:28c5) has gain
+     * (upstream #2478), but ours reports no gain control, so the Camera Gain slider did nothing.
+     * Asks the camera, once it's connected (cscore lists its controls only then).
+     */
+    @Override
+    public boolean hasControl(String name) {
+        if (!camera.isConnected()) return true;
+        return camera.getProperty(name).getKind() != VideoProperty.Kind.NONE
+                || camera.getProperty("raw_" + name).getKind() != VideoProperty.Kind.NONE;
+    }
+
     protected Optional<VideoProperty> findProperty(String... options) {
         VideoProperty retProp = null;
         boolean found = false;

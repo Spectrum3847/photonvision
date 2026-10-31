@@ -956,6 +956,56 @@ public class RequestHandler {
                                 UIPhotonConfiguration.programStateToUi(ConfigProvider.getInstance().getConfig())));
     }
 
+    private static org.photonvision.vision.processes.VisionModule moduleByUniqueName(String name) {
+        for (var m : VisionSourceManager.getInstance().vmm.getModules()) {
+            if (m.uniqueName().equals(name)) return m;
+        }
+        return null;
+    }
+
+    /**
+     * GET /api/focus?camera=UNIQUE_NAME (photonvision-34): the camera's focus score, and keep
+     * measuring for 3 s (FocusMeter). 204 until the first measurement. {@code &reset=1} clears the
+     * best score first.
+     */
+    public static void onFocusRequest(Context ctx) {
+        var m = moduleByUniqueName(ctx.queryParam("camera"));
+        if (m == null) {
+            ctx.status(404);
+            ctx.result("No camera " + ctx.queryParam("camera"));
+            return;
+        }
+        if (ctx.queryParam("reset") != null) m.focusMeter().resetBest();
+        var r = m.focusMeter().read();
+        try {
+            if (r == null) {
+                ctx.status(204);
+                return;
+            }
+            ctx.status(200);
+            ctx.json(r);
+        } catch (Exception e) {
+            ctx.status(500);
+            ctx.result("Focus reading failed: " + e.getMessage());
+        }
+    }
+
+    /** SpectrumJetson (photonvision-54): each camera's tag contrast over the last 2 s (TagContrast). */
+    public static void onTagContrastRequest(Context ctx) {
+        var names =
+                VisionSourceManager.getInstance().vmm.getModules().stream()
+                        .map(m -> m.toUICameraConfig().nickname)
+                        .toList();
+        try {
+            ctx.json(
+                    org.photonvision.vision.target.TagContrast.summary(names),
+                    Types.mapOf(Object.class));
+        } catch (Exception e) {
+            ctx.status(500);
+            ctx.result("Tag contrast failed: " + e.getMessage());
+        }
+    }
+
     // SpectrumJetson (photonvision-87): Settings > Thriftiest Cam firmware.
     @Json
     record ThriftiestFlashRequest(String port, String image) {}

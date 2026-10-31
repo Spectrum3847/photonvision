@@ -80,6 +80,14 @@ public abstract class VisionSourceSettables {
 
     public abstract void setGain(int gain);
 
+    /**
+     * SpectrumJetson (photonvision-54): whether the camera has this control. True when it can't
+     * tell (not connected yet, or not a USB camera), so callers keep what the camera's quirks say.
+     */
+    public boolean hasControl(String name) {
+        return true;
+    }
+
     // Pretty uncommon so instead of abstract this is just a no-op by default
     // Overridden by cameras with AWB gain support
     public void setRedGain(int red) {}
@@ -114,6 +122,24 @@ public abstract class VisionSourceSettables {
     }
 
     public abstract List<VideoMode> getAllVideoModes();
+
+    // SpectrumJetson (photonvision-28): camera controls the stock UI doesn't show. A value below 0
+    // restores the camera's default. No-ops for cameras without them.
+    public void setContrast(int value) {}
+
+    public void setGamma(int value) {}
+
+    public void setSharpness(int value) {}
+
+    public void setBacklightCompensation(int value) {}
+
+    /**
+     * SpectrumJetson (photonvision-28): the extra controls this camera has, for the Input tab: each
+     * {key (the pipeline setting), label, min, max, step, default, value}.
+     */
+    public List<java.util.Map<String, Object>> getExtraControls() {
+        return List.of();
+    }
 
     public double getFOV() {
         return configuration.FOV;

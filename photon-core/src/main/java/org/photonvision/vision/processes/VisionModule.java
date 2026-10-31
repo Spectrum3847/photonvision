@@ -86,6 +86,8 @@ public class VisionModule implements AutoCloseable {
     private final NTDataPublisher ntConsumer;
     private final UIDataPublisher uiDataConsumer;
     private final StatusLEDConsumer statusLEDsConsumer;
+    // SpectrumJetson (photonvision-34): a focus score for turning the lens (Camera page)
+    private final FocusMeter focusMeter = new FocusMeter();
     protected final QuirkyCamera cameraQuirks;
 
     protected TrackedTarget lastPipelineResultBestTarget;
@@ -126,8 +128,9 @@ public class VisionModule implements AutoCloseable {
             visionSource.getCameraConfiguration().cameraQuirks = QuirkyCamera.DefaultCamera;
 
         // We don't show gain if the config says it's -1. So check here to make sure
-        // it's non-negative if it _is_ supported
-        if (cameraQuirks.hasQuirk(CameraQuirk.Gain)) {
+        // it's non-negative if it _is_ supported. (The constructor's visionSource: the field
+        // hasGainControl() reads isn't set yet.)
+        if (cameraQuirks.hasQuirk(CameraQuirk.Gain) && visionSource.getSettables().hasControl("gain")) {
             pipelineManager.userPipelineSettings.forEach(
                     it -> {
                         if (it.cameraGain == -1) it.cameraGain = 75; // Sane default
@@ -176,11 +179,70 @@ public class VisionModule implements AutoCloseable {
                 new StatusLEDConsumer(visionSource.getSettables().getConfiguration().uniqueName);
         resultConsumers.add(ntConsumer);
         resultConsumers.add(uiDataConsumer);
+        resultConsumers.add(focusMeter); // SpectrumJetson (photonvision-34): idle unless asked
         resultConsumers.add(statusLEDsConsumer);
         resultConsumers.add(
                 (result) ->
                         lastPipelineResultBestTarget = result.hasTargets() ? result.targets.get(0) : null);
         resultConsumers.addAll(extraConsumers);
+
+        // SpectrumJetson: a brand-new camera gets the team's tuned settings (TeamCameraDefaults)
+        // instead of stock PhotonVision's CPU AprilTag at 320x240. The camera usually hasn't
+        // reported its video modes yet at this point (they're enumerated when it connects), so
+        // the resolution is picked by a short background wait once the modes are known.
+        if (pipelineManager.createdDefaultPipeline && !pipelineManager.userPipelineSettings.isEmpty()) {
+            var first = pipelineManager.userPipelineSettings.get(0);
+            TeamCameraDefaults.apply(first, visionSource.getSettables().getAllVideoModes());
+            logger.info(
+                    "New camera: applied team defaults ("
+                            + first.pipelineType
+                            + ", exposure "
+                            + first.cameraExposureRaw
+                            + ", brightness "
+                            + first.cameraBrightness
+                            + "); resolution is picked once the camera reports its modes");
+            pipelineManager.createdDefaultPipeline = false;
+            saveModule();
+            var modeThread =
+                    new Thread(
+                            () -> {
+                                for (int i = 0; i < 150; i++) { // up to 30 s
+                                    var modes = visionSource.getSettables().getAllVideoModes();
+                                    if (!modes.isEmpty()) {
+                                        int idx = TeamCameraDefaults.pickVideoMode(modes);
+                                        if (idx >= 0) {
+                                            first.cameraVideoModeIndex = idx;
+                                            var m = modes.get(idx);
+                                            logger.info(
+                                                    "New camera: team default resolution "
+                                                            + m.width
+                                                            + "x"
+                                                            + m.height
+                                                            + " "
+                                                            + m.pixelFormat
+                                                            + " @ "
+                                                            + m.fps
+                                                            + " fps (mode "
+                                                            + idx
+                                                            + ")");
+                                            enable3dWhereCalibrated();
+                                            setPipeline(pipelineManager.getRequestedIndex());
+                                            saveAndBroadcastAll();
+                                        }
+                                        return;
+                                    }
+                                    try {
+                                        Thread.sleep(200);
+                                    } catch (InterruptedException e) {
+                                        return;
+                                    }
+                                }
+                                logger.warn("New camera: no video modes after 30 s; resolution left at default");
+                            },
+                            "TeamDefaultVideoMode");
+            modeThread.setDaemon(true);
+            modeThread.start();
+        }
 
         // Sync VisionModule state with the first pipeline index
         setPipeline(visionSource.getSettables().getConfiguration().currentPipelineIndex);
@@ -411,7 +473,7 @@ public class VisionModule implements AutoCloseable {
         settings.tagFamily = data.tagFamily;
 
         // Disable gain if not applicable
-        if (!cameraQuirks.hasQuirk(CameraQuirk.Gain)) {
+        if (!hasGainControl()) {
             settings.cameraGain = -1;
         }
         if (!cameraQuirks.hasQuirk(CameraQuirk.AwbRedBlueGain)) {
@@ -571,6 +633,11 @@ public class VisionModule implements AutoCloseable {
                 () -> {
                     settables.setVideoModeInternal(pipelineSettings.cameraVideoModeIndex);
                     settables.setBrightness(pipelineSettings.cameraBrightness);
+                    // SpectrumJetson (photonvision-28): -1 restores the camera's default.
+                    settables.setContrast(pipelineSettings.cameraContrast);
+                    settables.setGamma(pipelineSettings.cameraGamma);
+                    settables.setSharpness(pipelineSettings.cameraSharpness);
+                    settables.setBacklightCompensation(pipelineSettings.cameraBacklightCompensation);
 
                     // If manual exposure, force exposure slider to be valid
                     if (!pipelineSettings.cameraAutoExposure) {
@@ -585,7 +652,7 @@ public class VisionModule implements AutoCloseable {
                         logger.error("Unable to set camera auto exposure!");
                         logger.error(e.toString());
                     }
-                    if (cameraQuirks.hasQuirk(CameraQuirk.Gain)) {
+                    if (hasGainControl()) {
                         // If the gain is disabled for some reason, re-enable it
                         if (pipelineSettings.cameraGain == -1) pipelineSettings.cameraGain = 75;
                         settables.setGain(Math.max(0, pipelineSettings.cameraGain));
@@ -688,6 +755,7 @@ public class VisionModule implements AutoCloseable {
         ret.maxExposureRaw = visionSource.getSettables().getMaxExposureRaw();
         ret.minWhiteBalanceTemp = visionSource.getSettables().getMinWhiteBalanceTemp();
         ret.maxWhiteBalanceTemp = visionSource.getSettables().getMaxWhiteBalanceTemp();
+        ret.extraControls = visionSource.getSettables().getExtraControls(); // SpectrumJetson
 
         ret.deactivated = config.deactivated;
         ret.isEnabled = getEnabled();
@@ -788,6 +856,10 @@ public class VisionModule implements AutoCloseable {
     }
 
     private void consumeResult(CVPipelineResult result) {
+        if (result.tagContrast != null) {
+            org.photonvision.vision.target.TagContrast.record(
+                    visionSource.getSettables().getConfiguration().nickname, result.tagContrast);
+        }
         consumePipelineResult(result);
 
         // Pipelines like DriverMode and Calibrate3dPipeline have null output frames
@@ -832,11 +904,30 @@ public class VisionModule implements AutoCloseable {
         if (newCalibration != null) {
             logger.info("Got new calibration for " + newCalibration.resolution);
             visionSource.getSettables().addCalibration(newCalibration);
+            enable3dWhereCalibrated();
         } else {
             logger.error("Got null calibration?");
         }
 
         saveAndBroadcastAll();
+    }
+
+    /**
+     * SpectrumJetson: turn 3D and multi-tag on for every AprilTag pipeline whose resolution now
+     * has a calibration (TeamCameraDefaults). Called when a calibration is saved and when a new
+     * camera's resolution is picked. Never turns anything off.
+     */
+    private void enable3dWhereCalibrated() {
+        var modes = visionSource.getSettables().getAllVideoModes();
+        var calibrations = visionSource.getSettables().getConfiguration().calibrations;
+        for (var settings : pipelineManager.userPipelineSettings) {
+            if (TeamCameraDefaults.enable3dIfCalibrated(settings, modes, calibrations)) {
+                logger.info(
+                        "Calibrated at this resolution: turned on 3D and multi-tag for pipeline \""
+                                + settings.pipelineNickname
+                                + "\"");
+            }
+        }
     }
 
     public void removeCalibrationFromConfig(Size resolution) {
@@ -892,5 +983,18 @@ public class VisionModule implements AutoCloseable {
         pipelineManager.close();
         visionSource.close();
         if (lastPipelineResultBestTarget != null) lastPipelineResultBestTarget.close();
+    }
+
+    /**
+     * The camera's quirks say it has gain, and (once connected) it really has the control
+     * (photonvision-54: the Thriftiest Cam is listed with gain but has none).
+     */
+    public boolean hasGainControl() {
+        return cameraQuirks.hasQuirk(CameraQuirk.Gain) && visionSource.getSettables().hasControl("gain");
+    }
+
+    /** SpectrumJetson (photonvision-34): the focus score for this camera's lens. */
+    public FocusMeter focusMeter() {
+        return focusMeter;
     }
 }

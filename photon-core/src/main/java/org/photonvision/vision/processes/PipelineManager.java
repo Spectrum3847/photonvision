@@ -40,6 +40,9 @@ public class PipelineManager implements AutoCloseable {
     public static final int CAL_3D_INDEX = -2;
 
     protected final List<CVPipelineSettings> userPipelineSettings;
+
+    /** SpectrumJetson: true if this camera had no pipelines and got the team default one. */
+    boolean createdDefaultPipeline = false;
     protected final Calibrate3dPipeline calibration3dPipeline;
     protected final FocusPipeline focusPipeline = new FocusPipeline();
     protected final DriverModePipeline driverModePipeline = new DriverModePipeline();
@@ -70,7 +73,12 @@ public class PipelineManager implements AutoCloseable {
 
         this.driverModePipeline.setSettings(driverSettings);
 
-        if (userPipelines.isEmpty()) addPipeline(PipelineType.AprilTag);
+        // SpectrumJetson: a new camera starts with the team's pipeline (AprilTagCuda on the
+        // Jetson); VisionModule then applies TeamCameraDefaults, which need the camera's modes.
+        if (userPipelines.isEmpty()) {
+            addPipeline(TeamCameraDefaults.defaultPipelineType());
+            createdDefaultPipeline = true;
+        }
 
         calibration3dPipeline = new Calibrate3dPipeline();
 

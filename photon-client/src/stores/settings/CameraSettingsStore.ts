@@ -140,6 +140,7 @@ export const useCameraSettingsStore = defineStore("cameraSettings", {
           cameraQuirks: d.cameraQuirks,
           minWhiteBalanceTemp: d.minWhiteBalanceTemp,
           maxWhiteBalanceTemp: d.maxWhiteBalanceTemp,
+          extraControls: d.extraControls ?? [],
           matchedCameraInfo: d.matchedCameraInfo,
           fpsLimit: d.fpsLimit,
           isEnabled: d.isEnabled,

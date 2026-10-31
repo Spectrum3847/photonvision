@@ -262,6 +262,9 @@ export interface UiCameraConfiguration {
   minWhiteBalanceTemp: number;
   maxWhiteBalanceTemp: number;
 
+  // SpectrumJetson (photonvision-28): contrast, gamma, sharpness, backlight compensation
+  extraControls: ExtraCameraControl[];
+
   fpsLimit: number;
   isEnabled: boolean;
 
@@ -269,6 +272,17 @@ export interface UiCameraConfiguration {
   isConnected: boolean;
   hasConnected: boolean;
   mismatch: boolean;
+}
+
+// SpectrumJetson (photonvision-28): a camera control the stock UI doesn't show, as the camera reports it.
+export interface ExtraCameraControl {
+  key: "cameraContrast" | "cameraGamma" | "cameraSharpness" | "cameraBacklightCompensation";
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+  value: number;
 }
 
 export interface CameraSettingsChangeRequest {
@@ -425,6 +439,7 @@ export const PlaceholderCameraSettings: UiCameraConfiguration = reactive({
   maxExposureRaw: 100,
   minWhiteBalanceTemp: 2000,
   maxWhiteBalanceTemp: 10000,
+  extraControls: [],
   matchedCameraInfo: {
     type: PVFileCamera,
     name: "Foobar",

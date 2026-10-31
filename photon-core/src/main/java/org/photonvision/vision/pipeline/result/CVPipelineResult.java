@@ -36,6 +36,8 @@ public class CVPipelineResult implements Releasable {
     public final Frame inputAndOutputFrame;
     public Optional<MultiTargetPNPResult> multiTagResult;
     public final List<String> objectDetectionClassNames;
+    /** SpectrumJetson (photonvision-54): how the tags look this frame, when it was measured. */
+    public org.photonvision.vision.target.TagContrast.Measurement tagContrast = null;
 
     public CVPipelineResult(
             long sequenceID,

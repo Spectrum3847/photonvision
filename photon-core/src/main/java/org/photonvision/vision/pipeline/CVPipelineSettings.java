@@ -60,6 +60,13 @@ public class CVPipelineSettings implements Cloneable {
 
     public boolean blockForFrames = true;
 
+    // SpectrumJetson (photonvision-28): camera controls the stock UI doesn't show. -1 = the camera's
+    // own default (re-applied on pipeline switch, so pipelines stay independent).
+    public int cameraContrast = -1;
+    public int cameraGamma = -1;
+    public int cameraSharpness = -1;
+    public int cameraBacklightCompensation = -1;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -81,7 +88,11 @@ public class CVPipelineSettings implements Cloneable {
                 && pipelineNickname.equals(that.pipelineNickname)
                 && streamingFrameDivisor == that.streamingFrameDivisor
                 && inputShouldShow == that.inputShouldShow
-                && outputShouldShow == that.outputShouldShow;
+                && outputShouldShow == that.outputShouldShow
+                && cameraContrast == that.cameraContrast
+                && cameraGamma == that.cameraGamma
+                && cameraSharpness == that.cameraSharpness
+                && cameraBacklightCompensation == that.cameraBacklightCompensation;
     }
 
     @Override
@@ -103,7 +114,11 @@ public class CVPipelineSettings implements Cloneable {
                 streamingFrameDivisor,
                 ledMode,
                 inputShouldShow,
-                outputShouldShow);
+                outputShouldShow,
+                cameraContrast,
+                cameraGamma,
+                cameraSharpness,
+                cameraBacklightCompensation);
     }
 
     @Override

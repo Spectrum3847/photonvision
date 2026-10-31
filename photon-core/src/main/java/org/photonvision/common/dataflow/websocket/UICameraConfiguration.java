@@ -53,6 +53,8 @@ public class UICameraConfiguration {
     public double maxExposureRaw;
     public double minWhiteBalanceTemp;
     public double maxWhiteBalanceTemp;
+    // SpectrumJetson (photonvision-28): contrast, gamma, sharpness, backlight compensation
+    public List<Map<String, Object>> extraControls = List.of();
     public PVCameraInfo matchedCameraInfo;
     public boolean mismatch;
 

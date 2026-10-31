@@ -1,5 +1,6 @@
 import type {
   CameraCalibrationResult,
+  ExtraCameraControl,
   GeneralSettings,
   LightingSettings,
   LogLevel,
@@ -63,6 +64,8 @@ export interface WebsocketCameraSettingsUpdate {
   maxExposureRaw: number;
   minWhiteBalanceTemp: number;
   maxWhiteBalanceTemp: number;
+  // SpectrumJetson (photonvision-28): contrast, gamma, sharpness, backlight compensation
+  extraControls?: ExtraCameraControl[];
   matchedCameraInfo: PVCameraInfo;
   fpsLimit: number;
   isEnabled: boolean;

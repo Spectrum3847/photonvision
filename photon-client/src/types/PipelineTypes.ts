@@ -134,6 +134,12 @@ export interface PipelineSettings {
   crosshair: boolean;
 
   blockForFrames: boolean;
+
+  // SpectrumJetson (photonvision-28): -1 = the camera's own default
+  cameraContrast: number;
+  cameraGamma: number;
+  cameraSharpness: number;
+  cameraBacklightCompensation: number;
 }
 export type ConfigurablePipelineSettings = Partial<
   Omit<
@@ -201,7 +207,11 @@ export const DefaultPipelineSettings: Omit<
   cameraMinExposureRaw: 1,
   cameraMaxExposureRaw: 2,
   crosshair: true,
-  blockForFrames: true
+  blockForFrames: true,
+  cameraContrast: -1,
+  cameraGamma: -1,
+  cameraSharpness: -1,
+  cameraBacklightCompensation: -1
 };
 
 export interface ReflectivePipelineSettings extends PipelineSettings {
