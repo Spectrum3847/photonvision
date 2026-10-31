@@ -26,7 +26,7 @@ import java.util.Objects;
  * SpectrumJetson (photonvision-40): areas of the image a pipeline should ignore, or the only areas
  * it should search, drawn as boxes on the dashboard stream (pv-mask-overlay). Boxes are fractions
  * of the image as displayed (after rotation), so they survive a resolution change. AprilCudaTag
- * applies it on the GPU right after thresholding (bos-07); object detection drops detections whose
+ * applies it on the GPU right after thresholding (detector-07); object detection drops detections whose
  * centre is ignored.
  *
  * <p>Saved with the pipeline settings ({@code detectionMask}), as in 2026, so a 2026 Jetson's mask

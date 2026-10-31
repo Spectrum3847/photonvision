@@ -117,7 +117,7 @@ public final class FarSearch {
             applied = true;
             excludedSent = null; // send them again
         } catch (UnsatisfiedLinkError | NoClassDefFoundError e) {
-            // An older lib971apriltag.so without the far search: try again later.
+            // An older libspectrum-gpu-apriltag.so without the far search: try again later.
         }
     }
 
@@ -136,7 +136,7 @@ public final class FarSearch {
             GpuDetectorJNI.setFarSearchExcluded(ex.stream().mapToInt(Integer::intValue).toArray());
             excludedSent = ex;
         } catch (UnsatisfiedLinkError e) {
-            excludedUnsupported = true; // an older lib971apriltag.so without it
+            excludedUnsupported = true; // an older libspectrum-gpu-apriltag.so without it
         }
     }
 

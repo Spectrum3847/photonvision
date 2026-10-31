@@ -101,7 +101,12 @@ public final class JetsonSettingsPublisher {
                             });
             root.put("environment", env);
             Map<String, Object> overrides = new LinkedHashMap<>();
-            for (String f : new String[] {"/tmp/spectrum-jpeg-decoder", "/tmp/spectrum-971-cuda-sync"}) {
+            for (String f :
+                    new String[] {
+                        "/tmp/spectrum-jpeg-decoder",
+                        "/tmp/spectrum-detector-cuda-sync",
+                        "/tmp/spectrum-971-cuda-sync" // the name before 2026-10-31
+                    }) {
                 String v = read(Path.of(f));
                 if (v != null) overrides.put(f, v);
             }

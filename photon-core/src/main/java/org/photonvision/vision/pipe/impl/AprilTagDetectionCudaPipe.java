@@ -43,7 +43,7 @@ public class AprilTagDetectionCudaPipe
     private DetectionMask sentMask = null;
     private boolean maskUnsupported = false;
 
-    /** Sends the detection mask to the GPU detector when it changed (bos-07). */
+    /** Sends the detection mask to the GPU detector when it changed (detector-07). */
     public void setMask(DetectionMask mask) {
         if (maskUnsupported || mask == null || mask.equals(sentMask)) return;
         try {
@@ -56,7 +56,7 @@ public class AprilTagDetectionCudaPipe
             }
             sentMask = copy;
         } catch (UnsatisfiedLinkError e) {
-            maskUnsupported = true; // an older lib971apriltag.so without setMask
+            maskUnsupported = true; // an older libspectrum-gpu-apriltag.so without setMask
         }
     }
 
@@ -123,7 +123,7 @@ public class AprilTagDetectionCudaPipe
                     sent = true;
                 } catch (UnsatisfiedLinkError e) {
                     System.out.println(
-                            "lib971apriltag has no setparams8; sending 5 of 8 distortion coefficients");
+                            "libspectrum-gpu-apriltag has no setparams8; sending 5 of 8 distortion coefficients");
                 }
             }
             if (!sent) {

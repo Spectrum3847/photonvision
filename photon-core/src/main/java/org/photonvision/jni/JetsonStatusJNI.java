@@ -18,7 +18,7 @@
 package org.photonvision.jni;
 
 /**
- * SpectrumJetson: status from the detector library (lib971apriltag, loaded by GpuDetectorJNI) for
+ * SpectrumJetson: status from the detector library (libspectrum-gpu-apriltag, loaded by GpuDetectorJNI) for
  * JetsonTelemetry. Safe to call without the library, or with an older one that lacks it: returns
  * null.
  */
@@ -32,7 +32,7 @@ public final class JetsonStatusJNI {
      */
     public static long[] jpegStatus() {
         try {
-            Class.forName("org.photonvision.jni.GpuDetectorJNI"); // loads lib971apriltag
+            Class.forName("org.photonvision.jni.GpuDetectorJNI"); // loads libspectrum-gpu-apriltag
             return nativeJpegStatus();
         } catch (Throwable t) { // no library (ExceptionInInitializerError) or no symbol
             return null;

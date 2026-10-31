@@ -36,12 +36,19 @@ public final class GpuStatus {
 
     private GpuStatus() {}
 
+    /** The GPU detector library, under its name or its name before 2026-10-31. */
+    private static boolean detectorLoaded(String loaded) {
+        return loaded.contains("libspectrum-gpu-apriltag.so")
+                || loaded.contains("lib971apriltag.so");
+    }
+
     /** The GPU's work in a sentence, or "" off a Jetson (no CUDA detector installed). */
     public static String describe(Iterable<VisionModule> modules) {
         String loaded = loadedLibraries();
-        if (!Files.exists(Path.of("/usr/lib/lib971apriltag.so"))
+        if (!Files.exists(Path.of("/usr/lib/libspectrum-gpu-apriltag.so"))
+                && !Files.exists(Path.of("/usr/lib/lib971apriltag.so"))
                 && !Files.exists(Path.of("/usr/local/lib/lib971apriltag.so"))
-                && !loaded.contains("lib971apriltag.so")) {
+                && !detectorLoaded(loaded)) {
             return "";
         }
         var cuda = new ArrayList<String>();
@@ -54,7 +61,7 @@ public final class GpuStatus {
             else if (s.pipelineType == PipelineType.AprilTag) cpu.add(name);
         }
         var parts = new ArrayList<String>();
-        if (loaded.contains("lib971apriltag.so") && !cuda.isEmpty()) {
+        if (detectorLoaded(loaded) && !cuda.isEmpty()) {
             parts.add(
                     "CUDA AprilTag detection: "
                             + plural(cuda.size(), "camera")

@@ -105,7 +105,7 @@ public class AprilTagCudaPipeline
         config.quadSigma = (float) settings.blur;
         config.quadDecimate = settings.decimate;
 
-        // The CUDA detector (lib971apriltag) has its own thresholds; it takes the camera's lens
+        // The CUDA detector (libspectrum-gpu-apriltag) has its own thresholds; it takes the camera's lens
         // calibration instead, to undistort the edges it refines.
         aprilTagDetectionPipe.setParams(
                 new AprilTagDetectionCudaPipeParams(

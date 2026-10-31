@@ -66,7 +66,7 @@ Robot code should be able to use upstream's PhotonLib, unchanged. So:
 | 2-5, 7-10, 12-14 | Not started |
 
 **The CUDA detector must be rebuilt against WPILib 2027 before feature 1 can detect a tag.**
-`lib971apriltag.so` (SpectrumJetson `detector/`) creates the Java `AprilTagDetection` objects it
+`libspectrum-gpu-apriltag.so` (SpectrumJetson `detector/`; `lib971apriltag.so` before 2026-10-31) creates the Java `AprilTagDetection` objects it
 returns by class name, and WPILib 2027 moved that class from `edu/wpi/first/apriltag` to
 `org/wpilib/vision/apriltag` (same constructor, `(String, int, int, float, double[], double, double,
 double[])`). It also links WPILib's C++ libraries (`libwpiutil` for its JNI helpers, `RawFrame`,
@@ -75,7 +75,7 @@ WPILib 2027's libraries of the same names into the same process, so the detector
 libraries it wasn't built against. So: build it against WPILib 2027's C++ (with 2027's namespace and
 header moves), and look the class up by its 2027 name, falling back to the 2026 one so a single
 library serves both during the switch. That needs a Jetson set up from source (cmake and allwpilib);
-this is the `bos`/`gpudetector` fork step, moved ahead of feature 2.
+this is the `gpu`/`gpu-4143` detector step (then called `bos`/`4143`), moved ahead of feature 2.
 
 ## Settings from a 2026 Jetson
 
@@ -151,7 +151,7 @@ tell PhotonVision what we've done, but not one change at a time.
 | 15 | **Calibration view** (new on this branch, 2026-10-31; branch `calui`): full-screen live view at the calibration resolution, 10x8 coverage grid with ring and corner blocks, "move the board here" ghost, auto-capture when still and adding coverage, solve with a quality readout (rms, fx ± 2σ, outliers, uncertainty map, lens-model fold check) and a pass/fail gate before saving, snapshot list with delete, JSON export. Server: partial boards of 6+ corners at the edge kept, mrcal's rejected edge corners re-admitted with an 8-coefficient refit, per-corner flags and residuals lined up with their corners. Unit tests for the fold check, coverage, session and alignment; not yet run on a camera. Targets from SpectrumJetson `tests/calibration-analysis/RESULTS.md` | 91 | no |
 | - | **Audit fixes**: split into the features above as they're ported. 2026-10-31: all ported except the hunks of unported features (CameraFocusCard: feature 4; FieldCalibrationView, CameraSettingsTuner: feature 11, patch 30), which go in with those | 63 | |
 
-The CUDA detector (`bos-*`, `gpudetector-*` in SpectrumJetson) is a separate library and moves to its
+The CUDA detector (`detector-*` (was `bos-*`) and `gpudetector-*` patches in SpectrumJetson) is a separate library and moves to its
 own fork of frc971/bos later; until then SpectrumJetson keeps building it.
 
 ## Later
@@ -221,3 +221,17 @@ When it's clean (or the conflicts look small): do the real update as in "Keeping
 alpha-8 (same as upstream #2663)", and anything in "Already upstream"), update **Version pins**,
 build-install and retest on a Jetson, then bump the pin in SpectrumJetson. Robot code's PhotonLib
 must move with it (see "Robot code moves with it").
+
+## Names (2026-10-31)
+
+SpectrumJetson renamed its GPU detector pieces so they say what they are. This fork loads the
+detector library as `spectrum-gpu-apriltag` first and falls back to `971apriltag`, so it runs with
+either build. The Java class names (`GpuDetectorJNI`, `AprilTagCudaPipeline`) stay: the native
+functions are named after them.
+
+| Old | New |
+| --- | --- |
+| `lib971apriltag.so` | `libspectrum-gpu-apriltag.so` (08 also links the old name to it) |
+| `08-select-detector.sh bos` / `4143` | `gpu` / `gpu-4143` (old words still accepted) |
+| `SPECTRUM_971_*`, `/tmp/spectrum-971-*` | `SPECTRUM_DETECTOR_*`, `/tmp/spectrum-detector-*` (old still read) |
+| `971 stats`, `971 jpeg`, `971 library loaded` log lines | `detector stats`, `jpeg decoder`, `detector loaded` |

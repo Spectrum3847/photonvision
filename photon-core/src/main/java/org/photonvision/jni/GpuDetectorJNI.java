@@ -20,14 +20,21 @@ package org.photonvision.jni;
 import org.wpilib.vision.apriltag.AprilTagDetection;
 
 /**
- * FRC 4143: the CUDA AprilTag detector, lib971apriltag.so (built by SpectrumJetson from frc971's
- * detector). Its native functions are named after this package and class, so neither can move.
+ * FRC 4143: the CUDA AprilTag detector, libspectrum-gpu-apriltag.so (built by SpectrumJetson from
+ * frc971's detector; lib971apriltag.so before 2026-10-31, still loaded if it's the only one). Its
+ * native functions are named after this package and class, so neither can move.
  */
 public class GpuDetectorJNI {
     static boolean libraryLoaded = false;
 
     static {
-        if (!libraryLoaded) System.loadLibrary("971apriltag");
+        if (!libraryLoaded) {
+            try {
+                System.loadLibrary("spectrum-gpu-apriltag");
+            } catch (UnsatisfiedLinkError e) {
+                System.loadLibrary("971apriltag"); // the name before 2026-10-31
+            }
+        }
         libraryLoaded = true;
     }
 
@@ -50,7 +57,7 @@ public class GpuDetectorJNI {
     public static native AprilTagDetection[] processimage(long handle, long p);
 
     /**
-     * SpectrumJetson (photonvision-40, bos-07): the detection mask. mode 0 off, 1 ignore inside the
+     * SpectrumJetson (photonvision-40, detector-07): the detection mask. mode 0 off, 1 ignore inside the
      * boxes, 2 search only inside them; rects: x, y, w, h fractions of the image, 4 per box. Takes
      * effect on the next frame.
      */
@@ -59,7 +66,7 @@ public class GpuDetectorJNI {
     /**
      * SpectrumJetson (photonvision-04): all 8 coefficients of the OpenCV rational model
      * PhotonVision's calibration produces (k1 k2 p1 p2 k3 k4 k5 k6). setparams() drops k4..k6. Only
-     * the SpectrumJetson/bos build of lib971apriltag has this; callers fall back to setparams().
+     * the SpectrumJetson gpu build of libspectrum-gpu-apriltag has this; callers fall back to setparams().
      */
     public static native void setparams8(
             long handle,
