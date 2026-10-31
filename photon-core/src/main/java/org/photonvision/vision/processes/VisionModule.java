@@ -1140,7 +1140,18 @@ public class VisionModule implements AutoCloseable {
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-        saveAndBroadcastAll();
+        logger.info(
+                "Camera "
+                        + (enabled ? "enabled" : "disabled")
+                        + " (NetworkTables enabledRequest, e.g. PhotonCamera.setEnabled)");
+        // SpectrumJetson (photonvision-63): tell the dashboards, but don't save. enabled isn't a
+        // saved setting, and the save wrote the settings database a second later: robot code that
+        // switches cameras off in disabledInit wrote the SSD just before the robot's power was cut.
+        DataChangeService.getInstance()
+                .publishEvent(
+                        new OutgoingUIEvent<>(
+                                "fullsettings",
+                                UIPhotonConfiguration.programStateToUi(ConfigProvider.getInstance().getConfig())));
     }
 
     /**

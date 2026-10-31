@@ -148,7 +148,7 @@ tell PhotonVision what we've done, but not one change at a time.
 | 12 | **Far-tag search** | 55, 69 | yes (CUDA) |
 | 13 | **Operations UI**: Match Ready, settings snapshots, settings JSON, copy settings, tuning guide, theme, radio switches, stream-only-when-watched, setting broadcasts, switch-all, test hooks, UI state, dashboard guards | 05, 15, 24, 25, 26, 35, 41, 45, 46, 47, 48, 52, 53, 58, 59, 60, 67, 68, 73 | 52 (via health-check) |
 | 14 | **TensorRT object detection** | 14 | yes |
-| - | **Audit fixes**: split into the features above as they're ported | 63 | |
+| - | **Audit fixes**: split into the features above as they're ported. 2026-10-31: all ported except the hunks of unported features (CameraFocusCard: feature 4; FieldCalibrationView, CameraSettingsTuner: feature 11, patch 30), which go in with those | 63 | |
 
 The CUDA detector (`bos-*`, `gpudetector-*` in SpectrumJetson) is a separate library and moves to its
 own fork of frc971/bos later; until then SpectrumJetson keeps building it.
