@@ -131,7 +131,7 @@ const autoCalibrate = computed<boolean>({
     if (live.value) live.value.autoCalibrate = v;
   }
 });
-const keepEdgeCorners = ref(true);
+const keepEdgeCorners = ref(false); // off by default (not yet validated on the bench)
 watch(keepEdgeCorners, (v) => useCameraSettingsStore().changeCurrentPipelineSetting({ keepEdgeCorners: v }, false));
 
 // Cell tint: red when empty, amber while short, green at target.

@@ -202,6 +202,69 @@ public class Calibrate3dPipeTest {
         System.out.println("Mean uncertainty: " + meanUncertainty);
     }
 
+    // Spectrum (photonvision-91): calibrateCommon with the edge-corner refit on
+    static boolean keepEdgeCornersForTest = false;
+
+    /**
+     * Spectrum (photonvision-91): with the edge-corner refit on, the result is sane next to mrcal's
+     * own, and the uncertainty path doesn't produce a map evaluated at the wrong solution: a refit
+     * carries no mrcal optimization inputs, and the quality readout reports no uncertainty.
+     */
+    @Test
+    public void testEdgeCornerRefitUncertaintyIsConsistent() throws IOException {
+        var dataset = CalibrationDatasets.CHARUCO_LIFECAM_1280;
+        String charucoBase = TestUtils.getCharucoBoardImagesPath().toAbsolutePath().toString();
+        File charucoDir = Path.of(charucoBase, dataset.path).toFile();
+        var mrcal =
+                calibrateCommon(
+                        dataset.size,
+                        charucoDir,
+                        dataset.boardSize,
+                        dataset.boardType,
+                        true,
+                        dataset.useOldPattern);
+        CameraCalibrationCoefficients refit;
+        keepEdgeCornersForTest = true;
+        try {
+            refit =
+                    calibrateCommon(
+                            dataset.size,
+                            charucoDir,
+                            dataset.boardSize,
+                            dataset.boardType,
+                            true,
+                            dataset.useOldPattern);
+        } finally {
+            keepEdgeCornersForTest = false;
+        }
+        // mrcal's own result still has its inputs and a sane uncertainty
+        assertNotNull(mrcal.optimizationInputs);
+        double mrcalMin =
+                mrcal.estimateUncertainty().stream().mapToDouble(p -> p.z).min().orElseThrow();
+        assertEquals(1.5, mrcalMin, 1.5);
+
+        // Same camera, same order of focal length and centre
+        double fxM = mrcal.cameraIntrinsics.data[0], fxR = refit.cameraIntrinsics.data[0];
+        assertEquals(fxM, fxR, 0.03 * fxM);
+        assertEquals(mrcal.cameraIntrinsics.data[2], refit.cameraIntrinsics.data[2], 0.03 * fxM);
+        assertEquals(mrcal.cameraIntrinsics.data[5], refit.cameraIntrinsics.data[5], 0.03 * fxM);
+        assertEquals(8, refit.distCoeffs.data.length);
+
+        if (refit.optimizationInputs == null) {
+            // The refit was used: no mrcal uncertainty for it, and the readout says so
+            var q =
+                    org.photonvision.vision.calibration.CalibrationQuality.evaluate(
+                            refit, Double.NaN, "refit", null);
+            assertEquals(null, q.uncertainty());
+            assertTrue(q.rms() > 0 && q.rms() < 1.0, "refit rms " + q.rms());
+        } else {
+            // mrcal's was kept (the refit folded or failed): its uncertainty is mrcal's
+            double min =
+                    refit.estimateUncertainty().stream().mapToDouble(p -> p.z).min().orElseThrow();
+            assertEquals(mrcalMin, min, 1e-6);
+        }
+    }
+
     public static CameraCalibrationCoefficients calibrateCommon(
             Size imgRes,
             File rootFolder,
@@ -278,6 +341,7 @@ public class Calibrate3dPipeTest {
             calibration3dPipeline.getSettings().streamingFrameDivisor = FrameDivisor.NONE;
             calibration3dPipeline.getSettings().useMrCal = useMrCal;
             calibration3dPipeline.getSettings().useOldPattern = useOldPattern;
+            calibration3dPipeline.getSettings().keepEdgeCorners = keepEdgeCornersForTest;
 
             for (var file : directoryListing) {
                 if (file.isFile()) {

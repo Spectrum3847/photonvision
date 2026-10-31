@@ -43,10 +43,6 @@ import org.photonvision.vision.calibration.JsonMatOfDouble;
 import org.photonvision.vision.calibration.LensFoldCheck;
 import org.photonvision.vision.frame.FrameStaticProperties;
 import org.photonvision.vision.pipe.CVPipe;
-import org.wpilib.math.geometry.Pose3d;
-import org.wpilib.math.geometry.Rotation3d;
-import org.wpilib.math.geometry.Translation3d;
-import org.wpilib.math.linalg.VecBuilder;
 
 public class Calibrate3dPipe
         extends CVPipe<
@@ -477,6 +473,10 @@ public class Calibrate3dPipe
      * mrcal's didn't. It has no board warp, and its covariance gives fx's spread for the quality
      * readout.
      *
+     * <p>It carries no optimization inputs: mrcal's projection uncertainty is only valid at the
+     * optimum of mrcal's own problem (its model, warp and outlier set), and evaluated at the refit
+     * it came out ~20x too large. So a refit calibration reports no uncertainty map.
+     *
      * @return the refit calibration, or null to keep mrcal's
      */
     private CameraCalibrationCoefficients refitKeepingEdgeCorners(
@@ -540,18 +540,10 @@ public class Calibrate3dPipe
             // Final poses and residuals, with the final flags
             List<Mat> rvecs = new ArrayList<>();
             List<Mat> tvecs = new ArrayList<>();
-            List<Pose3d> poses = new ArrayList<>();
             for (int i = 0; i < obs.size(); i++) {
                 var rt = solvePose(obs.get(i), used.get(i), k, d);
                 rvecs.add(rt[0]);
                 tvecs.add(rt[1]);
-                double[] r = new double[3], t = new double[3];
-                rt[0].get(0, 0, r);
-                rt[1].get(0, 0, t);
-                poses.add(
-                        new Pose3d(
-                                new Translation3d(t[0], t[1], t[2]),
-                                new Rotation3d(VecBuilder.fill(r[0], r[1], r[2]))));
             }
             var kJson = JsonMatOfDouble.fromMat(k);
             var dJson = new JsonMatOfDouble(1, dArr.length, CvType.CV_64FC1, dArr);
@@ -564,7 +556,7 @@ public class Calibrate3dPipe
                             + count(used)
                             + " used, mrcal kept "
                             + before
-                            + ")";
+                            + "); no uncertainty map, mrcal's applies only to its own solve";
             return new CameraCalibrationCoefficients(
                     size,
                     kJson,
@@ -574,8 +566,8 @@ public class Calibrate3dPipe
                     new Size(params.boardWidth, params.boardHeight),
                     params.squareSize,
                     CameraLensModel.LENSMODEL_OPENCV,
-                    // mrcal's uncertainty is evaluated at this solution (no warp)
-                    new OptimizationInputs(poses));
+                    // No mrcal uncertainty for a refit (see above)
+                    null);
         } catch (Exception e) {
             logger.error("Edge-corner refit failed; keeping mrcal's solution", e);
             return null;

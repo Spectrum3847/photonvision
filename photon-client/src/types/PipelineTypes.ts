@@ -463,7 +463,7 @@ export const DefaultCalibration3dPipelineSettings: Calibration3dPipelineSettings
   drawAllSnapshots: false,
   showExclusionZone: false,
   autoCalibrate: false,
-  keepEdgeCorners: true
+  keepEdgeCorners: false
 };
 
 export type ActivePipelineSettings =

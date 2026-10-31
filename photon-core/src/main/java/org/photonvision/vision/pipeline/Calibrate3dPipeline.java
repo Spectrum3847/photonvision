@@ -538,6 +538,7 @@ public class Calibrate3dPipeline
     /** Grade a solved calibration (the view's quality readout and save gate). */
     public CalibrationQuality.Report evaluate(CameraCalibrationCoefficients cal) {
         List<org.opencv.core.Point3> uncertainty = null;
+        // A refit keeping edge corners has no mrcal optimization inputs: no uncertainty map
         if (cal.optimizationInputs != null) {
             try {
                 uncertainty = cal.estimateUncertainty();
