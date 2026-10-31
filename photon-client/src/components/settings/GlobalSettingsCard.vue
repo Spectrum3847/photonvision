@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
-import { computed, ref, watchEffect } from "vue";
+import { computed, onMounted, ref, watchEffect } from "vue";
+import axios from "axios";
 import PvInput from "@/components/common/pv-input.vue";
 import PvRadio from "@/components/common/pv-radio.vue";
 import PvSwitch from "@/components/common/pv-switch.vue";
@@ -80,6 +81,57 @@ const settingsHaveChanged = (): boolean => {
     a.setDHCPcommand !== b.setDHCPcommand
   );
 };
+
+// SpectrumJetson: Wi-Fi / Bluetooth radio switches. They apply immediately (not part of
+// Save) and persist across reboots. Robot coprocessors may not use radios at events.
+type RadioStatus = {
+  wifiSupported: boolean;
+  wifi: boolean;
+  wifiConnection: string;
+  bluetoothSupported: boolean;
+  bluetooth: boolean;
+  clientOverWifi: boolean;
+};
+const radios = ref<RadioStatus | null>(null);
+const radioBusy = ref(false);
+const loadRadios = async () => {
+  try {
+    radios.value = (await axios.get("/settings/radios")).data;
+  } catch {
+    radios.value = null;
+  }
+};
+const setRadio = async (kind: "wifi" | "bluetooth", on: boolean) => {
+  if (!radios.value) return;
+  if (
+    kind === "wifi" &&
+    !on &&
+    radios.value.clientOverWifi &&
+    !window.confirm(
+      "You are connected to this device over Wi-Fi. Turning Wi-Fi off will disconnect this page. Continue?"
+    )
+  ) {
+    radios.value = { ...radios.value };
+    return;
+  }
+  radioBusy.value = true;
+  try {
+    radios.value = (await axios.post("/settings/radios", { [kind]: on })).data;
+    useStateStore().showSnackbarMessage({
+      message: `${kind === "wifi" ? "Wi-Fi" : "Bluetooth"} turned ${on ? "on" : "off"}`,
+      color: "success"
+    });
+  } catch {
+    useStateStore().showSnackbarMessage({
+      message: `Could not change ${kind === "wifi" ? "Wi-Fi" : "Bluetooth"} (or this page lost its connection)`,
+      color: "error"
+    });
+    await loadRadios();
+  } finally {
+    radioBusy.value = false;
+  }
+};
+onMounted(loadRadios);
 
 const saveGeneralSettings = async () => {
   // replace undefined members with empty strings for backend
@@ -293,6 +345,36 @@ watchEffect(() => {
           icon="mdi-information-outline"
           :variant="theme.global.current.value.dark ? 'tonal' : 'elevated'"
         />
+        <template v-if="radios && (radios.wifiSupported || radios.bluetoothSupported)">
+          <v-card-title class="pl-0 pt-3 pb-10px">Radios</v-card-title>
+          <pv-switch
+            v-if="radios.wifiSupported"
+            :model-value="radios.wifi"
+            :disabled="radioBusy"
+            label="Wi-Fi"
+            tooltip="Turns this device's Wi-Fi radio on or off (applies immediately, survives reboots). Useful for updates in the shop; robot coprocessors may not use radios at competition."
+            :label-cols="4"
+            @update:model-value="(v) => setRadio('wifi', !!v)"
+          />
+          <v-alert
+            v-if="radios.wifi"
+            class="mb-3"
+            color="buttonActive"
+            density="compact"
+            :text="`Wi-Fi is on${radios.wifiConnection ? ' (connected to ' + radios.wifiConnection + ')' : ''}. Turn it off before competition: robot coprocessors may not use radios.`"
+            icon="mdi-wifi-alert"
+            :variant="theme.global.current.value.dark ? 'tonal' : 'elevated'"
+          />
+          <pv-switch
+            v-if="radios.bluetoothSupported"
+            :model-value="radios.bluetooth"
+            :disabled="radioBusy"
+            label="Bluetooth"
+            tooltip="Turns this device's Bluetooth radio on or off (applies immediately, survives reboots)."
+            :label-cols="4"
+            @update:model-value="(v) => setRadio('bluetooth', !!v)"
+          />
+        </template>
         <v-card-title class="pl-0 pt-3 pb-10px">Miscellaneous</v-card-title>
         <pv-switch
           v-model="tempSettingsStruct.shouldPublishProto"

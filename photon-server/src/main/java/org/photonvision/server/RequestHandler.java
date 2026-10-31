@@ -1196,6 +1196,73 @@ public class RequestHandler {
         }
     }
 
+    // SpectrumJetson (photonvision-05): Wi-Fi / Bluetooth radio switches (Settings > Networking).
+    // PhotonVision runs as root, so it drives nmcli / rfkill directly. Both persist across reboots
+    // (NetworkManager saves the Wi-Fi radio state, systemd-rfkill the Bluetooth block).
+    @Json
+    record RadioRequest(Boolean wifi, Boolean bluetooth) {}
+
+    private static String shellOutput(String command) {
+        try {
+            var shell = new ShellExec(true, false);
+            shell.executeBashCommand(command, true, false);
+            String out = shell.getOutput();
+            return out == null ? "" : out.trim();
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private static Map<String, Object> radioStatus(String clientIp) {
+        Map<String, Object> status = new java.util.LinkedHashMap<>();
+        status.put("wifiSupported", !shellOutput("nmcli -t -f TYPE dev | grep -x wifi").isEmpty());
+        status.put("wifi", shellOutput("nmcli radio wifi").equals("enabled"));
+        status.put(
+                "wifiConnection",
+                shellOutput(
+                        "nmcli -t -f TYPE,STATE,CONNECTION dev"
+                                + " | awk -F: '$1==\"wifi\" && $2==\"connected\" {print $3}'"));
+        status.put("bluetoothSupported", !shellOutput("rfkill list bluetooth").isEmpty());
+        status.put(
+                "bluetooth", !shellOutput("rfkill list bluetooth | grep -i 'soft blocked: no'").isEmpty());
+        // Does this browser reach us over Wi-Fi? Then turning Wi-Fi off cuts the UI off.
+        boolean overWifi = false;
+        if (clientIp != null && clientIp.matches("[0-9.]+")) {
+            String dev =
+                    shellOutput("ip route get " + clientIp + " | grep -o 'dev [^ ]*' | cut -d' ' -f2");
+            overWifi =
+                    !dev.isEmpty() && shellOutput("nmcli -t -f DEVICE,TYPE dev").contains(dev + ":wifi");
+        }
+        status.put("clientOverWifi", overWifi);
+        return status;
+    }
+
+    /** GET /api/settings/radios. */
+    public static void onRadioStatusRequest(Context ctx) {
+        ctx.json(radioStatus(ctx.ip()), Types.mapOf(Object.class));
+    }
+
+    /** POST /api/settings/radios {"wifi": bool, "bluetooth": bool}, either optional. */
+    public static void onRadioSetRequest(Context ctx) {
+        RadioRequest req;
+        try {
+            req = ctx.bodyAsClass(RadioRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Expected {\"wifi\": true|false} and/or {\"bluetooth\": true|false}");
+            return;
+        }
+        if (req.wifi() != null) {
+            logger.info("Turning Wi-Fi " + (req.wifi() ? "on" : "off"));
+            shellOutput("nmcli radio wifi " + (req.wifi() ? "on" : "off"));
+        }
+        if (req.bluetooth() != null) {
+            logger.info("Turning Bluetooth " + (req.bluetooth() ? "on" : "off"));
+            shellOutput("rfkill " + (req.bluetooth() ? "unblock" : "block") + " bluetooth");
+        }
+        onRadioStatusRequest(ctx);
+    }
+
     // SpectrumJetson (photonvision-22): tags left out of multi-tag on every camera.
     @Json
     record ExcludedTagsRequest(java.util.List<Integer> saved) {}
