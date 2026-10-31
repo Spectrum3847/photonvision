@@ -123,6 +123,14 @@ public abstract class VisionSourceSettables {
 
     public abstract List<VideoMode> getAllVideoModes();
 
+    /**
+     * SpectrumJetson (photonvision-24): the camera's controls as actually set (raw values), for the
+     * settings snapshot in the robot log. Empty for cameras that don't have them.
+     */
+    public java.util.Map<String, Long> getRawControls() {
+        return java.util.Map.of();
+    }
+
     // SpectrumJetson (photonvision-28): camera controls the stock UI doesn't show. A value below 0
     // restores the camera's default. No-ops for cameras without them.
     public void setContrast(int value) {}

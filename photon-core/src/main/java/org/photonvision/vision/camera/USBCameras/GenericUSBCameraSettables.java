@@ -427,6 +427,40 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
         return out;
     }
 
+    // SpectrumJetson (photonvision-24): the UVC controls worth logging, including ones the UI doesn't
+    // show (contrast, gamma, sharpness, backlight compensation).
+    private static final String[] LOGGED_CONTROLS = {
+        "exposure_time_absolute",
+        "exposure_absolute",
+        "auto_exposure",
+        "brightness",
+        "contrast",
+        "gamma",
+        "sharpness",
+        "saturation",
+        "gain",
+        "white_balance_temperature",
+        "white_balance_automatic",
+        "backlight_compensation",
+        "power_line_frequency",
+        "focus_automatic_continuous"
+    };
+
+    @Override
+    public java.util.Map<String, Long> getRawControls() {
+        var m = new java.util.LinkedHashMap<String, Long>();
+        for (String name : LOGGED_CONTROLS) {
+            try {
+                // cscore scales some controls to 0-100 and keeps the camera's own value as raw_*.
+                VideoProperty prop = rawProperty(name);
+                if (prop.getKind() != VideoProperty.Kind.NONE) m.put(name, (long) prop.get());
+            } catch (Exception e) {
+                // Camera unplugged or the property went away; skip it this time.
+            }
+        }
+        return m;
+    }
+
     /**
      * Forgiving "set this property" action. Produces a debug message but skips properties if they
      * aren't supported Errors if the property exists but the set fails.

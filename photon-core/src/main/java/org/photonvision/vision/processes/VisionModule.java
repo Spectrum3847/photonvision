@@ -42,6 +42,7 @@ import org.photonvision.common.dataflow.websocket.UICameraConfiguration;
 import org.photonvision.common.dataflow.websocket.UIDataPublisher;
 import org.photonvision.common.dataflow.websocket.UIPhotonConfiguration;
 import org.photonvision.common.hardware.HardwareManager;
+import org.photonvision.common.hardware.metrics.JetsonSettingsPublisher;
 import org.photonvision.common.hardware.metrics.JetsonTelemetry;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
@@ -224,6 +225,10 @@ public class VisionModule implements AutoCloseable {
         // (photonvision-17).
         resultConsumers.add(
                 new MountEstimatePublisher(() -> visionSource.getSettables().getConfiguration().nickname));
+        // SpectrumJetson: this camera's settings, and the Jetson's, as JSON for the robot log
+        // (photonvision-24).
+        settingsPublisher = new CameraSettingsPublisher(this);
+        JetsonSettingsPublisher.start();
 
         // SpectrumJetson: a brand-new camera gets the team's tuned settings (TeamCameraDefaults)
         // instead of stock PhotonVision's CPU AprilTag at 320x240. The camera usually hasn't
@@ -1121,8 +1126,12 @@ public class VisionModule implements AutoCloseable {
         return this.visionSource.cameraConfiguration;
     }
 
+    // SpectrumJetson (photonvision-24, -63): kept so close() can end its timed task.
+    private CameraSettingsPublisher settingsPublisher;
+
     @Override
     public void close() {
+        if (settingsPublisher != null) settingsPublisher.stop();
         if (visionRunner.isRunning()) {
             stop();
         }

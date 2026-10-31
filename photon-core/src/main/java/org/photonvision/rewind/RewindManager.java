@@ -134,11 +134,21 @@ public class RewindManager {
         }
     }
 
-    // The 2026 session also carried the camera and Jetson settings at its start (photonvision-24's
-    // CameraSettingsPublisher and JetsonSettingsPublisher, feature 13); they aren't ported yet, so
-    // session.json has no "settings"/"settingsAtEnd" until they are.
-    /** startNs: NetworkTables' clock (nanoseconds) when the session opened. */
-    public record Session(String name, Path dir, long startNs, String reason) {}
+    /**
+     * startNs: NetworkTables' clock (nanoseconds) when the session opened. startSettings
+     * (photonvision-24): every camera's settings and the Jetson's at that moment.
+     */
+    public record Session(
+            String name, Path dir, long startNs, String reason, Map<String, Object> startSettings) {}
+
+    /** SpectrumJetson (photonvision-24): every camera's settings and the Jetson's, right now. */
+    private static Map<String, Object> settingsSnapshot() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("cameras", org.photonvision.vision.processes.CameraSettingsPublisher.snapshots());
+        var jetson = org.photonvision.common.hardware.metrics.JetsonSettingsPublisher.snapshot();
+        if (jetson != null) m.put("jetson", jetson);
+        return m;
+    }
 
     private static RewindManager INSTANCE;
 
@@ -400,7 +410,7 @@ public class RewindManager {
             logger.error("Rewind: cannot create " + dir, e);
             return;
         }
-        current = new Session(name, dir, now, reason);
+        current = new Session(name, dir, now, reason, settingsSnapshot());
         VisionLog.open(dir.resolve(name + "_vision.wpilog")); // photonvision-79
         stopReason = "";
         writeSessionJson(current, null);
@@ -439,6 +449,13 @@ public class RewindManager {
             cams.add(c);
         }
         m.put("cameras", cams);
+        // SpectrumJetson (photonvision-24): what the cameras and the Jetson were set to, when the
+        // recording started (and at the end, if anything changed).
+        if (s.startSettings() != null) m.put("settings", s.startSettings());
+        if (endReason != null) {
+            var endSettings = settingsSnapshot();
+            if (!endSettings.equals(s.startSettings())) m.put("settingsAtEnd", endSettings);
+        }
         if (endReason != null) {
             m.put("endJetsonUs", NetworkTablesJNI.now() / 1000);
             m.put("endReason", endReason);
