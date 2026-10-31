@@ -154,6 +154,10 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
     private void removeEntries() {
         if (pipelineIndexListener != null) pipelineIndexListener.remove();
         if (driverModeListener != null) driverModeListener.remove();
+        // SpectrumJetson (photonvision-11): upstream never removed these two, so a camera rename
+        // left the old listeners registered.
+        if (fpsLimitListener != null) fpsLimitListener.remove();
+        if (isEnabledListener != null) isEnabledListener.remove();
         ts.removeEntries();
         if (tagQualityPublisher != null) tagQualityPublisher.close();
         tagQualityPublisher = null;
@@ -163,6 +167,7 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         if (pipelineIndexListener != null) pipelineIndexListener.remove();
         if (driverModeListener != null) driverModeListener.remove();
         if (fpsLimitListener != null) fpsLimitListener.remove();
+        if (isEnabledListener != null) isEnabledListener.remove(); // SpectrumJetson (photonvision-11)
 
         ts.updateEntries();
 

@@ -99,7 +99,9 @@ public class VisionModule implements AutoCloseable {
     private int outputStreamPort = -1;
 
     private int fpsLimit = -1;
-    private boolean enabled = true;
+    // SpectrumJetson (photonvision-11): volatile, written by the NT listener thread and read by the
+    // VisionRunner. Not saved: every camera starts enabled when PhotonVision starts.
+    private volatile boolean enabled = true;
 
     FileSaveFrameConsumer inputFrameSaver;
     FileSaveFrameConsumer outputFrameSaver;
