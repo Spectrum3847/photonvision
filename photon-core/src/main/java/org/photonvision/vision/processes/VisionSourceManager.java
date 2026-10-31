@@ -363,6 +363,21 @@ public class VisionSourceManager implements AutoCloseable {
                 .publishEvent(OutgoingUIEvent.wrappedOf("visionSourceManager", getVsmState()));
     }
 
+    /**
+     * SpectrumJetson (photonvision-60): connected cameras that no VisionModule uses yet, as Camera
+     * Matching lists them, for /api/spectrum/uiState. Fake cameras (tools/fakecam, v4l2loopback) are
+     * adopted from this list with assignUnmatchedCamera.
+     */
+    public synchronized List<PVCameraInfo> unmatchedConnectedCameras() {
+        var used =
+                vmm.getModules().stream()
+                        .map(m -> m.getCameraConfiguration().matchedCameraInfo.uniquePath())
+                        .toList();
+        return filterAllowedDevices(getConnectedCameras()).stream()
+                .filter(c -> !used.contains(c.uniquePath()))
+                .toList();
+    }
+
     protected List<PVCameraInfo> getConnectedCameras() {
         List<PVCameraInfo> cameraInfos = new ArrayList<>();
         // find all connected cameras

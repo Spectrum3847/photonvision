@@ -20,7 +20,8 @@ withDefaults(
 </script>
 
 <template>
-  <div class="d-flex">
+  <div class="d-flex" data-pv-control="radio" :data-pv-label="label">
+    <!-- SpectrumJetson (photonvision-45): data-pv-* name the control for tests/ui -->
     <v-col :cols="12 - inputCols" class="d-flex align-center pl-0 pt-10px pb-10px">
       <tooltipped-label :tooltip="tooltip" :label="label" />
     </v-col>

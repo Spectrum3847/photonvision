@@ -27,7 +27,8 @@ const localValue = computed({
 </script>
 
 <template>
-  <div class="d-flex">
+  <div class="d-flex" data-pv-control="number" :data-pv-label="label">
+    <!-- SpectrumJetson (photonvision-45): data-pv-* name the control for tests/ui -->
     <v-col :cols="labelCols" class="d-flex pl-0 pt-10px pb-10px align-center">
       <tooltipped-label :tooltip="tooltip" :label="label" />
     </v-col>

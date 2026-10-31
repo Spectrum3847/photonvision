@@ -2012,4 +2012,51 @@ public class RequestHandler {
         out.put("raw", raw.toString());
         return out;
     }
+
+    /**
+     * The backend's own copy of what each camera's dashboard shows (current pipeline and its
+     * settings), so tests/ui can check a control really changed the backend, not only the page.
+     * Read-only. SpectrumJetson (photonvision-45), with framesProcessed (58) and unmatchedCameras
+     * (60). health-check.sh reads cameras[].nickname and pipelineNicknames.
+     */
+    public static void onUiStateRequest(Context ctx) {
+        var jsonb = io.avaje.jsonb.Jsonb.instance();
+        var tree = jsonb.type(Object.class);
+        var settingsType = jsonb.type(org.photonvision.vision.pipeline.CVPipelineSettings.class);
+        var cameras = new ArrayList<Map<String, Object>>();
+        for (var module : VisionSourceManager.getInstance().vmm.getModules()) {
+            var ui = module.toUICameraConfig();
+            var camera = new HashMap<String, Object>();
+            camera.put("uniqueName", ui.uniqueName);
+            camera.put("nickname", ui.nickname);
+            camera.put("currentPipelineIndex", ui.currentPipelineIndex);
+            camera.put("pipelineNicknames", ui.pipelineNicknames);
+            // As the dashboard gets it (enums as numbers), so tests compare like with like.
+            camera.put("currentPipelineSettings", ui.currentPipelineSettings);
+            camera.put("extraControls", ui.extraControls);
+            camera.put("streamViewers", module.streamViewers()); // photonvision-48
+            camera.put("framesProcessed", module.framesProcessed.get()); // photonvision-58
+            // Every pipeline's saved settings, not only the running one's (photonvision-46), as
+            // saved: avaje's form, with its "type" property (2026's had Jackson's ["type", {...}]
+            // wrapper, which 45 stripped).
+            var pipelines = new ArrayList<Object>();
+            for (var settings : module.uiStatePipelineSettings()) {
+                try {
+                    pipelines.add(tree.fromJson(settingsType.toJson(settings)));
+                } catch (RuntimeException e) {
+                    pipelines.add(Map.of("error", String.valueOf(e.getMessage())));
+                }
+            }
+            camera.put("pipelines", pipelines);
+            cameras.add(camera);
+        }
+        // photonvision-60: connected cameras not in use yet, in the form assignUnmatchedCamera takes
+        // (each written as a PVCameraInfo, so its "type" property comes along).
+        var unmatched = new ArrayList<Object>();
+        var infoType = jsonb.type(PVCameraInfo.class);
+        for (var info : VisionSourceManager.getInstance().unmatchedConnectedCameras()) {
+            unmatched.add(tree.fromJson(infoType.toJson(info)));
+        }
+        ctx.json(Map.of("cameras", cameras, "unmatchedCameras", unmatched), Types.mapOf(Object.class));
+    }
 }
