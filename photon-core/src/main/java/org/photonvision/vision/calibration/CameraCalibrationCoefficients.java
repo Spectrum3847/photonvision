@@ -344,8 +344,13 @@ public class CameraCalibrationCoefficients implements Releasable {
         mrcalIntrinsics[2] = core.get(0, 2);
         mrcalIntrinsics[3] = core.get(1, 2);
         // distortion
+        // Spectrum (photonvision-91): at most 8 (a 14-coefficient OpenCV result overflowed this)
         System.arraycopy(
-                this.getDistCoeffsArr(), 0, mrcalIntrinsics, 4, this.getDistCoeffsArr().length);
+                this.getDistCoeffsArr(),
+                0,
+                mrcalIntrinsics,
+                4,
+                Math.min(8, this.getDistCoeffsArr().length));
 
         var uncertainty = // x, y, uncertainty
                 MrCalJNI.computeUncertainty(

@@ -216,7 +216,10 @@ public class Calibrate3dPipe
         }
 
         JsonMatOfDouble cameraMatrixMat = JsonMatOfDouble.fromMat(cameraMatrix);
-        JsonMatOfDouble distortionCoefficientsMat = JsonMatOfDouble.fromMat(distortionCoefficients);
+        // Spectrum (photonvision-91): the 8 rational coefficients (OpenCV returns 14, the rest zero)
+        double[] dist8 = Arrays.copyOf(distortionCoefficients.toArray(), 8);
+        JsonMatOfDouble distortionCoefficientsMat =
+                new JsonMatOfDouble(1, 8, CvType.CV_64FC1, dist8);
 
         // Opencv is lame, so we can only assume all points are inliers
         var inliners =
@@ -522,7 +525,10 @@ public class Calibrate3dPipe
             var size = obs.get(0).size;
             double[] kArr = new double[9];
             k.get(0, 0, kArr);
-            double[] dArr = d.toArray();
+            // OpenCV returns 14 coefficients with CALIB_RATIONAL_MODEL; the 6 past k6 are the thin
+            // prism and tilt terms, zero without their flags. Keep the 8 the rest of PhotonVision
+            // (and mrcal's uncertainty, 4 + 8 intrinsics) expects.
+            double[] dArr = java.util.Arrays.copyOf(d.toArray(), 8);
             var foldRefit = LensFoldCheck.check(kArr, dArr, size.width, size.height);
             var foldMrcal = LensFoldCheck.check(mrcalK.data, mrcalD.data, size.width, size.height);
             if (foldRefit.folds() && !foldMrcal.folds()) {
