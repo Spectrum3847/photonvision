@@ -48,4 +48,24 @@ public class GpuDetectorJNI {
             double k3);
 
     public static native AprilTagDetection[] processimage(long handle, long p);
+
+    /**
+     * SpectrumJetson (photonvision-09): decodes a camera's MJPEG frame (a cscore RawFrame, by its
+     * native address) straight to 8-bit gray into a Mat Java allocated (WxH CV_8UC1). 0 ok, -1 not
+     * an MJPEG frame, -2 bad JPEG, -3 the Mat isn't the frame's size.
+     */
+    public static native int decodeMjpegGray(long rawFramePtr, long cvMatPtr);
+
+    /**
+     * SpectrumJetson (photonvision-18): whether colour frames are decoded on the Jetson's JPEG
+     * hardware (SPECTRUM_JPEG_DECODER=nvjpg and libspectrumnvjpg.so loaded).
+     */
+    public static native boolean hardwareJpegDecode();
+
+    /**
+     * SpectrumJetson (photonvision-18): decodes a camera's MJPEG frame to BGR on the JPEG hardware
+     * into a WxH CV_8UC3 Mat. Return codes as decodeMjpegGray.
+     */
+    public static native int decodeMjpegBgr(long rawFramePtr, long cvMatPtr);
+
 }

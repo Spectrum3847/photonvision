@@ -794,6 +794,7 @@ public class VisionModule implements AutoCloseable {
         if (result.inputAndOutputFrame != null
                 && (pipelineManager.getCurrentPipelineSettings()
                         instanceof AdvancedPipelineSettings settings)) {
+            result.inputAndOutputFrame.unshareProcessed(); // the stream draws on both (photonvision-37)
             streamRunnable.updateData(result.inputAndOutputFrame, settings, result.targets);
             // The streamRunnable manages releasing in this case
         } else {

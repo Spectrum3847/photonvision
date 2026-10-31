@@ -25,6 +25,14 @@ public class GrayscalePipe extends CVPipe<Mat, Mat, GrayscalePipe.GrayscaleParam
     @Override
     protected Mat process(Mat in) {
         var outputMat = new Mat();
+        if (in.channels() == 1) {
+            // SpectrumJetson (photonvision-37): already gray (the direct gray decode). Share the
+            // pixels instead of copying 1 MB a frame: OpenCV counts the references, so either Mat
+            // can be released first. Only the dashboard stream draws on a frame, and it gets its
+            // own copy first (Frame.unshareProcessed).
+            in.assignTo(outputMat);
+            return outputMat;
+        }
         // We can save a copy here by sending the output of cvtcolor to outputMat directly
         // rather than copying. Free performance!
         Imgproc.cvtColor(in, outputMat, Imgproc.COLOR_BGR2GRAY, 3);

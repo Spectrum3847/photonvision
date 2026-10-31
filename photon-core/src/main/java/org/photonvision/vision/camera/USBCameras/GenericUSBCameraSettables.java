@@ -46,6 +46,8 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
     protected VideoProperty wbTempProp = null;
 
     protected double minExposure = 1;
+    // SpectrumJetson (photonvision-13): for getExposureTimeUs.
+    protected volatile boolean autoExposureOn = false;
     protected double maxExposure = 80000;
 
     protected double minWhiteBalanceTemp = 1;
@@ -191,6 +193,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
 
     public void setAutoExposureImpl(boolean cameraAutoExposure) {
         logger.debug("Setting auto exposure to " + cameraAutoExposure);
+        autoExposureOn = cameraAutoExposure;
 
         if (!cameraAutoExposure) {
             // Pick a bunch of reasonable setting defaults for vision processing
@@ -211,6 +214,16 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
             softSet("iso_sensitivity", 1); // Manual ISO adjustment by default
             if (autoExposureProp != null) autoExposureProp.set(PROP_AUTO_EXPOSURE_ENABLED);
         }
+    }
+
+    /**
+     * SpectrumJetson (photonvision-13): V4L2's exposure_time_absolute is in 100 us units, so the
+     * last manual setting gives the exposure; unknown under auto exposure.
+     */
+    @Override
+    public double getExposureTimeUs() {
+        if (autoExposureOn || lastExposureRaw <= 0) return -1;
+        return Math.clamp(lastExposureRaw, minExposure, maxExposure) * 100.0;
     }
 
     @Override
@@ -279,7 +292,11 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
                 logger.error("Got a null video mode! Doing nothing...");
                 return;
             }
-            if (camera.setVideoMode(videoMode)) logger.debug("Failed to set video mode!");
+            // SpectrumJetson (photonvision-37): setVideoMode returns true on success; this logged
+            // "Failed" on every successful set. cscore also returns true when the device refused
+            // the format (it logs "could not set format"); USBFrameProvider catches that from the
+            // frame size.
+            if (!camera.setVideoMode(videoMode)) logger.warn("Failed to set video mode!");
         } catch (Exception e) {
             logger.error("Failed to set video mode!", e);
         }

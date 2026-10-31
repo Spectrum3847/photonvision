@@ -57,6 +57,15 @@ public abstract class VisionSourceSettables {
 
     public abstract void setExposureRaw(double exposureRaw);
 
+    /**
+     * SpectrumJetson (photonvision-13): the camera's current exposure time in microseconds, or -1
+     * if unknown (auto exposure, or a camera type that doesn't report it). Used to move frame
+     * timestamps to mid-exposure.
+     */
+    public double getExposureTimeUs() {
+        return -1;
+    }
+
     public abstract double getMinExposureRaw();
 
     public abstract double getMaxExposureRaw();
