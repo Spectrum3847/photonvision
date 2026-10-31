@@ -32,6 +32,7 @@ import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.frame.FrameThresholdType;
 import org.photonvision.vision.pipe.CVPipe.CVPipeResult;
 import org.photonvision.vision.pipe.impl.AprilTagDetectionPipe;
+import org.photonvision.vision.processes.SystemCoreProfile;
 import org.photonvision.vision.pipe.impl.AprilTagDetectionPipe.AprilTagDetectionPipeParams;
 import org.photonvision.vision.pipe.impl.AprilTagPoseEstimatorPipe;
 import org.photonvision.vision.pipe.impl.AprilTagPoseEstimatorPipe.AprilTagPoseEstimatorPipeParams;
@@ -97,10 +98,17 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         tagWidthMeters = tagWidth; // photonvision-61
 
         var config = new AprilTagDetector.Config();
-        config.numThreads = settings.threads;
+        // Spectrum (photonvision-98): the SystemCore profile caps the threads
+        config.numThreads = SystemCoreProfile.threads(settings.threads);
         config.refineEdges = settings.refineEdges;
         config.quadSigma = (float) settings.blur;
-        config.quadDecimate = settings.decimate;
+        // Spectrum (photonvision-98): at least 2 under the SystemCore profile
+        int decimate = SystemCoreProfile.decimate(settings.decimate);
+        config.quadDecimate = decimate;
+        // Spectrum (photonvision-98): on a half-resolution frame (low-CPU decode) half the
+        // decimation searches at the same scale: decimate 2 here is decimate 1 there.
+        halfDecimate = Math.max(1, decimate / 2);
+        fullConfig = config;
 
         var quadParams = new AprilTagDetector.QuadThresholdParameters();
         // 5 was the default minClusterPixels in WPILib prior to 2025
@@ -114,8 +122,9 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         quadParams.minWhiteBlackDiff = 5;
         quadParams.deglitch = false;
 
+        this.quadParams = quadParams;
         aprilTagDetectionPipe.setParams(
-                new AprilTagDetectionPipeParams(settings.tagFamily, config, quadParams));
+                new AprilTagDetectionPipeParams(settings.tagFamily, detectorConfig(halfInput), quadParams));
 
         if (frameStaticProperties.cameraCalibration != null) {
             var cameraMatrix = frameStaticProperties.cameraCalibration.getCameraIntrinsicsMat();
@@ -139,6 +148,52 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         }
     }
 
+    // Spectrum (photonvision-98): the low-CPU decode's half-resolution frames
+    private boolean halfInput = false;
+    private int halfDecimate = 1;
+    private AprilTagDetector.Config fullConfig;
+    private AprilTagDetector.QuadThresholdParameters quadParams;
+
+    private AprilTagDetector.Config detectorConfig(boolean half) {
+        if (!half) return fullConfig;
+        var c = new AprilTagDetector.Config();
+        c.numThreads = fullConfig.numThreads;
+        c.refineEdges = fullConfig.refineEdges;
+        c.quadSigma = fullConfig.quadSigma;
+        c.quadDecimate = halfDecimate;
+        c.decodeSharpening = fullConfig.decodeSharpening;
+        c.debug = fullConfig.debug;
+        return c;
+    }
+
+    /**
+     * A detection on the half-resolution image at full resolution. apriltag's pixel centres are at
+     * +0.5 (the decimated-image convention), so the scale is exact: half-res pixel i's centre i+0.5
+     * covers full-res pixels 2i and 2i+1, centre 2i+1. The homography maps tag to image, so the
+     * image rows scale too.
+     */
+    public static AprilTagDetection scaled(AprilTagDetection d, double sx, double sy) {
+        double[] h = d.getHomography().clone();
+        for (int i = 0; i < 3; i++) {
+            h[i] *= sx;
+            h[3 + i] *= sy;
+        }
+        double[] c = d.getCorners().clone();
+        for (int i = 0; i < 4; i++) {
+            c[2 * i] *= sx;
+            c[2 * i + 1] *= sy;
+        }
+        return new AprilTagDetection(
+                d.getFamily(),
+                d.getId(),
+                d.getHamming(),
+                d.getDecisionMargin(),
+                h,
+                d.getCenterX() * sx,
+                d.getCenterY() * sy,
+                c);
+    }
+
     @Override
     protected CVPipelineResult process(Frame frame, AprilTagPipelineSettings settings) {
         long sumPipeNanosElapsed = 0L;
@@ -148,11 +203,29 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
             return new CVPipelineResult(frame.sequenceID, 0, 0, List.of(), frame);
         }
 
+        // Spectrum (photonvision-98): a half-resolution frame from the low-CPU decode
+        var in = frame.processedImage.getMat();
+        boolean half =
+                !in.empty()
+                        && frameStaticProperties.imageWidth > 0
+                        && Math.abs(in.cols() * 2 - frameStaticProperties.imageWidth) <= 1
+                        && Math.abs(in.rows() * 2 - frameStaticProperties.imageHeight) <= 1;
+        if (half != halfInput) {
+            halfInput = half;
+            aprilTagDetectionPipe.setParams(
+                    new AprilTagDetectionPipeParams(settings.tagFamily, detectorConfig(half), quadParams));
+        }
+
         CVPipeResult<List<AprilTagDetection>> tagDetectionPipeResult =
                 aprilTagDetectionPipe.run(frame.processedImage);
         sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
 
         List<AprilTagDetection> detections = tagDetectionPipeResult.output;
+        if (half) {
+            double sx = frameStaticProperties.imageWidth / (double) in.cols();
+            double sy = frameStaticProperties.imageHeight / (double) in.rows();
+            detections = detections.stream().map(d -> scaled(d, sx, sy)).toList();
+        }
         List<AprilTagDetection> usedDetections = new ArrayList<>();
         List<TrackedTarget> targetList = new ArrayList<>();
 

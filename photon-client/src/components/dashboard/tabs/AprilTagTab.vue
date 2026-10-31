@@ -90,5 +90,14 @@ const interactiveCols = computed(() =>
         (value) => useCameraSettingsStore().changeCurrentPipelineSetting({ refineEdges: value }, false)
       "
     />
+    <pv-switch
+      v-model="currentPipelineSettings.lowCpuDecode"
+      :switch-cols="interactiveCols"
+      label="Low-CPU Decode"
+      tooltip="Decodes USB MJPEG cameras to gray at half resolution and searches that (decimate halved). Saves under 1 ms a frame; finds fewer small tags and corners are less precise. Leave off unless CPU-bound."
+      @update:modelValue="
+        (value) => useCameraSettingsStore().changeCurrentPipelineSetting({ lowCpuDecode: value }, false)
+      "
+    />
   </div>
 </template>

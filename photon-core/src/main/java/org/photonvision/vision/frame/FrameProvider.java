@@ -70,6 +70,12 @@ public abstract class FrameProvider implements Supplier<Frame>, Releasable {
     /** Ask the camera to rotate frames it outputs */
     public abstract void requestHsvSettings(HSVPipe.HSVParams params);
 
+    /**
+     * Spectrum (photonvision-98): ask for gray frames at half resolution (the low-CPU decode), where
+     * the camera can decode them that way (USB MJPEG). Others ignore it and keep full resolution.
+     */
+    public void requestHalfResGray(boolean half) {}
+
     /** Ask the camera to block for new frames (true) or use latest available (false) */
     public abstract void requestBlockForFrames(boolean blockForFrames);
 }

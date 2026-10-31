@@ -28,6 +28,7 @@ import org.photonvision.rewind.RewindRecorder;
 import org.photonvision.vision.frame.FrameThresholdType;
 import org.photonvision.vision.opencv.CVMat;
 import org.photonvision.vision.processes.IdleMode;
+import org.photonvision.vision.processes.SystemCoreProfile;
 import org.photonvision.vision.processes.VisionSourceSettables;
 import org.wpilib.util.PixelFormat;
 import org.wpilib.util.RawFrame;
@@ -762,7 +763,24 @@ public class USBFrameProvider extends CpuImageProcessor {
         }
     }
 
-    private boolean loggedDirectGray = false;
+    private volatile boolean loggedDirectGray = false;
+    // Spectrum (photonvision-98): no detector library, so gray frames are decoded on the CPU.
+    private volatile boolean cpuGray = false;
+    // Spectrum (photonvision-98): the pipeline wants half-resolution gray (low-CPU decode).
+    private volatile boolean halfGray = false;
+
+    /**
+     * Spectrum (photonvision-98): the low-CPU decode. MJPEG frames are decoded to gray at half the
+     * resolution (libjpeg's scaled IDCT), for the CPU AprilTag pipeline, which maps the corners back
+     * to full resolution. Off for every other pipeline.
+     */
+    @Override
+    public void requestHalfResGray(boolean half) {
+        if (half == halfGray) return;
+        halfGray = half;
+        loggedDirectGray = false; // log the new capture format
+        logger.info("Low-CPU decode (half-resolution gray) " + (half ? "on" : "off"));
+    }
 
     /**
      * SpectrumJetson (photonvision-27): off after repeated failures (retried every 10 s), or with a
@@ -805,27 +823,46 @@ public class USBFrameProvider extends CpuImageProcessor {
                 return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
             }
             lastTime = captureTimeNs;
-            Mat gray = new Mat(height, width, CvType.CV_8UC1);
-            int rc;
-            try {
-                rc = GpuDetectorJNI.decodeMjpegGray(frame.getNativeObj(), gray.getNativeObjAddr());
-            } catch (LinkageError e) { // no detector library, or one without the decoder
-                gray.release();
-                directGray.unavailable(
-                        "No MJPEG->gray decoder in the detector library; using cscore's conversion");
-                return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+            boolean half = halfGray;
+            Mat gray = null;
+            int rc = 0;
+            if (!half && !cpuGray) {
+                gray = new Mat(height, width, CvType.CV_8UC1);
+                try {
+                    rc = GpuDetectorJNI.decodeMjpegGray(frame.getNativeObj(), gray.getNativeObjAddr());
+                } catch (LinkageError e) { // no detector library, or one without the decoder
+                    gray.release();
+                    gray = null;
+                    cpuGray = true;
+                    logger.info(
+                            "No MJPEG->gray decoder in the detector library: decoding straight to gray on the"
+                                    + " CPU (libjpeg-turbo in OpenCV)");
+                }
+            }
+            // Spectrum (photonvision-98): the CPU decoder, for a machine without the detector
+            // library (the SystemCore) and for the low-CPU half-resolution decode.
+            if (half || cpuGray) {
+                Mat[] out = new Mat[1];
+                rc = CpuMjpegDecode.decode(frame.getNativeObj(), width, height, half, out);
+                gray = out[0];
+                if (rc == -4) {
+                    directGray.unavailable(
+                            "cscore's frame isn't laid out as the CPU MJPEG->gray decoder reads it; using"
+                                    + " cscore's conversion");
+                    return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+                }
             }
             if (rc == -3) {
                 // Not the size of the video mode PhotonVision set (briefly while the camera switches;
                 // for good if cscore lost the mode): drop it, and fix the camera if it lasts.
-                gray.release();
+                if (gray != null) gray.release();
                 if (directGray.sizeMismatch()) {
                     reconnectForVideoMode(width, height, directGray.reconnects());
                 }
                 return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
             }
             if (rc != 0) {
-                gray.release();
+                if (gray != null) gray.release();
                 return directGrayFailed(rc == -1 ? "frame not MJPEG" : "bad JPEG");
             }
             directGray.succeeded();
@@ -836,6 +873,8 @@ public class USBFrameProvider extends CpuImageProcessor {
                                 + gray.cols()
                                 + "x"
                                 + gray.rows()
+                                + (half ? ", half resolution" : "")
+                                + (half || cpuGray ? ", CPU" : "")
                                 + ")");
             }
             return new CapturedFrame(
@@ -1125,9 +1164,13 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     private boolean waitForTakeWindow() {
         while (true) {
-            long period = IdleMode.periodNanos();
+            // Spectrum (photonvision-98): and the SystemCore profile's frame rate cap, with a
+            // shorter lead (a quarter period), so a 20 ms period decodes one frame, not two
+            long idle = IdleMode.periodNanos(), cap = SystemCoreProfile.minPeriodNanos();
+            long period = Math.max(idle, cap);
             if (period == 0) return true;
-            long waitNanos = lastTakenNs + period - DECODE_LEAD_NS - System.nanoTime();
+            long lead = idle >= cap ? DECODE_LEAD_NS : Math.min(DECODE_LEAD_NS, period / 4);
+            long waitNanos = lastTakenNs + period - lead - System.nanoTime();
             if (waitNanos <= 0) return true;
             try {
                 Thread.sleep(Math.max(1, Math.min(5, waitNanos / 1_000_000)));

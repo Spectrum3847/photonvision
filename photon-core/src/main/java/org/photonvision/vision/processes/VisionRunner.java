@@ -36,8 +36,10 @@ import org.photonvision.vision.frame.FrameProvider;
 import org.photonvision.vision.frame.FrameThresholdType;
 import org.photonvision.vision.pipe.impl.HSVPipe;
 import org.photonvision.vision.pipeline.AdvancedPipelineSettings;
+import org.photonvision.vision.pipeline.AprilTagPipelineSettings;
 import org.photonvision.vision.pipeline.ArucoPipelineSettings;
 import org.photonvision.vision.pipeline.CVPipeline;
+import org.photonvision.vision.pipeline.PipelineType;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
 
 /**
@@ -101,6 +103,12 @@ public class VisionRunner implements AutoCloseable {
 
         frameSupplier.requestFrameThresholdType(wantedProcessType);
         var settings = pipeline.getSettings();
+        // Spectrum (photonvision-98): the low-CPU decode, for the CPU AprilTag pipeline only (it
+        // maps the corners back to full resolution; the others would measure half-size targets).
+        frameSupplier.requestHalfResGray(
+                settings instanceof AprilTagPipelineSettings at
+                        && settings.pipelineType == PipelineType.AprilTag
+                        && SystemCoreProfile.lowCpuDecode(at.lowCpuDecode));
         if (settings instanceof AdvancedPipelineSettings advanced) {
             var hsvParams =
                     new HSVPipe.HSVParams(
@@ -180,7 +188,8 @@ public class VisionRunner implements AutoCloseable {
      * Waits until the next time this VisionRunner should run its pipeline, based on current FPS limit
      */
     private void waitUntilNextTick(long startNanos) {
-        int fpsLimit = fpsLimitSupplier.get();
+        // Spectrum (photonvision-98): capped on the SystemCore
+        int fpsLimit = SystemCoreProfile.fpsLimit(fpsLimitSupplier.get());
 
         if (fpsLimit > 0) {
             // SpectrumJetson (photonvision-65): a monotonic clock. The date can jump when the Jetson

@@ -19,6 +19,7 @@ package org.photonvision.vision.pipeline;
 
 import java.util.List;
 import org.photonvision.vision.frame.Frame;
+import org.photonvision.vision.frame.FrameDivisor;
 import org.photonvision.vision.frame.FrameStaticProperties;
 import org.photonvision.vision.opencv.DualOffsetValues;
 import org.photonvision.vision.opencv.Releasable;
@@ -49,6 +50,32 @@ public class OutputStreamPipeline implements Releasable {
 
     protected void setPipeParams(
             FrameStaticProperties frameStaticProperties, AdvancedPipelineSettings settings) {
+        setPipeParams(frameStaticProperties, settings, false);
+    }
+
+    /**
+     * Spectrum (photonvision-98): with {@code halfInput} (a half-resolution frame from the low-CPU
+     * decode) targets are still at full resolution, so they're drawn at twice the divisor, and the
+     * frame is resized by half the divisor (NONE streams the half-size frame as it is).
+     * Without a 1/3 divisor, SIXTH streams as QUARTER.
+     */
+    protected void setPipeParams(
+            FrameStaticProperties frameStaticProperties,
+            AdvancedPipelineSettings settings,
+            boolean halfInput) {
+        FrameDivisor draw = settings.streamingFrameDivisor, resize = settings.streamingFrameDivisor;
+        if (halfInput) {
+            switch (settings.streamingFrameDivisor) {
+                case NONE, HALF -> {
+                    draw = FrameDivisor.HALF;
+                    resize = FrameDivisor.NONE;
+                }
+                default -> {
+                    draw = FrameDivisor.QUARTER;
+                    resize = FrameDivisor.HALF;
+                }
+            }
+        }
         var dualOffsetValues =
                 new DualOffsetValues(
                         settings.offsetDualPointA,
@@ -60,19 +87,19 @@ public class OutputStreamPipeline implements Releasable {
                 new Draw2dTargetsPipe.Draw2dTargetsParams(
                         settings.outputShouldDraw,
                         settings.outputMaximumTargets,
-                        settings.streamingFrameDivisor));
+                        draw));
 
         draw2dAprilTagsPipe.setParams(
                 new Draw2dAprilTagsPipe.Draw2dAprilTagsParams(
                         settings.outputShouldDraw,
                         settings.outputMaximumTargets,
-                        settings.streamingFrameDivisor));
+                        draw));
 
         draw2dArucoPipe.setParams(
                 new Draw2dArucoPipe.Draw2dArucoParams(
                         settings.outputShouldDraw,
                         settings.outputMaximumTargets,
-                        settings.streamingFrameDivisor));
+                        draw));
 
         draw2dCrosshairPipe.setParams(
                 new Draw2dCrosshairPipe.Draw2dCrosshairParams(
@@ -81,7 +108,7 @@ public class OutputStreamPipeline implements Releasable {
                         settings.offsetSinglePoint,
                         dualOffsetValues,
                         frameStaticProperties,
-                        settings.streamingFrameDivisor,
+                        draw,
                         settings.inputImageRotationMode));
 
         draw3dTargetsPipe.setParams(
@@ -89,24 +116,24 @@ public class OutputStreamPipeline implements Releasable {
                         settings.outputShouldDraw,
                         frameStaticProperties.cameraCalibration,
                         settings.targetModel,
-                        settings.streamingFrameDivisor));
+                        draw));
 
         draw3dAprilTagsPipe.setParams(
                 new Draw3dAprilTagsPipe.Draw3dAprilTagsParams(
                         settings.outputShouldDraw,
                         frameStaticProperties.cameraCalibration,
                         settings.targetModel,
-                        settings.streamingFrameDivisor));
+                        draw));
 
         draw3dArucoPipe.setParams(
                 new Draw3dArucoPipe.Draw3dArucoParams(
                         settings.outputShouldDraw,
                         frameStaticProperties.cameraCalibration,
                         settings.targetModel,
-                        settings.streamingFrameDivisor));
+                        draw));
 
         resizeImagePipe.setParams(
-                new ResizeImagePipe.ResizeImageParams(settings.streamingFrameDivisor));
+                new ResizeImagePipe.ResizeImageParams(resize));
 
         if (settings instanceof Calibration3dPipelineSettings pipelineSettings) {
             drawCalibrationPipe.setParams(
@@ -119,8 +146,14 @@ public class OutputStreamPipeline implements Releasable {
             Frame inputAndOutputFrame,
             AdvancedPipelineSettings settings,
             List<TrackedTarget> targetsToDraw) {
-        setPipeParams(inputAndOutputFrame.frameStaticProperties, settings);
         var inMat = inputAndOutputFrame.colorImage.getMat();
+        var fsp = inputAndOutputFrame.frameStaticProperties;
+        boolean halfInput =
+                !inMat.empty()
+                        && fsp != null
+                        && fsp.imageWidth > 0
+                        && Math.abs(inMat.cols() * 2 - fsp.imageWidth) <= 1;
+        setPipeParams(fsp, settings, halfInput);
         var outMat = inputAndOutputFrame.processedImage.getMat();
 
         long sumPipeNanosElapsed = 0L;

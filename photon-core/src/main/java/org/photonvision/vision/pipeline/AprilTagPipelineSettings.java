@@ -32,6 +32,10 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
     public int decisionMargin = 35;
     public boolean doMultiTarget = false;
     public boolean doSingleTargetAlways = false;
+    // Spectrum (photonvision-98): decode MJPEG to half-resolution gray and detect on that (decimate
+    // halved), corners scaled back to full resolution. Off by default: ~0.9 ms less decode a
+    // 1280x800 frame, but fewer tags found and twice the corner error (tests/systemcore-cpu).
+    public boolean lowCpuDecode = false;
 
     // 3d settings
 
@@ -61,6 +65,7 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
         result = prime * result + decisionMargin;
         result = prime * result + (doMultiTarget ? 1231 : 1237);
         result = prime * result + (doSingleTargetAlways ? 1231 : 1237);
+        result = prime * result + (lowCpuDecode ? 1231 : 1237);
         return result;
     }
 
@@ -75,6 +80,7 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
         if (Double.doubleToLongBits(blur) != Double.doubleToLongBits(other.blur)) return false;
         if (threads != other.threads) return false;
         if (debug != other.debug) return false;
+        if (lowCpuDecode != other.lowCpuDecode) return false;
         if (refineEdges != other.refineEdges) return false;
         if (numIterations != other.numIterations) return false;
         if (hammingDist != other.hammingDist) return false;
