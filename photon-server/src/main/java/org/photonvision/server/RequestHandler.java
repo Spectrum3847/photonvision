@@ -1315,8 +1315,8 @@ public class RequestHandler {
             java.util.List<String> groups) {}
 
     /**
-     * POST /api/settings/copySettings {fromCamera, fromPipeline, toCamera, toPipeline, groups}: copies
-     * the chosen groups (camera, resolution, apriltag, output, objectDetection) of settings.
+     * POST /api/settings/copySettings {fromCamera, fromPipeline, toCamera, toPipeline, groups}:
+     * copies the chosen groups (camera, resolution, apriltag, output, objectDetection) of settings.
      */
     public static void onCopySettingsRequest(Context ctx) {
         CopySettingsRequest req;
@@ -1374,8 +1374,8 @@ public class RequestHandler {
      * each of {@code cameras}: blank of {@code type} (the dashboard's pipeline type number), or
      * starting from {@code fromCamera}'s pipeline {@code fromPipeline}. {@code switchCamera} (the one
      * on the dashboard) switches to its new pipeline; the others stay on theirs. A camera that
-     * already has a pipeline with that name is skipped. Answers {created: [{camera, index}],
-     * skipped: [{camera, reason}]}.
+     * already has a pipeline with that name is skipped. Answers {created: [{camera, index}], skipped:
+     * [{camera, reason}]}.
      */
     public static void onCreatePipelineRequest(Context ctx) {
         CreatePipelineRequest req;
@@ -1445,6 +1445,71 @@ public class RequestHandler {
         }
         ctx.status(created.isEmpty() ? 400 : 200);
         ctx.json(Map.of("created", created, "skipped", skipped), Types.mapOf(Object.class));
+    }
+
+    // SpectrumJetson (photonvision-53): named settings snapshots (Settings > Settings snapshots).
+    @Json
+    record SnapshotRequest(String name, String id) {}
+
+    /** GET /api/snapshots: every snapshot's meta, newest first. */
+    public static void onSnapshotListRequest(Context ctx) {
+        ctx.json(
+                org.photonvision.common.configuration.SettingsSnapshots.listAsMaps(),
+                Types.listOf(Types.mapOf(Object.class)));
+    }
+
+    /** POST /api/snapshots {name}: takes a snapshot now. */
+    public static void onSnapshotCreateRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(SnapshotRequest.class);
+            var meta =
+                    org.photonvision.common.configuration.SettingsSnapshots.create(req.name(), "manual");
+            ctx.json(meta.toMap(), Types.mapOf(Object.class));
+        } catch (IOException | RuntimeException e) {
+            ctx.status(500);
+            ctx.result("Couldn't save the snapshot: " + e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/snapshots/restore {id}: restores it and restarts PhotonVision; answers with the
+     * automatic "Before restoring" snapshot.
+     */
+    public static void onSnapshotRestoreRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(SnapshotRequest.class);
+            var before = org.photonvision.common.configuration.SettingsSnapshots.restore(req.id());
+            ctx.json(before.toMap(), Types.mapOf(Object.class));
+        } catch (IOException | RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Couldn't restore: " + e.getMessage());
+        }
+    }
+
+    /** POST /api/snapshots/delete {id}: answers with the list left. */
+    public static void onSnapshotDeleteRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(SnapshotRequest.class);
+            org.photonvision.common.configuration.SettingsSnapshots.delete(req.id());
+            onSnapshotListRequest(ctx);
+        } catch (IOException | RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Couldn't delete: " + e.getMessage());
+        }
+    }
+
+    /** GET /api/snapshots/download?id=...: the snapshot as a zip. */
+    public static void onSnapshotDownloadRequest(Context ctx) {
+        try {
+            String id = ctx.queryParam("id");
+            ctx.contentType("application/zip");
+            ctx.header(
+                    "Content-Disposition", "attachment; filename=\"photonvision-snapshot-" + id + ".zip\"");
+            org.photonvision.common.configuration.SettingsSnapshots.writeZip(id, ctx.outputStream());
+        } catch (IOException e) {
+            ctx.status(400);
+            ctx.result("Couldn't download: " + e.getMessage());
+        }
     }
 
     // ---- end of feature 13 part A ----

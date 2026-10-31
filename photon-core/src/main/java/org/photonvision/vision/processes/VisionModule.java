@@ -741,9 +741,13 @@ public class VisionModule implements AutoCloseable {
      * @return the fields copied
      */
     public List<String> copySettingsFrom(
-            CVPipelineSettings source, int targetIndex, Collection<String> groups, boolean sameVideoModes) {
+            CVPipelineSettings source,
+            int targetIndex,
+            Collection<String> groups,
+            boolean sameVideoModes) {
         var target = pipelineManager.getPipelineSettings(targetIndex);
-        if (target == null) throw new IllegalArgumentException("This camera has no pipeline " + targetIndex);
+        if (target == null)
+            throw new IllegalArgumentException("This camera has no pipeline " + targetIndex);
         var copied = new ArrayList<String>();
         // photonvision-63: every group checked before anything is copied. Checked inside the copy
         // loop, a refused resolution left the groups before it copied, unsaved and not broadcast.
@@ -830,7 +834,8 @@ public class VisionModule implements AutoCloseable {
             try {
                 own = deepCopy(pipelineManager.getCurrentPipelineSettings());
             } catch (RuntimeException e) {
-                throw new IllegalArgumentException("couldn't read this camera's pipeline: " + e.getMessage());
+                throw new IllegalArgumentException(
+                        "couldn't read this camera's pipeline: " + e.getMessage());
             }
         }
         CVPipelineSettings copy = null;
@@ -877,7 +882,9 @@ public class VisionModule implements AutoCloseable {
                         + " '"
                         + nickname
                         + "'"
-                        + (source == null ? " (blank " + type + ")" : " from '" + source.pipelineNickname + "'"));
+                        + (source == null
+                                ? " (blank " + type + ")"
+                                : " from '" + source.pipelineNickname + "'"));
         if (switchToIt) setPipeline(index);
         saveAndBroadcastAll();
         return index;

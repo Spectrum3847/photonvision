@@ -318,6 +318,14 @@ public class ConfigProvider {
         flushOnShutdown = false;
     }
 
+    /**
+     * SpectrumJetson (photonvision-63): undoes disableFlushOnShutdown, for a settings snapshot
+     * restore that failed.
+     */
+    public void enableFlushOnShutdown() {
+        flushOnShutdown = true;
+    }
+
     public void setWriteTaskEnabled(boolean enabled) {
         allowWriteTask = enabled;
     }

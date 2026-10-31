@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.photonvision.common.configuration.PathManager;
+import org.photonvision.common.configuration.SettingsSnapshots;
 import org.photonvision.common.dataflow.networktables.NetworkTablesManager;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
@@ -323,9 +324,23 @@ public final class IdleMode {
                     if (!old.m_fmsAttached() && now.m_fmsAttached() && settings.eventProfileOnFms) {
                         switchAllTo(settings.eventPipeline, "the field (FMS) connected");
                     }
-                    // Hook for feature 13 (photonvision-53, settings snapshots, not ported yet): a
-                    // snapshot of the settings the first time the field connects each day, started
-                    // here, off this (NetworkTables) thread.
+                    // photonvision-53: a snapshot of the settings the first time the field connects
+                    // each day, off this (NetworkTables) thread.
+                    if (!old.m_fmsAttached() && now.m_fmsAttached()) {
+                        new Thread(
+                                        () -> {
+                                            try {
+                                                if (!SettingsSnapshots.fieldSnapshotToday()) {
+                                                    SettingsSnapshots.create(
+                                                            "Field connected " + java.time.LocalDate.now(), "field connected");
+                                                }
+                                            } catch (Exception e) {
+                                                logger.error("Couldn't take the field-connected snapshot", e);
+                                            }
+                                        },
+                                        "SpectrumFieldSnapshot")
+                                .start();
+                    }
                     if (old.m_enabled() && !now.m_enabled()) {
                         var gc =
                                 new Thread(

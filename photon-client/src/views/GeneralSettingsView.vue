@@ -8,12 +8,14 @@ import DeviceCard from "@/components/settings/DeviceCard.vue";
 import ThriftiestFirmwareCard from "@/components/settings/ThriftiestFirmwareCard.vue";
 import RobotStateCard from "@/components/settings/RobotStateCard.vue";
 import RewindCard from "@/components/settings/RewindCard.vue";
+import SnapshotsCard from "@/components/settings/SnapshotsCard.vue";
 </script>
 
 <template>
   <div class="pa-3">
     <DeviceCard />
     <GlobalSettingsCard />
+    <SnapshotsCard />
     <ThriftiestFirmwareCard />
     <RobotStateCard />
     <RewindCard />
