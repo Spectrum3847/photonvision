@@ -656,6 +656,13 @@ public class VisionModule implements AutoCloseable {
         return pendingCalibration;
     }
 
+    /** SpectrumJetson (photonvision-48): whether each stream has a viewer, for tests/ui. */
+    public Map<String, Boolean> streamViewers() {
+        return Map.of(
+                "input", inputVideoStreamer != null && inputVideoStreamer.hasViewers(),
+                "output", outputVideoStreamer != null && outputVideoStreamer.hasViewers());
+    }
+
     boolean setPipeline(int index) {
         logger.info("Setting pipeline to " + index);
         logger.info("Pipeline name: " + pipelineManager.getPipelineNickname(index));
@@ -918,15 +925,51 @@ public class VisionModule implements AutoCloseable {
         if (result.inputAndOutputFrame != null
                 && (pipelineManager.getCurrentPipelineSettings()
                         instanceof AdvancedPipelineSettings settings)) {
-            result.inputAndOutputFrame.unshareProcessed(); // the stream draws on both (photonvision-37)
-            streamRunnable.updateData(result.inputAndOutputFrame, settings, result.targets);
-            // The streamRunnable manages releasing in this case
+            if (streamFrameWanted()) {
+                result.inputAndOutputFrame.unshareProcessed(); // the stream draws on both (photonvision-37)
+                streamRunnable.updateData(result.inputAndOutputFrame, settings, result.targets);
+                // The streamRunnable manages releasing in this case
+            } else {
+                // SpectrumJetson (photonvision-15): no viewer and no snapshot, or not yet time for
+                // the next stream frame
+                result.release();
+            }
         } else {
             consumeResults(result.inputAndOutputFrame, result.targets);
 
             result.release();
             // In this case we don't bother with a separate streaming thread and we release
         }
+    }
+
+    // SpectrumJetson (photonvision-15): the stream thread resizes, colour-converts and draws every
+    // frame it gets, and it used to get every frame (~0.3 ms of CPU each, plus photonvision-37's
+    // 1 MB unshareProcessed copy) even with no dashboard open. Now it gets a frame only while a
+    // stream has a viewer or a snapshot is pending, and at most SPECTRUM_STREAM_FPS a second while
+    // streaming (default 30; 0 = every frame). Snapshots are never delayed by the cap.
+    private static final double kStreamFps = streamFpsSetting();
+    private long nextStreamFrameNs = 0;
+
+    private static double streamFpsSetting() {
+        try {
+            String v = System.getenv("SPECTRUM_STREAM_FPS");
+            return v == null ? 30 : Double.parseDouble(v);
+        } catch (NumberFormatException e) {
+            return 30;
+        }
+    }
+
+    private boolean streamFrameWanted() {
+        if (inputFrameSaver.wantsFrame() || outputFrameSaver.wantsFrame()) return true;
+        if (!inputVideoStreamer.hasViewers() && !outputVideoStreamer.hasViewers()) return false;
+        if (kStreamFps <= 0) return true;
+        long now = System.nanoTime();
+        if (now < nextStreamFrameNs) return false;
+        long period = (long) (1e9 / kStreamFps);
+        // Keep the average rate exact, but don't bank frames after a pause.
+        nextStreamFrameNs =
+                nextStreamFrameNs + period < now ? now + period : nextStreamFrameNs + period;
+        return true;
     }
 
     private void consumePipelineResult(CVPipelineResult result) {

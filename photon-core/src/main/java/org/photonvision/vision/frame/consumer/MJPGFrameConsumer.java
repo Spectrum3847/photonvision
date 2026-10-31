@@ -45,6 +45,15 @@ public class MJPGFrameConsumer implements AutoCloseable {
         this(name, 320, 240, port);
     }
 
+    /**
+     * SpectrumJetson (photonvision-15): true while a client (the dashboard) is streaming. cscore
+     * enables a source only while an MjpegServer connection streams from it
+     * (CS_CONNECTION_AUTO_MANAGE).
+     */
+    public boolean hasViewers() {
+        return cvSource != null && cvSource.isEnabled();
+    }
+
     public void accept(CVMat image) {
         long now = NetworkTablesJNI.now();
 

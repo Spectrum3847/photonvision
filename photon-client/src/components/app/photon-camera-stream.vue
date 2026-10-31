@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, useTemplateRef } from "vue";
+import { computed, inject, onBeforeUnmount, ref, useTemplateRef } from "vue";
 import { useStateStore } from "@/stores/StateStore";
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
 import type { StyleValue } from "vue";
@@ -15,10 +15,18 @@ const props = defineProps<{
 
 const backendHostname = inject<string>("backendHostname");
 const emptyStreamSrc = "//:0";
+// SpectrumJetson (photonvision-48): a hidden tab (another tab in front, or the window minimised)
+// drops its stream connections, so the Jetson stops encoding frames nobody sees (photonvision-15
+// encodes only while a stream has a viewer). They reconnect when the tab is shown again.
+const pageVisible = ref(document.visibilityState !== "hidden");
+const onVisibilityChange = () => {
+  pageVisible.value = document.visibilityState !== "hidden";
+};
+document.addEventListener("visibilitychange", onVisibilityChange);
 const streamSrc = computed<string>(() => {
   const port = props.cameraSettings.stream[props.streamType === "Raw" ? "inputPort" : "outputPort"];
 
-  if (!useStateStore().backendConnected || port === 0) {
+  if (!useStateStore().backendConnected || port === 0 || !pageVisible.value) {
     return emptyStreamSrc;
   }
 
@@ -86,6 +94,7 @@ const handleStreamError = () => {
 };
 
 onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange);
   if (!mjpgStream.value) return;
   mjpgStream.value.src = emptyStreamSrc;
 });

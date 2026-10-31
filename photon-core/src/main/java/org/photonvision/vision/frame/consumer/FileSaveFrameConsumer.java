@@ -141,6 +141,16 @@ public class FileSaveFrameConsumer implements Consumer<CVMat> {
         this.saveFrameEntry = subTable.getIntegerTopic(ntEntryName).getEntry(-1); // Default negative
     }
 
+    /**
+     * SpectrumJetson (photonvision-15): whether the next accept() has work to do: a snapshot is
+     * pending, or the robot's counter moved backwards and accept() must resync. VisionModule skips
+     * the stream thread's work when neither this nor a stream viewer needs a frame.
+     */
+    public boolean wantsFrame() {
+        long currentCount = saveFrameEntry.get();
+        return currentCount != -1 && currentCount != savedImagesCount;
+    }
+
     public void overrideTakeSnapshot() {
         // Simulate NT change
         saveFrameEntry.set(saveFrameEntry.get() + 1);
