@@ -17,8 +17,10 @@
 
 package org.photonvision.vision.pipe.impl;
 
+import java.util.Arrays;
 import java.util.List;
 import org.photonvision.vision.apriltag.AprilTagFamily;
+import org.photonvision.vision.apriltag.AprilTagPixelConvention;
 import org.photonvision.vision.opencv.CVMat;
 import org.photonvision.vision.pipe.CVPipe;
 import org.wpilib.vision.apriltag.AprilTagDetection;
@@ -52,7 +54,8 @@ public class AprilTagDetectionPipe
             return List.of();
         }
 
-        return List.of(ret);
+        // Spectrum: OpenCV's pixel convention, as the calibration and pose solve expect.
+        return Arrays.stream(ret).map(AprilTagPixelConvention::toOpenCv).toList();
     }
 
     @Override
