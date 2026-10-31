@@ -29,11 +29,14 @@ import org.photonvision.common.networktables.NTTopicSet;
 import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
 import org.photonvision.vision.pipeline.result.CalibrationPipelineResult;
+import org.photonvision.vision.target.TagQuality;
 import org.photonvision.vision.target.TrackedTarget;
 import org.wpilib.math.geometry.Transform3d;
+import org.wpilib.networktables.DoubleArrayPublisher;
 import org.wpilib.networktables.NetworkTable;
 import org.wpilib.networktables.NetworkTableEvent;
 import org.wpilib.networktables.NetworkTablesJNI;
+import org.wpilib.networktables.PubSubOption;
 
 public class NTDataPublisher implements CVPipelineResultConsumer {
     private final Logger logger = new Logger(NTDataPublisher.class, LogGroup.General);
@@ -41,6 +44,10 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
     private final NetworkTable rootTable = NetworkTablesManager.getInstance().kRootTable;
 
     private final NTTopicSet ts = new NTTopicSet();
+
+    // SpectrumJetson (photonvision-61): per-tag quality, every frame with tags (see TagQuality). In
+    // 2026 it was in NTTopicSet; here it stays out of photon-targeting, which is upstream's.
+    private DoubleArrayPublisher tagQualityPublisher;
 
     NTDataChangeListener pipelineIndexListener;
     private final Supplier<Integer> pipelineIndexSupplier;
@@ -148,6 +155,8 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         if (pipelineIndexListener != null) pipelineIndexListener.remove();
         if (driverModeListener != null) driverModeListener.remove();
         ts.removeEntries();
+        if (tagQualityPublisher != null) tagQualityPublisher.close();
+        tagQualityPublisher = null;
     }
 
     private void updateEntries() {
@@ -156,6 +165,17 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         if (fpsLimitListener != null) fpsLimitListener.remove();
 
         ts.updateEntries();
+
+        // photonvision-61: every value, like rawBytes, so the robot can match each frame's by
+        // sequence ID.
+        if (tagQualityPublisher != null) tagQualityPublisher.close();
+        tagQualityPublisher =
+                ts.subTable
+                        .getDoubleArrayTopic("tagQuality")
+                        .publish(
+                                PubSubOption.periodic(0.01),
+                                PubSubOption.SEND_ALL,
+                                PubSubOption.KEEP_DUPLICATES);
 
         pipelineIndexListener =
                 new NTDataChangeListener(
@@ -223,6 +243,11 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
                         NetworkTablesManager.getInstance().getTimeSinceLastPong(),
                         TrackedTarget.simpleFromTrackedTargets(acceptedResult.targets),
                         acceptedResult.multiTagResult);
+
+        // SpectrumJetson (photonvision-61): each tag's quality, sent just before the result it
+        // belongs to (same sequence ID), and only for frames with tags.
+        var quality = TagQuality.toArray(acceptedResult.sequenceID, acceptedResult.targets);
+        if (quality != null && tagQualityPublisher != null) tagQualityPublisher.set(quality);
 
         // random guess at size of the array
         ts.resultPublisher.set(simplified, 1024);

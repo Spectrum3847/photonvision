@@ -39,6 +39,8 @@ import org.photonvision.vision.pipe.impl.CalculateFPSPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe.MultiTargetPNPPipeParams;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
+import org.photonvision.vision.target.ExcludedTags;
+import org.photonvision.vision.target.TagQuality;
 import org.photonvision.vision.target.TrackedTarget;
 import org.photonvision.vision.target.TrackedTarget.TargetCalculationParameters;
 import org.wpilib.math.geometry.CoordinateSystem;
@@ -62,6 +64,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
     // give one frame's multi-tag and single-tag poses different layouts.
     private org.wpilib.fields.Field frameLayout;
     private final CalculateFPSPipe calculateFPSPipe = new CalculateFPSPipe();
+    private double tagWidthMeters = Units.inchesToMeters(6.5); // photonvision-61
 
     private static final FrameThresholdType PROCESSING_TYPE = FrameThresholdType.GREYSCALE;
 
@@ -90,6 +93,8 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
             tagWidth = Units.inchesToMeters(6);
             tagModel = TargetModel.kAprilTag16h5;
         }
+
+        tagWidthMeters = tagWidth; // photonvision-61
 
         var config = new AprilTagDetector.Config();
         config.numThreads = settings.threads;
@@ -168,6 +173,10 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                             null,
                             new TargetCalculationParameters(
                                     false, null, null, null, null, frameStaticProperties));
+            // SpectrumJetson (photonvision-61): without solvePNP these are the published targets.
+            if (!settings.solvePNPEnabled) {
+                TagQuality.fill(target, detection, null, frameStaticProperties, tagWidthMeters);
+            }
 
             targetList.add(target);
         }
@@ -175,7 +184,14 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         // Do multi-tag pose estimation
         Optional<MultiTargetPNPResult> multiTagResult = Optional.empty();
         if (settings.solvePNPEnabled && settings.doMultiTarget) {
-            var multiTagOutput = multiTagPNPPipe.run(targetList);
+            // SpectrumJetson: leave the listed bad tags out of multi-tag (photonvision-22). They're
+            // still reported, with single-tag poses.
+            var excluded = ExcludedTags.getInstance().active();
+            var multiTagTargets =
+                    excluded.isEmpty()
+                            ? targetList
+                            : targetList.stream().filter(t -> !excluded.contains(t.getFiducialId())).toList();
+            var multiTagOutput = multiTagPNPPipe.run(multiTagTargets);
             sumPipeNanosElapsed += multiTagOutput.nanosElapsed;
             multiTagResult = multiTagOutput.output;
         }
@@ -226,6 +242,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                                 tagPoseEstimate,
                                 new TargetCalculationParameters(
                                         false, null, null, null, null, frameStaticProperties));
+                TagQuality.fill(target, detection, tagPoseEstimate, frameStaticProperties, tagWidthMeters);
 
                 var correctedBestPose =
                         MathUtils.convertOpenCVtoPhotonTransform(target.getBestCameraToTarget3d());

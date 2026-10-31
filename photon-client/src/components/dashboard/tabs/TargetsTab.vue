@@ -29,6 +29,22 @@ const calculateStdDev = (values: number[]): number => {
 
   return Math.sqrt(values.map((x) => Math.pow(angleModulus(x - mean), 2)).reduce((a, b) => a + b) / values.length);
 };
+
+// SpectrumJetson: the camera's mount on the robot, from the same multi-tag samples. With the robot
+// level on the floor, the camera's field height, pitch and roll are its mount's (photonvision-17).
+const mean = (values: number[]): number => (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
+const plainStdDev = (values: number[]): number => {
+  if (values.length < 2) return 0;
+  const m = mean(values);
+  return Math.sqrt(values.reduce((sum, v) => sum + (v - m) * (v - m), 0) / values.length);
+};
+const mountHeights = computed(() => useStateStore().currentMultitagBuffer?.map((v) => v.bestTransform.z) || []);
+const mountPitches = computed(
+  () => useStateStore().currentMultitagBuffer?.map((v) => toDeg(v.bestTransform.angle_y)) || []
+);
+const mountRolls = computed(
+  () => useStateStore().currentMultitagBuffer?.map((v) => toDeg(v.bestTransform.angle_x)) || []
+);
 const resetCurrentBuffer = () => {
   // Need to clear the array in place
   if (useStateStore().currentMultitagBuffer) useStateStore().currentMultitagBuffer!.length = 0;
@@ -276,6 +292,46 @@ const resetCurrentBuffer = () => {
             </tbody>
           </template>
         </v-table>
+      </v-row>
+      <v-row
+        v-if="useStateStore().currentPipelineResults?.multitagResult"
+        class="pb-4 text-white"
+        style="display: flex; flex-direction: column"
+      >
+        <v-card-subtitle class="ma-0 pa-0 pb-2 pr-4" style="font-size: 16px"
+          >Camera mount estimate from the same samples (robot level on the floor)
+        </v-card-subtitle>
+        <v-table density="compact">
+          <template #default>
+            <thead>
+              <tr>
+                <th class="text-center text-white">Height</th>
+                <th class="text-center text-white">Pitch &theta;&deg;</th>
+                <th class="text-center text-white">Roll &theta;&deg;</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-center text-white">
+                  {{ mean(mountHeights).toFixed(3) }}&nbsp;m &plusmn; {{ plainStdDev(mountHeights).toFixed(3) }}
+                </td>
+                <td class="text-center text-white">
+                  {{ mean(mountPitches).toFixed(2) }}&deg; &plusmn; {{ plainStdDev(mountPitches).toFixed(2) }}
+                </td>
+                <td class="text-center text-white">
+                  {{ mean(mountRolls).toFixed(2) }}&deg; &plusmn; {{ plainStdDev(mountRolls).toFixed(2) }}
+                </td>
+              </tr>
+            </tbody>
+          </template>
+        </v-table>
+        <v-card-text class="ma-0 pa-0 pt-2" style="font-size: 14px">
+          While the robot is level on the floor, the camera's height, pitch and roll on the field are its mount on the
+          robot, wherever the robot is. They use the same axes and signs as <code>robotToCamera</code> in robot code:
+          negative pitch means tilted up. Yaw and the X/Y offsets also need the robot's pose. Robot code gets these
+          numbers, and the camera's field X, Y and yaw, from <code>/photonvision/&lt;camera&gt;/mount</code> on
+          NetworkTables.
+        </v-card-text>
       </v-row>
     </v-container>
   </div>

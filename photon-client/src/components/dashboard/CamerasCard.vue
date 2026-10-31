@@ -6,6 +6,14 @@ import { useStateStore } from "@/stores/StateStore";
 import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import { PipelineType } from "@/types/PipelineTypes";
 import PhotonCameraStream from "@/components/app/photon-camera-stream.vue";
+import PvMaskOverlay from "@/components/common/pv-mask-overlay.vue";
+import type { DetectionMask } from "@/types/PipelineTypes";
+
+// photonvision-40: the pipeline's detection mask, drawn over both streams, and edited on either
+// while the Mask tab's "Draw on the stream" is on (both show the same image area).
+const mask = computed<DetectionMask | undefined>(() => useCameraSettingsStore().currentPipelineSettings.detectionMask);
+const setMask = (m: DetectionMask) => useCameraSettingsStore().changeCurrentPipelineSetting({ detectionMask: m }, true);
+const maskEditing = computed(() => useStateStore().maskEditing && !useCameraSettingsStore().isDriverMode);
 
 const value = defineModel<number[]>();
 
@@ -90,20 +98,24 @@ const performanceRecommendation = computed<string>(() => {
     <v-divider class="ml-3 mr-3" />
     <v-row class="stream-viewer-container pa-3 align-center">
       <v-col v-if="value?.includes(0)" class="stream-view">
-        <photon-camera-stream
-          id="input-camera-stream"
-          :camera-settings="useCameraSettingsStore().currentCameraSettings"
-          stream-type="Raw"
-          style="width: 100%; height: auto"
-        />
+        <pv-mask-overlay :model-value="mask" :editing="maskEditing" @update:model-value="setMask">
+          <photon-camera-stream
+            id="input-camera-stream"
+            :camera-settings="useCameraSettingsStore().currentCameraSettings"
+            stream-type="Raw"
+            style="width: 100%; height: auto"
+          />
+        </pv-mask-overlay>
       </v-col>
       <v-col v-if="value?.includes(1)" class="stream-view">
-        <photon-camera-stream
-          id="output-camera-stream"
-          :camera-settings="useCameraSettingsStore().currentCameraSettings"
-          stream-type="Processed"
-          style="width: 100%; height: auto"
-        />
+        <pv-mask-overlay :model-value="mask" :editing="maskEditing" @update:model-value="setMask">
+          <photon-camera-stream
+            id="output-camera-stream"
+            :camera-settings="useCameraSettingsStore().currentCameraSettings"
+            stream-type="Processed"
+            style="width: 100%; height: auto"
+          />
+        </pv-mask-overlay>
       </v-col>
     </v-row>
   </v-card>

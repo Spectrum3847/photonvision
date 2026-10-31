@@ -143,6 +143,8 @@ public class Server {
         // SpectrumJetson (50): Settings > Robot state, with the far search (55) folded in
         app.get("/api/robotState", RequestHandler::onRobotStateRequest);
         app.post("/api/robotState", RequestHandler::onRobotStateSetRequest);
+        app.get("/api/excludedTags", RequestHandler::onExcludedTagsRequest); // SpectrumJetson (22)
+        app.post("/api/excludedTags", RequestHandler::onExcludedTagsSetRequest); // SpectrumJetson (22)
         app.get("/api/usb/bandwidth", RequestHandler::onUsbBandwidthRequest); // SpectrumJetson (32)
         app.post("/api/usb/bandwidth", RequestHandler::onUsbAllocationRequest);
         app.post("/api/utils/nukeConfigDirectory", RequestHandler::onNukeConfigDirectory);

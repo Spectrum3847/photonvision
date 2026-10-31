@@ -113,14 +113,17 @@ watchEffect(() => {
   useStateStore().calibrationData.videoFormatIndex = currentIndex;
   uniqueVideoResolutionIndex.value = currentIndex;
 });
+// SpectrumJetson (photonvision-23): the team's board is the default: ChArUco, 5x5 markers, 30 mm
+// squares, 22 mm markers. It's labelled "9x12", but PhotonVision needs width 12, height 9.
+// (2026's mm entry and Bypass minimum are upstream now, #2479 and #2480.)
 const dimensionUnit = ref<"in" | "mm">("mm");
-const squareSize = ref(25);
-const markerSize = ref(18);
-const patternWidth = ref(8);
-const patternHeight = ref(8);
+const squareSize = ref(30);
+const markerSize = ref(22);
+const patternWidth = ref(12);
+const patternHeight = ref(9);
 const boardType = ref<CalibrationBoardTypes>(CalibrationBoardTypes.ChArUco);
 const useOldPattern = ref(false);
-const tagFamily = ref<CalibrationTagFamilies>(CalibrationTagFamilies.Dict_4X4_1000);
+const tagFamily = ref<CalibrationTagFamilies>(CalibrationTagFamilies.Dict_5X5_1000);
 const requestedVideoFormatIndex = ref(0);
 const paperType = ref<CalibrationPaperTypes>(CalibrationPaperTypes.Letter);
 const paperOrientation = ref<"portrait" | "landscape">("portrait");
@@ -279,7 +282,27 @@ const autoCalibration = computed<boolean>({
   }
 });
 
+// SpectrumJetson (photonvision-70): calibrate at the slowest frame rate (15 fps or more) this
+// resolution and pixel format offer. Each camera's USB bandwidth is capped (11-uvcvideo-payload-cap.sh)
+// to what its frames need at full speed in a normal scene: about 85 KB a frame at 120 fps. A
+// calibration board fills the view with fine edges and makes 85-105 KB frames, which don't fit at
+// 120 fps: the camera cut out while the board was in view. At 30 fps the same cap allows ~340 KB a
+// frame, and calibrating doesn't need the frame rate. A calibration belongs to the resolution, so
+// it's used at 120 fps the same; the pipeline's own video mode comes back when calibration ends.
+const calibrationFormatIndex = (index: number): number => {
+  const formats = useCameraSettingsStore().currentCameraSettings.validVideoFormats;
+  const chosen = formats.find((f) => f.index === index) ?? formats[index];
+  if (!chosen) return index;
+  const candidates = formats.filter(
+    (f) => resolutionsAreEqual(f.resolution, chosen.resolution) && f.pixelFormat === chosen.pixelFormat && f.fps >= 15
+  );
+  if (!candidates.length) return index;
+  return candidates.reduce((slowest, f) => (f.fps < slowest.fps ? f : slowest)).index ?? index;
+};
+
 const startCalibration = () => {
+  const calibrationData = useStateStore().calibrationData;
+  calibrationData.videoFormatIndex = calibrationFormatIndex(calibrationData.videoFormatIndex);
   useStateStore().calibrationData.autoCalibrate = autoCalibrationEnabled.value;
   useCameraSettingsStore().startPnPCalibration({
     squareSizeMeters: length[dimensionUnit.value](squareSize.value).m.value,

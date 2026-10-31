@@ -34,6 +34,7 @@ import org.photonvision.common.util.numbers.DoubleCouple;
 import org.photonvision.common.util.numbers.IntegerCouple;
 import org.photonvision.vision.calibration.CameraCalibrationCoefficients;
 import org.photonvision.vision.pipeline.AdvancedPipelineSettings;
+import org.photonvision.vision.pipeline.DetectionMask;
 import org.photonvision.vision.pipeline.PipelineType;
 import org.photonvision.vision.pipeline.UICalibrationData;
 import org.photonvision.vision.target.RobotOffsetPointOperation;
@@ -299,6 +300,10 @@ public class VisionModuleChangeSubscriber extends DataChangeSubscriber {
             } else {
                 propField.setBoolean(currentSettings, (Boolean) newPropValue);
             }
+        } else if (propType == DetectionMask.class && newPropValue instanceof Map) {
+            // SpectrumJetson (photonvision-40): {mode, boxes: [{x, y, w, h}]} from the Mask tab
+            propField.set(
+                    currentSettings, Jsonb.instance().type(DetectionMask.class).fromObject(newPropValue));
         } else if (propField.getType() == ModelProperties.class
                 && newPropValue instanceof LinkedHashMap) {
             ModelProperties modelProps =

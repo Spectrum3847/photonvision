@@ -23,6 +23,7 @@ import org.photonvision.jni.GpuDetectorJNI;
 import org.photonvision.vision.opencv.CVMat;
 import org.photonvision.vision.opencv.Releasable;
 import org.photonvision.vision.pipe.CVPipe;
+import org.photonvision.vision.pipeline.DetectionMask;
 import org.photonvision.vision.processes.FarSearch;
 import org.wpilib.vision.apriltag.AprilTagDetection;
 
@@ -36,6 +37,27 @@ public class AprilTagDetectionCudaPipe
         super();
 
         handle = m_cudadetector.createGpuDetector(640, 480); // just a guess
+    }
+
+    // SpectrumJetson (photonvision-40): the mask last sent to the detector library.
+    private DetectionMask sentMask = null;
+    private boolean maskUnsupported = false;
+
+    /** Sends the detection mask to the GPU detector when it changed (bos-07). */
+    public void setMask(DetectionMask mask) {
+        if (maskUnsupported || mask == null || mask.equals(sentMask)) return;
+        try {
+            GpuDetectorJNI.setMask(handle, mask.active() ? mask.mode : 0, mask.flatBoxes());
+            // A copy, so later edits to the setting show up as a change.
+            var copy = new DetectionMask();
+            copy.mode = mask.mode;
+            for (var b : mask.boxes) {
+                copy.boxes.add(new DetectionMask.Box(b.x, b.y, b.w, b.h));
+            }
+            sentMask = copy;
+        } catch (UnsatisfiedLinkError e) {
+            maskUnsupported = true; // an older lib971apriltag.so without setMask
+        }
     }
 
     @Override

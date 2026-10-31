@@ -303,6 +303,9 @@ public class Main implements Callable<Integer> {
         // SpectrumJetson (photonvision-74): the robot's field map (the saved one first, before the
         // cameras start)
         org.photonvision.fieldmap.FieldMapNT.start();
+        // SpectrumJetson (photonvision-22, 69): the tags left out of multi-tag, loaded now so the
+        // far-tag search has them even on a pipeline without multi-tag
+        org.photonvision.vision.target.ExcludedTags.getInstance();
         // SpectrumJetson (photonvision-08): set the Jetson's date from the robot's (no clock battery,
         // no internet); off on the SystemCore, which is the robot
         org.photonvision.common.util.RobotClockSync.start();

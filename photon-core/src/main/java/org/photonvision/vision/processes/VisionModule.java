@@ -218,6 +218,10 @@ public class VisionModule implements AutoCloseable {
                                 visionSource.getFrameProvider() instanceof USBFrameProvider usb
                                         ? usb.getLastFrameAgeMs()
                                         : -1));
+        // SpectrumJetson: the camera's mount (height, pitch, roll) from the tags it sees
+        // (photonvision-17).
+        resultConsumers.add(
+                new MountEstimatePublisher(() -> visionSource.getSettables().getConfiguration().nickname));
 
         // SpectrumJetson: a brand-new camera gets the team's tuned settings (TeamCameraDefaults)
         // instead of stock PhotonVision's CPU AprilTag at 320x240. The camera usually hasn't
