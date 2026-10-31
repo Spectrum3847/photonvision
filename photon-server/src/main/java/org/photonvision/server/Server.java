@@ -185,6 +185,9 @@ public class Server {
         app.post("/api/thriftiest/firmware/delete", RequestHandler::onThriftiestFirmwareDeleteRequest);
         app.post("/api/thriftiest/firmware/flash", RequestHandler::onThriftiestFirmwareFlashRequest);
 
+        // ---- SpectrumJetson operations UI, part B ----
+        app.get("/api/healthCheck", RequestHandler::onHealthCheckRequest); // SpectrumJetson (52)
+
         /* Testing API Events */
 
         app.post("/api/test/resetBackend", TestRequestHandler::handleResetRequest);
