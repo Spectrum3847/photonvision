@@ -106,4 +106,64 @@ public class ClockThrottleTest {
         assertTrue(!p.throttled());
         assertEquals(Action.THROTTLE, p.step(20_250, false, AFTER, false));
     }
+
+    // photonvision-99: the deep tier.
+    private static final int DEEP = 300;
+
+    @Test
+    public void deepAfterLongNoRobotAndBackOnConnect() {
+        var p = new Policy(false);
+        assertEquals(Action.NONE, p.step(0, false, AFTER, false, true, DEEP));
+        assertEquals(Action.THROTTLE, p.step(20_000, false, AFTER, false, true, DEEP));
+        p.applied(Action.THROTTLE, true);
+        assertEquals(Action.NONE, p.step(299_750, false, AFTER, false, true, DEEP));
+        assertEquals(Action.DEEP, p.step(300_000, false, AFTER, false, true, DEEP));
+        p.applied(Action.DEEP, true);
+        assertTrue(p.deep());
+        assertEquals(Action.NONE, p.step(300_250, false, AFTER, false, true, DEEP));
+        // A robot connects, disabled: back to the throttle tier, not full.
+        assertEquals(Action.THROTTLE, p.step(300_500, false, AFTER, false, false, DEEP));
+        p.applied(Action.THROTTLE, true);
+        assertTrue(p.throttled() && !p.deep());
+        assertEquals(Action.NONE, p.step(900_000, false, AFTER, false, false, DEEP));
+    }
+
+    @Test
+    public void enableFromDeepIsFullAtOnce() {
+        var p = new Policy(true, true);
+        assertEquals(Action.FULL, p.step(0, true, AFTER, false, false, DEEP));
+        p.applied(Action.FULL, true);
+        assertTrue(!p.throttled() && !p.deep());
+    }
+
+    @Test
+    public void connectedRobotNeverDeepAndViewerResetsCount() {
+        var p = new Policy(false);
+        int deeps = 0;
+        for (long t = 0; t < 3_600_000; t += 250) {
+            var a = p.step(t, false, AFTER, false, false, DEEP); // robot connected, disabled
+            if (a == Action.DEEP) deeps++;
+            p.applied(a, true);
+        }
+        assertEquals(0, deeps);
+        var q = new Policy(false);
+        q.step(0, false, AFTER, false, true, DEEP);
+        q.step(200_000, false, AFTER, false, false, DEEP); // someone opened the UI
+        assertEquals(Action.THROTTLE, q.step(200_250, false, AFTER, false, true, DEEP));
+        q.applied(Action.THROTTLE, true);
+        assertEquals(Action.NONE, q.step(400_000, false, AFTER, false, true, DEEP));
+        assertEquals(Action.DEEP, q.step(500_250, false, AFTER, false, true, DEEP));
+    }
+
+    @Test
+    public void deepOffOrModeFull() {
+        var p = new Policy(false);
+        for (long t = 0; t < 1_000_000; t += 250) {
+            var a = p.step(t, false, AFTER, false, true, 0);
+            assertTrue(a != Action.DEEP);
+            p.applied(a, true);
+        }
+        var q = new Policy(true, true);
+        assertEquals(Action.FULL, q.step(0, false, AFTER, true, true, DEEP));
+    }
 }

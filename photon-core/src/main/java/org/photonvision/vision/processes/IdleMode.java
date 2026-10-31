@@ -126,8 +126,7 @@ public final class IdleMode {
             s.quietAfterDisabledSeconds =
                     j.extract("quietAfterDisabledSeconds", s.quietAfterDisabledSeconds);
             s.throttleClocksAfterDisabledSeconds =
-                    j.extract(
-                            "throttleClocksAfterDisabledSeconds", s.throttleClocksAfterDisabledSeconds);
+                    j.extract("throttleClocksAfterDisabledSeconds", s.throttleClocksAfterDisabledSeconds);
         } catch (IOException | RuntimeException e) {
             logger.error("Couldn't read " + file + "; using the defaults", e);
             return new Settings();
@@ -141,7 +140,8 @@ public final class IdleMode {
         JsonObject j = JsonObject.create();
         try {
             // a copy: parsed avaje nodes are read-only (add() would throw)
-            if (Files.exists(file)) json.fromJsonObject(Files.readString(file)).elements().forEach(j::add);
+            if (Files.exists(file))
+                json.fromJsonObject(Files.readString(file)).elements().forEach(j::add);
         } catch (IOException | RuntimeException e) {
             j = JsonObject.create();
         }
@@ -213,7 +213,7 @@ public final class IdleMode {
 
     /** True while frames are limited: idle (a disabled robot), or the thermal limit. */
     public static boolean active() {
-        return idleNow() || thermalLimitNow();
+        return idleNow() || thermalLimitNow() || ClockThrottle.deepPeriodNanos() > 0;
     }
 
     /** Idle: a robot is connected and disabled (and idle mode is on). */
@@ -267,7 +267,7 @@ public final class IdleMode {
     public static long periodNanos() {
         long p = idleNow() ? idlePeriodNanos : 0;
         if (thermalLimitNow()) p = Math.max(p, THERMAL_PERIOD_NANOS);
-        return p;
+        return Math.max(p, ClockThrottle.deepPeriodNanos()); // photonvision-99: deep idle
     }
 
     /**

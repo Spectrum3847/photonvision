@@ -28,6 +28,11 @@ public class MJPGFrameConsumer implements AutoCloseable {
     private static final double MAX_FRAMERATE = -1;
     private static final long MAX_FRAME_PERIOD_NS = Math.round(1e9 / MAX_FRAMERATE);
 
+    // SpectrumJetson (photonvision-99): every open stream, for anyViewers() (ClockThrottle's deep
+    // idle never starts while someone is watching).
+    private static final java.util.Set<MJPGFrameConsumer> OPEN =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private long lastFrameTimeNs;
     private CvSource cvSource;
     private MjpegServer mjpegServer;
@@ -39,6 +44,19 @@ public class MJPGFrameConsumer implements AutoCloseable {
         mjpegServer.setSource(cvSource);
         mjpegServer.setCompression(75);
         CameraServer.addServer(mjpegServer);
+        OPEN.add(this);
+    }
+
+    /** photonvision-99: true while any camera stream has a viewer. */
+    public static boolean anyViewers() {
+        for (var c : OPEN) {
+            try {
+                if (c.hasViewers()) return true;
+            } catch (RuntimeException e) {
+                // closing concurrently
+            }
+        }
+        return false;
     }
 
     public MJPGFrameConsumer(String name, int port) {
@@ -69,6 +87,7 @@ public class MJPGFrameConsumer implements AutoCloseable {
 
     @Override
     public void close() {
+        OPEN.remove(this);
         CameraServer.removeServer(mjpegServer.getName());
         mjpegServer.close();
         cvSource.close();

@@ -70,6 +70,7 @@ public class DataSocketHandler {
 
     public void onConnect(WsConnectContext context) {
         users.add(context);
+        org.photonvision.vision.processes.ClockThrottle.setUiClients(users.size()); // photonvision-99
         context.session.setIdleTimeout(Duration.ofMillis(5000));
         var remote = (InetSocketAddress) context.session.getRemoteAddress();
         var host = remote.getAddress().toString() + ":" + remote.getPort();
@@ -81,6 +82,7 @@ public class DataSocketHandler {
 
     protected void onClose(WsCloseContext context) {
         users.remove(context);
+        org.photonvision.vision.processes.ClockThrottle.setUiClients(users.size()); // photonvision-99
         var remote = (InetSocketAddress) context.session.getRemoteAddress();
         // Remote can be null if server is being closed for restart
         if (remote != null) {
