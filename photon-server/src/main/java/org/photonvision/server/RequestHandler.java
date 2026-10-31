@@ -52,6 +52,7 @@ import org.photonvision.common.dataflow.websocket.UIPhotonConfiguration;
 import org.photonvision.common.hardware.HardwareManager;
 import org.photonvision.common.hardware.Platform;
 import org.photonvision.common.hardware.ThriftiestFirmware;
+import org.photonvision.common.hardware.UsbBandwidth;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
 import org.photonvision.common.networking.NetworkManager;
@@ -1009,6 +1010,43 @@ public class RequestHandler {
         ctx.header("Cache-Control", "no-store");
         ctx.contentType("image/jpeg");
         ctx.result(jpeg);
+    }
+
+    /**
+     * GET /api/usb/bandwidth (photonvision-32): every USB camera's bandwidth, reserved and really
+     * used, against the budget all USB 2.0 ports share. See UsbBandwidth.
+     */
+    public static void onUsbBandwidthRequest(Context ctx) {
+        try {
+            ctx.status(200);
+            ctx.json(UsbBandwidth.survey());
+        } catch (Exception e) {
+            ctx.status(500);
+            ctx.result("USB bandwidth survey failed: " + e.getMessage());
+        }
+    }
+
+    @Json
+    record UsbAllocationRequest(String port, Integer bytes) {}
+
+    /**
+     * POST /api/usb/bandwidth {"port": "1-2.4", "bytes": 944} (photonvision-32): the most that camera
+     * may reserve per microframe: one of its alternate settings, 0 for uncapped, or null for its
+     * model's cap. Saved for the next boot; the camera is reset (like a replug) to apply it.
+     */
+    public static void onUsbAllocationRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(UsbAllocationRequest.class);
+            if (req.port() == null) throw new IllegalArgumentException("port is required");
+            ctx.status(200);
+            ctx.result(UsbBandwidth.setAllocation(req.port(), req.bytes()));
+        } catch (IllegalArgumentException | IllegalStateException | JsonException e) {
+            ctx.status(400);
+            ctx.result(e.getMessage());
+        } catch (Exception e) {
+            ctx.status(500);
+            ctx.result("Couldn't change the allocation: " + e.getMessage());
+        }
     }
 
     /** SpectrumJetson (photonvision-54): each camera's tag contrast over the last 2 s (TagContrast). */

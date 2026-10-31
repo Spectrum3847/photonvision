@@ -18,6 +18,7 @@
 package org.photonvision.vision.processes;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.photonvision.common.configuration.CameraConfiguration;
 import org.photonvision.common.dataflow.CVPipelineResultConsumer;
 import org.photonvision.common.logging.LogGroup;
@@ -27,7 +28,11 @@ import org.photonvision.common.logging.Logger;
 public class VisionModuleManager implements AutoCloseable {
     private final Logger logger = new Logger(VisionModuleManager.class, LogGroup.VisionModule);
 
-    private final List<VisionModule> visionModules = new ArrayList<>();
+    // SpectrumJetson (photonvision-38): copy-on-write, because camera threads iterate this list
+    // (UIPhotonConfiguration.programStateToUi, from VisionRunner) while VisionSourceManager is still
+    // adding cameras at startup. With an ArrayList that threw ConcurrentModificationException in the
+    // camera's own thread and killed it: that camera never ran until PhotonVision restarted.
+    private final List<VisionModule> visionModules = new CopyOnWriteArrayList<>();
 
     VisionModuleManager() {}
 

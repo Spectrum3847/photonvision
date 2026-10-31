@@ -65,12 +65,15 @@ public class VisionModuleChangeSubscriber extends DataChangeSubscriber {
             logger.trace("Got PSC event - propName: " + wsEvent.propertyName);
             changeListLock.lock();
             try {
+                // SpectrumJetson (photonvision-66): the settings only. getCurrentPipeline() also applies
+                // a pending pipeline switch, which on this (websocket) thread released the running
+                // pipeline, and its native detector, while the vision thread could be using it.
                 getSettingChanges()
                         .add(
                                 new VisionModuleChange<T>(
                                         wsEvent.propertyName,
                                         wsEvent.data,
-                                        parentModule.pipelineManager.getCurrentPipeline().getSettings(),
+                                        parentModule.pipelineManager.getCurrentPipelineSettings(),
                                         wsEvent.originContext));
             } finally {
                 changeListLock.unlock();

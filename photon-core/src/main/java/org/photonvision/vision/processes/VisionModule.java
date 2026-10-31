@@ -54,6 +54,7 @@ import org.photonvision.vision.camera.csi.LibcameraGpuSource;
 import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.frame.consumer.FileSaveFrameConsumer;
 import org.photonvision.vision.frame.consumer.MJPGFrameConsumer;
+import org.photonvision.vision.frame.provider.USBFrameProvider;
 import org.photonvision.vision.pipeline.AdvancedPipelineSettings;
 import org.photonvision.vision.pipeline.CVPipelineSettings;
 import org.photonvision.vision.pipeline.OutputStreamPipeline;
@@ -186,6 +187,33 @@ public class VisionModule implements AutoCloseable {
                 (result) ->
                         lastPipelineResultBestTarget = result.hasTargets() ? result.targets.get(0) : null);
         resultConsumers.addAll(extraConsumers);
+        // SpectrumJetson: this camera's health on NetworkTables (from photonvision-16's camera half):
+        // recoveries (photonvision-29), problem (-31), state and lastFrameAgeMs (-81).
+        resultConsumers.add(
+                new CameraHealthPublisher(
+                        () -> visionSource.getSettables().getConfiguration().nickname,
+                        () ->
+                                visionSource.getFrameProvider() instanceof USBFrameProvider usb
+                                        ? usb.getDecodeFailures()
+                                        : 0,
+                        () ->
+                                visionSource.getFrameProvider() instanceof USBFrameProvider usb
+                                        ? usb.getRecoveries()
+                                        : 0,
+                        // SpectrumJetson (photonvision-31): e.g. "not enough USB bandwidth (...)".
+                        () ->
+                                visionSource.getFrameProvider() instanceof USBFrameProvider usb
+                                        ? usb.getProblem()
+                                        : "",
+                        // SpectrumJetson (photonvision-81): e.g. "streaming", "gave-up".
+                        () ->
+                                visionSource.getFrameProvider() instanceof USBFrameProvider usb
+                                        ? usb.getHealthState()
+                                        : "",
+                        () ->
+                                visionSource.getFrameProvider() instanceof USBFrameProvider usb
+                                        ? usb.getLastFrameAgeMs()
+                                        : -1));
 
         // SpectrumJetson: a brand-new camera gets the team's tuned settings (TeamCameraDefaults)
         // instead of stock PhotonVision's CPU AprilTag at 320x240. The camera usually hasn't
@@ -911,7 +939,8 @@ public class VisionModule implements AutoCloseable {
     }
 
     public void setTargetModel(TargetModel targetModel) {
-        var pipelineSettings = pipelineManager.getCurrentPipeline().getSettings();
+        // photonvision-66: not getCurrentPipeline(), which switches pipelines off the vision thread.
+        var pipelineSettings = pipelineManager.getCurrentPipelineSettings();
         if (pipelineSettings instanceof ReflectivePipelineSettings settings) {
             settings.targetModel = targetModel;
             saveAndBroadcastAll();
@@ -1019,6 +1048,11 @@ public class VisionModule implements AutoCloseable {
         visionSource.getCameraConfiguration().cameraQuirks.updateQuirks(quirksToChange);
         visionSource.remakeSettables();
         saveAndBroadcastAll();
+    }
+
+    /** SpectrumJetson (photonvision-32): this camera's USB frame provider, or null (CSI, file). */
+    public USBFrameProvider usbFrameProvider() {
+        return visionSource.getFrameProvider() instanceof USBFrameProvider usb ? usb : null;
     }
 
     public String uniqueName() {

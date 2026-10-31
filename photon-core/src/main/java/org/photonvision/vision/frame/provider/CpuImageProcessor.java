@@ -29,6 +29,9 @@ import org.photonvision.vision.pipe.impl.HSVPipe;
 import org.photonvision.vision.pipe.impl.RotateImagePipe;
 
 public abstract class CpuImageProcessor extends FrameProvider {
+    private long emptyLoggedNs = 0; // SpectrumJetson (photonvision-33)
+    private int emptySince = 0;
+
     protected static class CapturedFrame {
         CVMat colorImage;
         FrameStaticProperties staticProps;
@@ -84,7 +87,18 @@ public abstract class CpuImageProcessor extends FrameProvider {
 
             ++sequenceID;
         } else {
-            System.out.println("Input was empty!");
+            // SpectrumJetson (photonvision-33): at most once per 5 s (it printed for every missing
+            // frame: ~150 lines a second with 4 cameras gone).
+            long now = System.nanoTime();
+            if (emptyLoggedNs == 0 || now - emptyLoggedNs >= 5_000_000_000L) {
+                System.out.println(
+                        "Input was empty!"
+                                + (emptySince > 0 ? " (and " + emptySince + " more since the last message)" : ""));
+                emptyLoggedNs = now;
+                emptySince = 0;
+            } else {
+                emptySince++;
+            }
             outputMat = new CVMat();
         }
 

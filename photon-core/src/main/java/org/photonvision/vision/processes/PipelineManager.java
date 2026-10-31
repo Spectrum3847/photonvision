@@ -158,6 +158,9 @@ public class PipelineManager implements AutoCloseable {
     /**
      * Get the currently active pipeline.
      *
+     * <p>SpectrumJetson (photonvision-66): the vision thread's only. It applies a pending switch,
+     * releasing the old pipeline's native resources; anywhere else, use getCurrentPipelineSettings().
+     *
      * @return The currently active pipeline.
      */
     public CVPipeline getCurrentPipeline() {

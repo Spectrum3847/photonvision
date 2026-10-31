@@ -208,11 +208,18 @@ public class VisionRunner implements AutoCloseable {
             }
         }
 
-        DataChangeService.getInstance()
-                .publishEvent(
-                        new OutgoingUIEvent<>(
-                                "fullsettings",
-                                UIPhotonConfiguration.programStateToUi(ConfigProvider.getInstance().getConfig())));
+        // SpectrumJetson (photonvision-38): a failure building the UI's state must not end this
+        // camera's thread.
+        try {
+            DataChangeService.getInstance()
+                    .publishEvent(
+                            new OutgoingUIEvent<>(
+                                    "fullsettings",
+                                    UIPhotonConfiguration.programStateToUi(
+                                            ConfigProvider.getInstance().getConfig())));
+        } catch (Exception e) {
+            logger.error("Couldn't send the settings to the UI", e);
+        }
 
         while (!Thread.interrupted()) {
             long start = System.currentTimeMillis();

@@ -56,10 +56,24 @@ public class AprilTagDetectionCudaPipe
         return List.of(ret);
     }
 
+    // SpectrumJetson (photonvision-66): the intrinsics last sent, for clearing the distortion.
+    private double[] sentIntrinsics = null;
+
     @Override
     public void setParams(AprilTagDetectionCudaPipeParams newParams) {
         if (this.params == null || !this.params.equals(newParams)) {
-            if (newParams.cameraCalibrationCoefficients == null) return;
+            if (newParams.cameraCalibrationCoefficients == null) {
+                // SpectrumJetson (photonvision-66): no calibration now (deleted, or none at this
+                // resolution). The detector kept straightening tag edges with the old lens model;
+                // zero distortion makes that a no-op (the intrinsics then don't matter).
+                if (sentIntrinsics != null) {
+                    var k = sentIntrinsics;
+                    m_cudadetector.setparams(handle, k[0], k[1], k[2], k[3], 0, 0, 0, 0, 0);
+                    sentIntrinsics = null;
+                }
+                super.setParams(newParams);
+                return;
+            }
 
             final Mat cameraMatrix = newParams.cameraCalibrationCoefficients.getCameraIntrinsicsMat();
             final Mat distCoeffs = newParams.cameraCalibrationCoefficients.getDistCoeffsMat();
@@ -68,6 +82,7 @@ public class AprilTagDetectionCudaPipe
             var cy = cameraMatrix.get(1, 2)[0];
             var fx = cameraMatrix.get(0, 0)[0];
             var fy = cameraMatrix.get(1, 1)[0];
+            sentIntrinsics = new double[] {fx, cx, fy, cy};
             // SpectrumJetson (photonvision-04): OpenCV order k1 k2 p1 p2 k3 [k4 k5 k6]. Read as a
             // flat array so a 1x8 or 8x1 Mat both work.
             double[] d = new double[(int) distCoeffs.total()];

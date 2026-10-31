@@ -60,6 +60,10 @@ const renderCompact = computed<boolean>(() => compact.value || !mdAndUp.value);
           >Camera Matching</v-list-item-title
         >
       </v-list-item>
+      <!-- SpectrumJetson (photonvision-32) -->
+      <v-list-item link to="/usb" prepend-icon="mdi-usb">
+        <v-list-item-title>USB Bandwidth</v-list-item-title>
+      </v-list-item>
       <v-list-item link to="/docs" prepend-icon="mdi-bookshelf">
         <v-list-item-title>Documentation</v-list-item-title>
       </v-list-item>

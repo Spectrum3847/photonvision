@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
-import { computed, inject, ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref } from "vue";
 import { useStateStore } from "@/stores/StateStore";
 import {
   PlaceholderCameraSettings,
@@ -15,8 +15,18 @@ import PvDeleteModal from "@/components/common/pv-delete-modal.vue";
 import PvCameraInfoCard from "@/components/common/pv-camera-info-card.vue";
 import PvCameraMatchCard from "@/components/common/pv-camera-match-card.vue";
 import { useTheme } from "vuetify";
+import { mbPerSec, usbSurvey, watchUsbBandwidth, type UsbCamera } from "@/lib/UsbBandwidth";
 
 const theme = useTheme();
+
+// SpectrumJetson (photonvision-32): each camera's USB bandwidth on its card (the USB Bandwidth page has more).
+const stopUsb = watchUsbBandwidth();
+onBeforeUnmount(stopUsb);
+const usbFor = (uniqueName: string) => usbSurvey.value?.cameras.find((c) => c.uniqueName === uniqueName);
+const usbLine = (c: UsbCamera) =>
+  c.streaming
+    ? `${c.usedBytesPerSec === null ? "…" : (c.usedBytesPerSec / 1e6).toFixed(1)} of ${mbPerSec(c.wantBytes).toFixed(1)} MB/s (port ${c.port})`
+    : `not streaming${c.problem ? ": " + c.problem : ""} (port ${c.port})`;
 
 const backendHostname = inject<string>("backendHostname");
 const formatUrl = (port: number) => `http://${backendHostname}:${port}/stream.mjpg`;
@@ -134,7 +144,9 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
         class="pr-0"
       >
         <v-card color="surface" class="rounded-12">
-          <v-card-title>{{ module.matchedCameraInfo.name }}</v-card-title>
+          <!-- photonvision-44 (upstream #2352): identical cameras all had the device name as title -->
+          <v-card-title>{{ module.nickname || module.matchedCameraInfo.name }}</v-card-title>
+          <v-card-subtitle v-if="module.nickname">Device: {{ module.matchedCameraInfo.name }}</v-card-subtitle>
           <v-card-subtitle v-if="!cameraConnected(module.matchedCameraInfo.uniquePath)"
             >Status: <span class="inactive-status">Disconnected</span></v-card-subtitle
           >
@@ -164,6 +176,10 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
                   <td>
                     {{ module.nickname }}
                   </td>
+                </tr>
+                <tr v-if="usbFor(module.uniqueName)">
+                  <td>USB bandwidth</td>
+                  <td>{{ usbLine(usbFor(module.uniqueName)!) }}</td>
                 </tr>
                 <tr>
                   <td>Pipelines</td>
@@ -443,7 +459,7 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
     <pv-delete-modal
       v-model="confirmDeleteDialog.show"
       title="Delete Camera"
-      :description="`Are you sure you want to delete the camera '${useCameraSettingsStore().currentCameraSettings.nickname}'? This action cannot be undone.`"
+      :description="`Are you sure you want to delete the camera '${confirmDeleteDialog.nickname}'? This action cannot be undone.`"
       :expected-confirmation-text="confirmDeleteDialog.nickname"
       :on-confirm="() => deleteThisCamera(confirmDeleteDialog.cameraUniqueName)"
     />

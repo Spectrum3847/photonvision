@@ -216,6 +216,11 @@ public class VisionSourceManager implements AutoCloseable {
             logger.error(
                     "Camera unique-path already in use by active VisionModule! Cannot reactivate "
                             + deactivatedConfig.get().nickname);
+            // SpectrumJetson (photonvision-44, upstream #2352): it went on and reactivated anyway,
+            // binding two modules to one device (easy with identical cameras, which only their USB
+            // port tells apart). Put the config back and refuse.
+            this.disabledCameraConfigs.put(uniqueName, deactivatedConfig.get());
+            return false;
         }
 
         // transform the camera info all the way to a VisionModule and then start it

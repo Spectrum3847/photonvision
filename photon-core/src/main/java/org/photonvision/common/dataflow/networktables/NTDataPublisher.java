@@ -196,6 +196,21 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
                             List.of(),
                             result.inputAndOutputFrame);
         else acceptedResult = result;
+
+        // SpectrumJetson (photonvision-81): a blank result (capture time 0: the camera is disabled,
+        // unplugged or sends nothing usable) isn't a frame. Published, it went out ~50 times a second,
+        // stamped with just the time-sync offset (TXMAN1: results dated ~26 s into the robot's boot,
+        // read for minutes after a camera died), and it blanked the calibration and best-target topics.
+        // The camera's settings still go out; its result and heartbeat stand still, so PhotonLib reads
+        // no results and isConnected() goes false.
+        if (result.getImageCaptureTimestampNanos() == 0) {
+            ts.pipelineIndexPublisher.set(pipelineIndexSupplier.get());
+            ts.driverModePublisher.set(driverModeSupplier.getAsBoolean());
+            ts.fpsLimitPublisher.set(fpsLimitSupplier.get());
+            ts.enabledPublisher.set(enabledSupplier.getAsBoolean());
+            return;
+        }
+
         var offsetNanos = NetworkTablesManager.getInstance().getOffset();
 
         // Transform the metadata timestamps from the local wpi::nt::Now timebase to the Time Sync
