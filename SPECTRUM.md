@@ -113,7 +113,7 @@ Checked 2026-10-30 against upstream `main` (`git log upstream/main --grep "(#N)"
 | --- | --- | --- |
 | 00 upstream v2026.3.4 | the merge itself | gone: `main` is newer |
 | 11 `setEnabled` | #2484, #2499 | in `main` |
-| 12 OpenCV leaks | #2511, #2356 | in `main`; our two extra leaks still to check |
+| 12 OpenCV leaks | #2511, #2356 | in `main`; our extras (AprilTag pipelines' dropped targets, the frame thrown away on a pipeline switch) ported on `spectrum-2027` |
 | 21 Thriftiest Cam support | #2478 | in `main`; our addition (saved cameras get the new quirks, except MJPEGOnly) ported on `spectrum-2027` |
 | 23 calibration | #2437, #2479, #2480 | in `main`; #2149 (Auto Snapshots) still ours |
 | 42 video format undefined | #2617 | in `main` |
