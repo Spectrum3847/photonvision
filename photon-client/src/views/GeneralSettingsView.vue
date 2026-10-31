@@ -6,6 +6,7 @@ import { useSettingsStore } from "@/stores/settings/GeneralSettingsStore";
 import ApriltagControlCard from "@/components/settings/ApriltagControlCard.vue";
 import DeviceCard from "@/components/settings/DeviceCard.vue";
 import ThriftiestFirmwareCard from "@/components/settings/ThriftiestFirmwareCard.vue";
+import SwyftFirmwareCard from "@/components/settings/SwyftFirmwareCard.vue";
 import RobotStateCard from "@/components/settings/RobotStateCard.vue";
 import RewindCard from "@/components/settings/RewindCard.vue";
 import SnapshotsCard from "@/components/settings/SnapshotsCard.vue";
@@ -17,6 +18,7 @@ import SnapshotsCard from "@/components/settings/SnapshotsCard.vue";
     <GlobalSettingsCard />
     <SnapshotsCard />
     <ThriftiestFirmwareCard />
+    <SwyftFirmwareCard />
     <RobotStateCard />
     <RewindCard />
     <ObjectDetectionCard v-if="useSettingsStore().general.supportedBackends.length > 0" />

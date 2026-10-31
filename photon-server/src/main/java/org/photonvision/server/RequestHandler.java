@@ -51,6 +51,7 @@ import org.photonvision.common.dataflow.networktables.NetworkTablesManager;
 import org.photonvision.common.dataflow.websocket.UIPhotonConfiguration;
 import org.photonvision.common.hardware.HardwareManager;
 import org.photonvision.common.hardware.Platform;
+import org.photonvision.common.hardware.SwyftFirmware;
 import org.photonvision.common.hardware.ThriftiestFirmware;
 import org.photonvision.common.hardware.UsbBandwidth;
 import org.photonvision.common.logging.LogGroup;
@@ -1560,6 +1561,51 @@ public class RequestHandler {
         try {
             var req = ctx.bodyAsClass(ThriftiestFlashRequest.class);
             ThriftiestFirmware.flash(req.port(), req.image());
+            ctx.status(202);
+        } catch (IOException | RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Not flashed: " + e.getMessage());
+        }
+    }
+
+    // SpectrumJetson: Settings > Swyft camera firmware (like the Thriftiest card above).
+    @Json
+    record SwyftFlashRequest(String port, String image, String serial) {}
+
+    public static void onSwyftFirmwareRequest(Context ctx) {
+        thriftiestJson(ctx, SwyftFirmware.status());
+    }
+
+    public static void onSwyftFirmwareUploadRequest(Context ctx) {
+        var file = ctx.uploadedFile("data");
+        if (file == null) {
+            ctx.status(400);
+            ctx.result("No file was sent (form field 'data')");
+            return;
+        }
+        try {
+            thriftiestJson(ctx, SwyftFirmware.upload(file.filename(), file.content()));
+        } catch (IOException e) {
+            ctx.status(400);
+            ctx.result("Not stored: " + e.getMessage());
+        }
+    }
+
+    public static void onSwyftFirmwareDeleteRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(SwyftFlashRequest.class);
+            SwyftFirmware.delete(req.image());
+            thriftiestJson(ctx, SwyftFirmware.status());
+        } catch (IOException | RuntimeException e) {
+            ctx.status(400);
+            ctx.result("Couldn't delete: " + e.getMessage());
+        }
+    }
+
+    public static void onSwyftFirmwareFlashRequest(Context ctx) {
+        try {
+            var req = ctx.bodyAsClass(SwyftFlashRequest.class);
+            SwyftFirmware.flash(req.port(), req.image(), req.serial());
             ctx.status(202);
         } catch (IOException | RuntimeException e) {
             ctx.status(400);

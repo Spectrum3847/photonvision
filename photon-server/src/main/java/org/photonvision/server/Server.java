@@ -193,6 +193,10 @@ public class Server {
         app.post("/api/thriftiest/firmware/upload", RequestHandler::onThriftiestFirmwareUploadRequest);
         app.post("/api/thriftiest/firmware/delete", RequestHandler::onThriftiestFirmwareDeleteRequest);
         app.post("/api/thriftiest/firmware/flash", RequestHandler::onThriftiestFirmwareFlashRequest);
+        app.get("/api/swyft/firmware", RequestHandler::onSwyftFirmwareRequest); // SpectrumJetson
+        app.post("/api/swyft/firmware/upload", RequestHandler::onSwyftFirmwareUploadRequest);
+        app.post("/api/swyft/firmware/delete", RequestHandler::onSwyftFirmwareDeleteRequest);
+        app.post("/api/swyft/firmware/flash", RequestHandler::onSwyftFirmwareFlashRequest);
 
         // ---- SpectrumJetson operations UI, part B ----
         app.get("/api/healthCheck", RequestHandler::onHealthCheckRequest); // SpectrumJetson (52)
