@@ -5,7 +5,6 @@ import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
 import { computed } from "vue";
 import CamerasView from "@/components/cameras/CamerasView.vue";
 import CameraControlCard from "@/components/cameras/CameraControlCard.vue";
-import CameraFocusCard from "@/components/cameras/CameraFocusCard.vue";
 import { useStateStore } from "@/stores/StateStore";
 
 const cameraViewType = computed<number[]>({
@@ -51,22 +50,8 @@ const cameraViewType = computed<number[]>({
         <CameraControlCard />
       </v-col>
       <v-col class="pl-md-3 pt-3 pt-md-0" cols="12" md="5">
-        <!-- Spectrum: the stream card is sticky on wide screens; pinning the Focus card with it keeps
-             the Focus card from scrolling up over the stream. -->
-        <div class="camera-view-and-focus">
-          <CamerasView v-model="cameraViewType" />
-          <CameraFocusCard />
-        </div>
+        <CamerasView v-model="cameraViewType" />
       </v-col>
     </v-row>
   </div>
 </template>
-
-<style scoped>
-@media only screen and (min-width: 960px) {
-  .camera-view-and-focus {
-    position: sticky;
-    top: 12px;
-  }
-}
-</style>

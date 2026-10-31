@@ -5,6 +5,10 @@ import PvNumberInput from "@/components/common/pv-number-input.vue";
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
 import { useStateStore } from "@/stores/StateStore";
 import { computed, ref, watchEffect } from "vue";
+import CameraFocusDialog from "@/components/cameras/CameraFocusDialog.vue";
+
+// Spectrum: the full-screen focus view, in place of upstream's Focus Mode switch.
+const focusViewOpen = ref(false);
 import { type CameraSettingsChangeRequest, ValidQuirks } from "@/types/SettingTypes";
 import { useTheme } from "vuetify";
 import { axiosPost } from "@/lib/PhotonUtils";
@@ -157,7 +161,11 @@ const wrappedCameras = computed<SelectItem<string>[]>(() =>
         ]"
         :select-cols="8"
       />
-      <!-- Spectrum: no upstream Focus Mode switch; the Focus card's focus view replaces it. -->
+      <!-- Spectrum: our focus view replaces upstream's Focus Mode switch (which stopped detection). -->
+      <v-btn class="mt-2" color="primary" variant="tonal" prepend-icon="mdi-target" @click="focusViewOpen = true">
+        Focus the lens
+      </v-btn>
+      <CameraFocusDialog v-model="focusViewOpen" />
     </v-card-text>
     <v-card-text class="d-flex pt-0">
       <v-col cols="6" class="pa-0 pr-2">
