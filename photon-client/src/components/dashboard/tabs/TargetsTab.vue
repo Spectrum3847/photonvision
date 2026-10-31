@@ -73,8 +73,15 @@ const resetCurrentBuffer = () => {
                 <th class="text-center text-white">Confidence</th>
               </template>
               <template v-if="!useCameraSettingsStore().currentPipelineSettings.solvePNPEnabled">
-                <th class="text-center text-white">Pitch &theta;&deg;</th>
-                <th class="text-center text-white">Yaw &theta;&deg;</th>
+                <th class="text-center text-white" title="Positive = the target is above the image centre">
+                  Pitch &theta;&deg; <span class="text-caption">(+ up)</span>
+                </th>
+                <th
+                  class="text-center text-white"
+                  title="Positive = the target is right of the image centre (the opposite of WPILib's counter-clockwise angles)"
+                >
+                  Yaw &theta;&deg; <span class="text-caption">(+ right)</span>
+                </th>
                 <th class="text-center text-white">Skew &theta;&deg;</th>
                 <th class="text-center text-white">Area %</th>
               </template>

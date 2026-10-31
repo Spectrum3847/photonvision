@@ -154,7 +154,7 @@ You can get the {ref}`best target <docs/reflectiveAndShape/contour-filtering:Con
 
 ## Getting Data From A Target
 
-- double `getYaw()`/`GetYaw()`/`getYaw()`: The yaw of the target in degrees (positive left).
+- double `getYaw()`/`GetYaw()`/`getYaw()`: The yaw of the target in degrees (positive right). This is the opposite of WPILib's counter-clockwise-positive angles, so turning toward a target is `-kP * getYaw()`.
 - double `getPitch()`/`GetPitch()`/`getPitch()`: The pitch of the target in degrees (positive up).
 - double `getArea()`/`GetArea()`/`getArea()`: The area (how much of the camera feed the bounding box takes up) as a percent (0-100).
 - double `getSkew()`/`GetSkew()`/`getSkew()`: The skew of the target in degrees (counter-clockwise positive).

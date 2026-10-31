@@ -137,7 +137,7 @@ tell PhotonVision what we've done, but not one change at a time.
 | 1 | **CUDA AprilTag pipeline**: the `AprilTagCuda` pipeline, its UI tab, the detector JNI (FRC 4143: 17 commits, 20 files) | 4143 `d8c9e8e`, 01 | yes |
 | 2 | **Capture and decode**: gray capture, direct MJPEG→gray decode, decode recovery, shared-gray video mode, mid-exposure timestamps | 02, 09, 13, 27, 37 | no (CPU; a big win on the SystemCore) |
 | 3 | **Hardware JPEG decode** (NVJPG) | 18 | yes |
-| 4 | **Camera controls**: 8 distortion coefficients, team defaults, exposure in ms, extra sliders, gain, focus score, yaw sign, duration format | 03, 04, 06, 10, 28, 34, 36, 39, 54 | no |
+| 4 | **Camera controls**: 8 distortion coefficients, team defaults, exposure in ms, extra sliders, gain, focus score, yaw sign, duration format | 03, 04, 06, 10, 28, 34, 36 (done: 2027 still computes yaw positive right, so the doc fix and Targets-tab labels are ported; PhotonTrackedTarget's comments left as upstream's), 39, 54 | no |
 | 5 | **Camera reliability**: stuck-camera watchdog and real reopen, USB bandwidth and its page, quiet frame errors, startup and pipeline races, duplicate activation, dead camera, USB port-power recovery | 29, 31, 32, 33, 38, 43, 44, 66, 81, 84 | no (port power needs a hub that switches it) |
 | 6 | **Thriftiest Cam**: quirks for saved cameras, serial identity, firmware card | 21 (our part), 86, 87 | no |
 | 7 | **Rewind** and its vision log | 07, 75, 76, 77, 78, 79, 65 (Rewind timers) | no |
