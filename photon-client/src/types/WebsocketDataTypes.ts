@@ -48,6 +48,8 @@ export type WebsocketVideoFormat = {
 export interface WebsocketCameraSettingsUpdate {
   cameraPath: string;
   calibrations: CameraCalibrationResult[];
+  // Spectrum: resolutions ("1280x800") still on a generic calibration (CameraProfiles)
+  genericCalibrations?: string[];
   currentPipelineIndex: number;
   currentPipelineSettings: ActivePipelineSettings;
   fov: number;

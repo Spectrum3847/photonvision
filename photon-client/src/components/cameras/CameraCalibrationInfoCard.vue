@@ -28,6 +28,10 @@ const isCalibrating = computed(
 );
 
 // The full calibration (with observations) for this resolution.
+// Spectrum: generic calibration from CameraProfiles
+const isGenericCalibration = computed(
+  () => useCameraSettingsStore().getCalibrationCoeffs(props.videoFormat.resolution)?.isGeneric === true
+);
 const fetchedCalibration = ref<CameraCalibrationResult | null>(null);
 
 const fetchCalibration = async () => {
@@ -214,6 +218,12 @@ const viewingImg = ref(0);
       </div>
     </v-card-title>
 
+    <v-card-text v-if="isGenericCalibration" class="pt-0">
+      <v-alert color="primary" variant="tonal" density="compact" icon="mdi-alert-circle-outline">
+        Generic calibration: calibrate this camera. This is a typical calibration for this camera model, not this
+        camera's own; calibrate at this resolution to replace it.
+      </v-alert>
+    </v-card-text>
     <v-card-text class="d-flex flex-row pt-0">
       <v-col cols="4" class="pa-0">
         <v-tabs v-model="tab" grow bg-color="surface" height="48" slider-color="buttonActive">

@@ -173,8 +173,13 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
                   <td>Calibrations</td>
                   <td>
                     {{
-                      module.completeCalibrations.map((it) => getResolutionString(it.resolution)).join(", ") ||
-                      "Not calibrated"
+                      module.completeCalibrations
+                        .map(
+                          (it) =>
+                            getResolutionString(it.resolution) +
+                            (it.isGeneric ? " (generic: calibrate this camera)" : "")
+                        )
+                        .join(", ") || "Not calibrated"
                     }}
                   </td>
                 </tr>
@@ -278,8 +283,13 @@ const getMatchedDevice = (info: PVCameraInfo | undefined): PVCameraInfo => {
                   <td>Calibrations</td>
                   <td>
                     {{
-                      module.calibrations.map((it2) => getResolutionString(it2.resolution)).join(", ") ||
-                      "Not calibrated"
+                      module.calibrations
+                        .map(
+                          (it2) =>
+                            getResolutionString(it2.resolution) +
+                            (it2.isGeneric ? " (generic: calibrate this camera)" : "")
+                        )
+                        .join(", ") || "Not calibrated"
                     }}
                   </td>
                 </tr>

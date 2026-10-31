@@ -113,12 +113,17 @@ public final class TeamCameraDefaults {
      * mode. Returns -1 if the camera reported no modes.
      */
     public static int pickVideoMode(List<VideoMode> modes) {
+        return pickVideoMode(modes, PREFERRED_WIDTH, PREFERRED_HEIGHT);
+    }
+
+    /** Spectrum: {@link #pickVideoMode(List)} with a camera profile's preferred resolution. */
+    public static int pickVideoMode(List<VideoMode> modes, int preferredWidth, int preferredHeight) {
         int best = -1;
         long bestScore = Long.MIN_VALUE;
         for (int i = 0; i < modes.size(); i++) {
             VideoMode m = modes.get(i);
             boolean mjpeg = m.pixelFormat == PixelFormat.MJPEG;
-            boolean preferred = m.width == PREFERRED_WIDTH && m.height == PREFERRED_HEIGHT;
+            boolean preferred = m.width == preferredWidth && m.height == preferredHeight;
             long score =
                     (preferred && mjpeg ? 1L << 50 : 0)
                             + (mjpeg && m.fps >= 60 ? 1L << 40 : 0)

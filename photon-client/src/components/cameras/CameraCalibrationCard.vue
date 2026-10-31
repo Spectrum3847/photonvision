@@ -65,6 +65,7 @@ const getUniqueVideoFormatsByResolution = (): VideoFormat[] => {
         format.horizontalFOV = stats.horizontalFOV;
         format.verticalFOV = stats.verticalFOV;
         format.diagonalFOV = stats.diagonalFOV;
+        format.isGenericCalibration = calib.isGeneric === true; // Spectrum
       }
 
       if (resArea >= minPixelCount) {
@@ -390,6 +391,11 @@ const bypassVal = computed<boolean>({
 const minCount = computed(() => (bypassVal.value ? 10 : 100));
 const hasEnoughImages = computed(() => useStateStore().calibrationData.imageCount >= minCount.value);
 
+// Spectrum: generic calibrations from CameraProfiles, which the team should replace
+const hasGenericCalibration = computed(() =>
+  useCameraSettingsStore().currentCameraSettings.completeCalibrations.some((c) => c.isGeneric === true)
+);
+
 const showCalDialog = ref(false);
 const selectedVideoFormat = ref<VideoFormat | undefined>(undefined);
 const setSelectedVideoFormat = (format: VideoFormat) => {
@@ -411,6 +417,17 @@ const setSelectedVideoFormat = (format: VideoFormat) => {
             tooltip="Click on a resolution to view detailed calibration information and import/export a calibration."
           />
         </div>
+        <v-alert
+          v-if="hasGenericCalibration"
+          class="mb-3"
+          color="primary"
+          variant="tonal"
+          density="compact"
+          icon="mdi-alert-circle-outline"
+        >
+          Generic calibration: calibrate this camera. The marked resolutions use a typical calibration for this camera
+          model so 3D works now; calibrate this camera to replace it.
+        </v-alert>
         <v-table fixed-header height="100%" density="compact">
           <thead>
             <tr>
@@ -431,7 +448,18 @@ const setSelectedVideoFormat = (format: VideoFormat) => {
             >
               <template #activator="{ props }">
                 <tr :key="index" v-bind="props" @click="setSelectedVideoFormat(value)">
-                  <td>{{ getResolutionString(value.resolution) }}</td>
+                  <td>
+                    {{ getResolutionString(value.resolution) }}
+                    <v-chip
+                      v-if="value.isGenericCalibration"
+                      class="ml-2"
+                      size="x-small"
+                      color="primary"
+                      variant="flat"
+                      prepend-icon="mdi-alert-circle-outline"
+                      >Generic: calibrate this camera</v-chip
+                    >
+                  </td>
                   <td>
                     {{
                       value.mean !== undefined ? (isNaN(value.mean) ? "Unknown" : value.mean.toFixed(2) + "px") : "-"

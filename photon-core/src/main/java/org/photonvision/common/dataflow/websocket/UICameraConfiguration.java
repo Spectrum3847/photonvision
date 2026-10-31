@@ -46,6 +46,8 @@ public class UICameraConfiguration {
     public int outputStreamPort;
     public int inputStreamPort;
     public List<UICameraCalibrationCoefficients> calibrations;
+    // Spectrum: resolutions ("1280x800") still on a generic calibration (CameraProfiles).
+    public List<String> genericCalibrations = List.of();
     public boolean isFovConfigurable = true;
     public QuirkyCamera cameraQuirks;
     public boolean isCSICamera;

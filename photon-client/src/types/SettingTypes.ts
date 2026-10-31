@@ -141,6 +141,8 @@ export interface VideoFormat {
   horizontalFOV?: number;
   verticalFOV?: number;
   mean?: number;
+  // Spectrum: the calibration at this resolution is generic (CameraProfiles)
+  isGenericCalibration?: boolean;
 }
 
 export enum CvType {
@@ -203,6 +205,9 @@ export interface CameraCalibrationResult {
   meanErrors: number[];
   numMissing: number[];
   numOutliers: number[];
+
+  // Spectrum: a bundled generic calibration for this camera model (CameraProfiles), not this camera's own
+  isGeneric?: boolean;
 }
 
 export enum ValidQuirks {

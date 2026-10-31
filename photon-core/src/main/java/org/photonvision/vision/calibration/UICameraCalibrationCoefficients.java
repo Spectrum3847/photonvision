@@ -30,6 +30,9 @@ public class UICameraCalibrationCoefficients extends CameraCalibrationCoefficien
     public List<Integer> numMissing;
     public List<Integer> numOutliers;
 
+    /** Spectrum: a bundled generic calibration (CameraProfiles), not this camera's own. */
+    public boolean isGeneric;
+
     private static int countOutliers(BoardObservation obs) {
         return (int) obs.locationInImageSpace.stream().filter(it -> it.x < 0 || it.y < 0).count();
     }

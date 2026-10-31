@@ -55,6 +55,7 @@ import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.frame.consumer.FileSaveFrameConsumer;
 import org.photonvision.vision.frame.consumer.MJPGFrameConsumer;
 import org.photonvision.vision.pipeline.AdvancedPipelineSettings;
+import org.photonvision.vision.pipeline.CVPipelineSettings;
 import org.photonvision.vision.pipeline.OutputStreamPipeline;
 import org.photonvision.vision.pipeline.ReflectivePipelineSettings;
 import org.photonvision.vision.pipeline.UICalibrationData;
@@ -193,6 +194,11 @@ public class VisionModule implements AutoCloseable {
         if (pipelineManager.createdDefaultPipeline && !pipelineManager.userPipelineSettings.isEmpty()) {
             var first = pipelineManager.userPipelineSettings.get(0);
             TeamCameraDefaults.apply(first, visionSource.getSettables().getAllVideoModes());
+            // Spectrum: a known camera model also gets its profile (CameraProfiles): exposure,
+            // resolution, a generic starting calibration, and the FOV computed from it.
+            var profile =
+                    CameraProfiles.forCamera(visionSource.getSettables().getConfiguration().matchedCameraInfo);
+            profile.ifPresent(p -> applyCameraProfile(p, first));
             logger.info(
                     "New camera: applied team defaults ("
                             + first.pipelineType
@@ -209,7 +215,10 @@ public class VisionModule implements AutoCloseable {
                                 for (int i = 0; i < 150; i++) { // up to 30 s
                                     var modes = visionSource.getSettables().getAllVideoModes();
                                     if (!modes.isEmpty()) {
-                                        int idx = TeamCameraDefaults.pickVideoMode(modes);
+                                        int idx =
+                                                profile
+                                                        .map(p -> TeamCameraDefaults.pickVideoMode(modes, p.width(), p.height()))
+                                                        .orElseGet(() -> TeamCameraDefaults.pickVideoMode(modes));
                                         if (idx >= 0) {
                                             first.cameraVideoModeIndex = idx;
                                             var m = modes.get(idx);
@@ -793,7 +802,18 @@ public class VisionModule implements AutoCloseable {
 
         ret.calibrations =
                 visionSource.getSettables().getConfiguration().calibrations.stream()
-                        .map(CameraCalibrationCoefficients::cloneWithoutObservations)
+                        .map(
+                                c -> {
+                                    var ui = c.cloneWithoutObservations();
+                                    ui.isGeneric = CameraProfiles.isGeneric(c); // Spectrum
+                                    return ui;
+                                })
+                        .toList();
+        // Spectrum: resolutions still on a generic calibration, for the UI and health checks.
+        ret.genericCalibrations =
+                ret.calibrations.stream()
+                        .filter(c -> c.isGeneric)
+                        .map(c -> (int) c.resolution.width + "x" + (int) c.resolution.height)
                         .toList();
 
         ret.isFovConfigurable =
@@ -910,6 +930,56 @@ public class VisionModule implements AutoCloseable {
         }
 
         saveAndBroadcastAll();
+    }
+
+    /**
+     * Spectrum: a brand-new camera of a known model (CameraProfiles) gets the model's exposure,
+     * generic starting calibrations (only at resolutions with no calibration) and the diagonal FOV
+     * computed from the calibration at its preferred resolution. Models without a calibration keep
+     * PhotonVision's FOV.
+     */
+    private void applyCameraProfile(CameraProfiles.Profile profile, CVPipelineSettings first) {
+        logger.info("New camera: known model " + profile.name() + "; applying its camera profile");
+        first.cameraAutoExposure = false;
+        first.cameraExposureRaw = profile.exposureRaw();
+        List<CameraCalibrationCoefficients> generic;
+        try {
+            generic = CameraProfiles.genericCalibrations(profile);
+        } catch (RuntimeException e) {
+            logger.error("Couldn't load the generic calibration for " + profile.name(), e);
+            return;
+        }
+        var settables = visionSource.getSettables();
+        for (var cal : generic) {
+            boolean has =
+                    settables.getConfiguration().calibrations.stream()
+                            .anyMatch(c -> c.resolution != null && c.resolution.equals(cal.resolution));
+            if (has) continue;
+            settables.addCalibration(cal);
+            logger.warn(
+                    "New camera: added a GENERIC "
+                            + profile.name()
+                            + " calibration at "
+                            + (int) cal.resolution.width
+                            + "x"
+                            + (int) cal.resolution.height
+                            + "; calibrate this camera");
+        }
+        if (!isVendorCamera()) {
+            generic.stream()
+                    .filter(
+                            c ->
+                                    (int) c.resolution.width == profile.width()
+                                            && (int) c.resolution.height == profile.height())
+                    .findFirst()
+                    .ifPresent(
+                            c -> {
+                                double fov = CameraProfiles.diagonalFovDegrees(c);
+                                logger.info(
+                                        "New camera: diagonal FOV " + fov + " deg from the calibration");
+                                settables.setFOV(fov);
+                            });
+        }
     }
 
     /**
