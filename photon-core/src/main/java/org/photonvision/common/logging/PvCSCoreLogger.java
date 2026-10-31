@@ -18,6 +18,8 @@
 package org.photonvision.common.logging;
 
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.wpilib.vision.camera.CameraServerJNI;
 
 /** Redirect cscore logs to our logger */
@@ -38,7 +40,43 @@ public class PvCSCoreLogger {
         this.logger = new Logger(getClass(), LogGroup.CSCore);
     }
 
+    /**
+     * SpectrumJetson (photonvision-89): UsbCameras (by name) whose cscore camera thread has ended.
+     * UsbCameraImpl::CameraThreadMain ends for good when its select() fails, EINTR included
+     * ("select(): Interrupted system call", WPILib 2027 alpha-8), and logs that as an error first;
+     * nothing on that UsbCamera can work again (photonvision-88). Its USBFrameProvider restarts the
+     * camera as soon as it sees it here, instead of after a USB reset and 13 s of cscore SetPath
+     * waits.
+     */
+    private static final Set<String> endedCameraThreads = ConcurrentHashMap.newKeySet();
+
+    /** The camera whose cscore thread this log message says has ended, or null. */
+    static String endedCameraThread(int level, String file, String msg) {
+        if (level < 40 || file == null || msg == null || !file.endsWith("UsbCameraImpl.cpp")) {
+            return null;
+        }
+        int i = msg.indexOf(": select(): "); // SERROR prefixes the source's name
+        return i > 0 ? msg.substring(0, i) : null;
+    }
+
+    /** Whether cscore has said this UsbCamera's camera thread ended (photonvision-89). */
+    public static boolean cameraThreadEnded(String cameraName) {
+        return endedCameraThreads.contains(cameraName);
+    }
+
+    /** A new UsbCamera with this name has its own thread (photonvision-89). */
+    public static void clearCameraThreadEnded(String cameraName) {
+        endedCameraThreads.remove(cameraName);
+    }
+
+    /** Notes a camera whose thread this cscore message says has ended. */
+    static void noteCameraThread(int level, String file, String msg) {
+        String ended = endedCameraThread(level, file, msg);
+        if (ended != null) endedCameraThreads.add(ended);
+    }
+
     private void logMsg(int level, String file, int line, String msg) {
+        noteCameraThread(level, file, msg);
         if (level == 20) {
             logger.info(msg);
             return;

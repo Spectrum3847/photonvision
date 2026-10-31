@@ -21,6 +21,7 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
+import org.photonvision.common.logging.PvCSCoreLogger;
 import org.photonvision.jni.CscoreExtras;
 import org.photonvision.jni.GpuDetectorJNI;
 import org.photonvision.rewind.RewindRecorder;
@@ -70,6 +71,9 @@ public class USBFrameProvider extends CpuImageProcessor {
         this.directGray = new DirectDecode(logger, "Direct MJPEG->gray decode", "cscore's conversion");
         this.directBgr = new DirectDecode(logger, "Hardware MJPEG->BGR decode", "cscore's decode");
         this.cvSink.setEnabled(true);
+        // photonvision-89: this UsbCamera has a camera thread of its own, whatever happened to the
+        // last one with this name.
+        PvCSCoreLogger.clearCameraThreadEnded(camera.getName());
 
         this.settables = visionSettables;
 
@@ -132,7 +136,8 @@ public class USBFrameProvider extends CpuImageProcessor {
                                         ? "disconnected for %.0f s with its USB device still there"
                                         : "gone from USB for %.0f s", // photonvision-84
                                 stuckWatchdog.secondsDisconnected()),
-                        devicePresent);
+                        devicePresent,
+                        false);
             }
             // SpectrumJetson (photonvision-33): it's plugged in but won't answer (the kernel couldn't
             // enumerate it). A USB hub reset leaves a Thriftiest Cam like this, and on this carrier
@@ -192,6 +197,7 @@ public class USBFrameProvider extends CpuImageProcessor {
                         recoverUsb(
                                 String.format(
                                         "still no usable frames %.1f s later", stuckWatchdog.secondsWithoutFrames()),
+                                true,
                                 true);
                 case NONE -> {}
             }
@@ -406,14 +412,16 @@ public class USBFrameProvider extends CpuImageProcessor {
      * on the stock firmware stays wedged; nothing in software helps that one.)
      *
      * <ul>
-     *   <li>The first reset since the last frame is the gentle one, if the device is there.
-     *   <li>Later ones, a failed one, or a camera gone from USB: the port's power, off and on.
+     *   <li>The first reset since the last frame is the gentle one, if the device is there and the
+     *       camera is connected but stalled (photonvision-89: or on a root port).
+     *   <li>Later ones, a failed one, a camera gone from USB, or (photonvision-89) one on a hub
+     *       that's disconnected with its USB device still there: the port's power, off and on.
      *   <li>Then cscore reopens the device: after the camera came back, cscore once kept failing on
      *       the old one ("could not queue buffer 0" every 2 s) and never opened the new one, until
      *       PhotonVision was restarted.
      * </ul>
      */
-    private void recoverUsb(String why, boolean devicePresent) {
+    private void recoverUsb(String why, boolean devicePresent, boolean stalled) {
         if (setPath.running()) {
             // photonvision-88: cscore hasn't finished reopening it after the last reset.
             logger.warn("Not resetting the camera (" + why + "): cscore is still reopening it");
@@ -429,11 +437,21 @@ public class USBFrameProvider extends CpuImageProcessor {
             logger.warn("Not resetting USB port " + port + " (" + why + "): another camera is in it now");
             return;
         }
-        boolean gentle = devicePresent && stuckWatchdog.usbResetsSinceFrame() <= 1;
-        if (!gentle || !usbReset(why, true)) {
-            portPowerCycle(port, gentle ? "the USB reset failed" : why);
+        // photonvision-89: a camera on a hub that's disconnected with its USB device still there is
+        // the USB drop of photonvision-84 (the device registered but unusable, "can't set config #1,
+        // error -71"), where "authorized" off and on fails the same way, every time: it cost 0.3 s
+        // plus the failed re-authorization before the port power toggle that does bring it back.
+        // On a root port (no hub port power to switch) it's still tried first.
+        boolean gentle =
+                devicePresent
+                        && stuckWatchdog.usbResetsSinceFrame() <= 1
+                        && (stalled || port.indexOf('.') < 0);
+        Object oldNode = nodeKey(camera.getPath());
+        boolean reset = gentle && usbReset(why, true);
+        if (!reset) {
+            reset = portPowerCycle(port, gentle ? "the USB reset failed" : why);
         }
-        reopenCamera();
+        reopenCamera(reset ? oldNode : null);
     }
 
     // usbdevfs from Python: Java can't issue the ioctl, and python3 is always on the Jetson
@@ -457,8 +475,11 @@ public class USBFrameProvider extends CpuImageProcessor {
                     "finally:",
                     "    os.close(fd)");
 
-    /** photonvision-84: switches the camera's hub port's power off and on (port e.g. "1-2.3"). */
-    private void portPowerCycle(String port, String why) {
+    /**
+     * photonvision-84: switches the camera's hub port's power off and on (port e.g. "1-2.3"). True if
+     * the hub took both requests.
+     */
+    private boolean portPowerCycle(String port, String why) {
         String hub;
         String num;
         int dot = port.lastIndexOf('.');
@@ -483,11 +504,29 @@ public class USBFrameProvider extends CpuImageProcessor {
                 logger.error(
                         "USB port power toggle failed: "
                                 + new String(p.getInputStream().readAllBytes()).strip());
+            } else {
+                return true;
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             logger.error("USB port power toggle failed: " + e);
+        }
+        return false;
+    }
+
+    /**
+     * photonvision-89: the device node a camera path leads to, as its file key (device and inode), or
+     * null if it isn't there. The kernel makes a new node (a new inode) each time the camera is
+     * probed again, so this tells the node from before a USB reset from the one after it.
+     */
+    private static Object nodeKey(String path) {
+        try {
+            return java.nio.file.Files.readAttributes(
+                            java.nio.file.Path.of(path), java.nio.file.attribute.BasicFileAttributes.class)
+                    .fileKey();
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -501,6 +540,19 @@ public class USBFrameProvider extends CpuImageProcessor {
      * rarely came back by itself first, so it was 0.2-0.4 s slower.
      */
     private static final long SETTLE_MS = 300;
+
+    /**
+     * photonvision-89: how often reopenCamera looks for the device node (was 100 ms), and how long it
+     * waits for the node from before the reset to be replaced. A camera stalled while connected still
+     * has its old node when the reset returns: the kernel drops it only when the hub reports the
+     * disconnect, and enumerates the camera again ~0.6 s after a power toggle. Waiting only for "a
+     * node" reopened cscore on the old one at once, and cscore then connected to the new one by
+     * itself (inotify) inside the second its video controls fail, the stuck state described above,
+     * which only the next reset (5 s later) cleared.
+     */
+    private static final long NODE_POLL_MS = 20;
+
+    private static final long NEW_NODE_WAIT_NS = 2_000_000_000L;
 
     /**
      * SpectrumJetson (photonvision-88): cscore's SetPath waits, with no timeout, for the camera's
@@ -523,22 +575,36 @@ public class USBFrameProvider extends CpuImageProcessor {
     private final DetachedCall setPath = new DetachedCall(System::nanoTime);
     private volatile boolean restartRequested = false;
 
-    private void reopenCamera() {
+    /**
+     * @param oldNode the device node's {@link #nodeKey} from before a reset that went through, to
+     *     wait (up to {@link #NEW_NODE_WAIT_NS}) for the kernel's new one; null to take any node
+     */
+    private void reopenCamera(Object oldNode) {
         if (setPath.running()) {
             logger.warn("cscore is still reopening the camera from the last reset; not again");
             return;
         }
         String path = camera.getPath();
-        long deadline = System.nanoTime() + 5_000_000_000L;
+        long start = System.nanoTime();
+        long deadline = start + 5_000_000_000L;
         try {
-            while (!java.nio.file.Files.exists(java.nio.file.Path.of(path))
-                    && System.nanoTime() < deadline) {
-                Thread.sleep(100);
+            while (System.nanoTime() < deadline) {
+                Object node = nodeKey(path);
+                if (node != null
+                        && (oldNode == null
+                                || !node.equals(oldNode)
+                                || System.nanoTime() - start > NEW_NODE_WAIT_NS)) {
+                    break;
+                }
+                Thread.sleep(NODE_POLL_MS);
             }
             Thread.sleep(SETTLE_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return;
+        }
+        if (PvCSCoreLogger.cameraThreadEnded(camera.getName())) {
+            return; // photonvision-89: SetPath would never return; the camera is restarted instead
         }
         // UsbCamera has no setPath in this WPILib; this is the call it would make.
         int handle = camera.getHandle();
@@ -576,16 +642,23 @@ public class USBFrameProvider extends CpuImageProcessor {
      */
     private boolean restartIfCameraThreadDead() {
         if (restartRequested) return true;
-        if (setPath.runningNs() < CAMERA_THREAD_DEAD_NS) return false;
+        // photonvision-89: cscore says so itself (its "select(): ..." error) the moment the thread
+        // ends; SetPath's 10 s is the fallback for a thread that ends without saying.
+        boolean said = PvCSCoreLogger.cameraThreadEnded(camera.getName());
+        if (!said && setPath.runningNs() < CAMERA_THREAD_DEAD_NS) return false;
         restartRequested = true;
         String uniqueName = settables.getConfiguration().uniqueName;
         problem = "cscore's camera thread stopped; restarting the camera";
         logger.error(
-                "cscore still hasn't reopened the camera after "
-                        + CAMERA_THREAD_DEAD_NS / 1_000_000_000L
-                        + " s: its cscore thread has stopped (look for \"select(): ...\" from cscore"
-                        + " above), so nothing on this UsbCamera can work again. Restarting this camera's"
-                        + " VisionModule.");
+                said
+                        ? "cscore's camera thread has stopped (its \"select(): ...\" error above), so"
+                                + " nothing on this UsbCamera can work again. Restarting this camera's"
+                                + " VisionModule."
+                        : "cscore still hasn't reopened the camera after "
+                                + CAMERA_THREAD_DEAD_NS / 1_000_000_000L
+                                + " s: its cscore thread has stopped (look for \"select(): ...\" from"
+                                + " cscore above), so nothing on this UsbCamera can work again. Restarting"
+                                + " this camera's VisionModule.");
         // Not on this thread: closing the module stops (joins) this VisionRunner.
         var t =
                 new Thread(
