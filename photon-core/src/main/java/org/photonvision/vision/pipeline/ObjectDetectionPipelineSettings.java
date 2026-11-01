@@ -26,6 +26,14 @@ public class ObjectDetectionPipelineSettings extends AdvancedPipelineSettings {
     public double nms; // non maximal suppression
     public NeuralNetworkModelsSettings.ModelProperties model;
 
+    /**
+     * SpectrumJetson (photonvision-100): "Object FPS max": at most this many frames a second go to
+     * the model (0 = every frame); frames in between are never grabbed or decoded. On the Jetson it
+     * starts at 30: the model shares the GPU with the AprilTag cameras (unlimited, a YOLO11n took the
+     * GPU from ~18% to ~70%). Robot code's fpsLimit still applies on top.
+     */
+    public int objectFpsMax = org.photonvision.jni.TensorRtJNI.isInstalled() ? 30 : 0;
+
     public ObjectDetectionPipelineSettings() {
         super();
         this.pipelineType = PipelineType.ObjectDetection; // TODO: FIX this

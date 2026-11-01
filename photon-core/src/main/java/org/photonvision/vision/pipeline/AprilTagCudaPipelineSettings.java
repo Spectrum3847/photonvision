@@ -33,6 +33,14 @@ public class AprilTagCudaPipelineSettings extends AdvancedPipelineSettings {
     public boolean doMultiTarget = false;
     public boolean doSingleTargetAlways = false;
 
+    /**
+     * SpectrumJetson (photonvision-100): "Tag FPS max": process at most this many frames a second (0
+     * = every frame). Frames in between are never grabbed or decoded, and the camera mode stays the
+     * same (e.g. 122 fps front, 60 sides), so it frees GPU and CPU without changing exposure or
+     * latency. Idle mode's and deep idle's lower rates still apply (the lower wins).
+     */
+    public int tagFpsMax = 0;
+
     // 3d settings
 
     public AprilTagCudaPipelineSettings() {

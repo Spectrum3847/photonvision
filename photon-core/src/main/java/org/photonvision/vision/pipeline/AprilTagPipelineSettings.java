@@ -32,6 +32,15 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
     public int decisionMargin = 35;
     public boolean doMultiTarget = false;
     public boolean doSingleTargetAlways = false;
+
+    /**
+     * SpectrumJetson (photonvision-100): "Tag FPS max": process at most this many frames a second (0
+     * = every frame). Frames in between are never grabbed or decoded, and the camera mode stays the
+     * same (e.g. 122 fps front, 60 sides), so it frees GPU and CPU without changing exposure or
+     * latency. Idle mode's and deep idle's lower rates still apply (the lower wins).
+     */
+    public int tagFpsMax = 0;
+
     // Spectrum (photonvision-98): decode MJPEG to half-resolution gray and detect on that (decimate
     // halved), corners scaled back to full resolution. Off by default: ~0.9 ms less decode a
     // 1280x800 frame, but fewer tags found and twice the corner error (tests/systemcore-cpu).

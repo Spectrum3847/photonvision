@@ -60,6 +60,16 @@ const interactiveCols = computed(() =>
       @update:modelValue="(value) => useCameraSettingsStore().changeCurrentPipelineSetting({ threads: value }, false)"
     />
     <pv-slider
+      v-model="currentPipelineSettings.tagFpsMax"
+      :slider-cols="interactiveCols"
+      label="Tag FPS max"
+      tooltip="Process at most this many frames a second (0 = every frame). The camera mode doesn't change; the frames in between are skipped before decoding. Idle mode's lower rate still applies"
+      :min="0"
+      :max="122"
+      :step="1"
+      @update:modelValue="(value) => useCameraSettingsStore().changeCurrentPipelineSetting({ tagFpsMax: value }, false)"
+    />
+    <pv-slider
       v-model="currentPipelineSettings.decisionMargin"
       :slider-cols="interactiveCols"
       label="Decision Margin Cutoff"

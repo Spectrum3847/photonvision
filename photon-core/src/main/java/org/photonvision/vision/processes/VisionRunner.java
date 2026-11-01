@@ -61,6 +61,7 @@ public class VisionRunner implements AutoCloseable {
 
     private long loopCount;
     private long lastGrabNanos = 0; // SpectrumJetson (photonvision-49)
+    private final FrameRateCap frameRateCap = new FrameRateCap(); // photonvision-100
     private long lastLoopErrorLogMs = 0; // photonvision-63: monotonic (System.nanoTime) ms
 
     /**
@@ -281,7 +282,12 @@ public class VisionRunner implements AutoCloseable {
                 // chip is too hot (the thermal limit), at most that many frames a second; the ones in
                 // between are never grabbed (decoded). Before the settings and the grab, so both are
                 // fresh for the frame that's processed.
-                if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;
+                // SpectrumJetson (photonvision-100): the pipeline's own cap (Tag/Object FPS max),
+                // combined with idle mode's; without one, idle mode alone, as before.
+                long capNanos = FrameRateCap.capPeriodNanos(pipelineSupplier.get());
+                if (capNanos > 0) {
+                    if (!frameRateCap.await(capNanos)) return;
+                } else if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;
                 lastGrabNanos = System.nanoTime();
 
                 long start = System.nanoTime(); // photonvision-65: monotonic
