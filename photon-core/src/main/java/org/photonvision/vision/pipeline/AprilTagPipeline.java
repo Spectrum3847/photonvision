@@ -32,14 +32,15 @@ import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.frame.FrameThresholdType;
 import org.photonvision.vision.pipe.CVPipe.CVPipeResult;
 import org.photonvision.vision.pipe.impl.AprilTagDetectionPipe;
-import org.photonvision.vision.processes.SystemCoreProfile;
 import org.photonvision.vision.pipe.impl.AprilTagDetectionPipe.AprilTagDetectionPipeParams;
 import org.photonvision.vision.pipe.impl.AprilTagPoseEstimatorPipe;
 import org.photonvision.vision.pipe.impl.AprilTagPoseEstimatorPipe.AprilTagPoseEstimatorPipeParams;
 import org.photonvision.vision.pipe.impl.CalculateFPSPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe.MultiTargetPNPPipeParams;
+import org.photonvision.vision.pipe.impl.NapaDetector;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
+import org.photonvision.vision.processes.SystemCoreProfile;
 import org.photonvision.vision.target.ExcludedTags;
 import org.photonvision.vision.target.TagQuality;
 import org.photonvision.vision.target.TrackedTarget;
@@ -58,6 +59,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
     private static final Logger logger = new Logger(AprilTagPipeline.class, LogGroup.VisionModule);
 
     private final AprilTagDetectionPipe aprilTagDetectionPipe = new AprilTagDetectionPipe();
+    private final NapaDetector napaDetector = new NapaDetector(); // Spectrum
     private final AprilTagPoseEstimatorPipe singleTagPoseEstimatorPipe =
             new AprilTagPoseEstimatorPipe();
     private final MultiTargetPNPPipe multiTagPNPPipe = new MultiTargetPNPPipe();
@@ -169,8 +171,8 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
     /**
      * A detection on the half-resolution image at full resolution. apriltag's pixel centres are at
      * +0.5 (the decimated-image convention), so the scale is exact: half-res pixel i's centre i+0.5
-     * covers full-res pixels 2i and 2i+1, centre 2i+1. The homography maps tag to image, so the
-     * image rows scale too.
+     * covers full-res pixels 2i and 2i+1, centre 2i+1. The homography maps tag to image, so the image
+     * rows scale too.
      */
     public static AprilTagDetection scaled(AprilTagDetection d, double sx, double sy) {
         double[] h = d.getHomography().clone();
@@ -216,11 +218,27 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                     new AprilTagDetectionPipeParams(settings.tagFamily, detectorConfig(half), quadParams));
         }
 
-        CVPipeResult<List<AprilTagDetection>> tagDetectionPipeResult =
-                aprilTagDetectionPipe.run(frame.processedImage);
-        sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
-
-        List<AprilTagDetection> detections = tagDetectionPipeResult.output;
+        // Spectrum: the NAPA detector choice (full-resolution frames; the low-CPU half-res decode keeps
+        // AprilTag 3).
+        boolean useNapa = settings.napa && !half && NapaDetector.usable();
+        List<AprilTagDetection> detections;
+        if (useNapa) {
+            long t0 = System.nanoTime();
+            napaDetector.configure(
+                    settings.tagFamily,
+                    settings.napaMinTagPx,
+                    settings.napaMaxHamming,
+                    settings.napaFarSearch,
+                    settings.napaFarMinTagPx,
+                    60);
+            detections = napaDetector.detect(in);
+            sumPipeNanosElapsed += System.nanoTime() - t0;
+        } else {
+            CVPipeResult<List<AprilTagDetection>> tagDetectionPipeResult =
+                    aprilTagDetectionPipe.run(frame.processedImage);
+            sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
+            detections = tagDetectionPipeResult.output;
+        }
         if (half) {
             double sx = frameStaticProperties.imageWidth / (double) in.cols();
             double sy = frameStaticProperties.imageHeight / (double) in.rows();
@@ -233,7 +251,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         for (AprilTagDetection detection : detections) {
             // TODO this should be in a pipe, not in the top level here (Matt)
             if (detection.getDecisionMargin() < settings.decisionMargin) continue;
-            if (detection.getHamming() > settings.hammingDist) continue;
+            if (!useNapa && detection.getHamming() > settings.hammingDist) continue;
 
             usedDetections.add(detection);
 
@@ -351,6 +369,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
     @Override
     public void release() {
         aprilTagDetectionPipe.release();
+        napaDetector.release();
         singleTagPoseEstimatorPipe.release();
         multiTagPNPPipe.release();
         calculateFPSPipe.release();

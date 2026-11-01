@@ -2,6 +2,7 @@
 import { PipelineType } from "@/types/PipelineTypes";
 import PvSelect from "@/components/common/pv-select.vue";
 import PvSlider from "@/components/common/pv-slider.vue";
+import NapaSettings from "@/components/dashboard/tabs/NapaSettings.vue";
 import { computed } from "vue";
 import { useStateStore } from "@/stores/StateStore";
 import type { ActivePipelineSettings } from "@/types/PipelineTypes";
@@ -68,6 +69,12 @@ const interactiveCols = computed(() =>
       @update:modelValue="
         (value) => useCameraSettingsStore().changeCurrentPipelineSetting({ numIterations: value }, false)
       "
+    />
+    <NapaSettings
+      flag="tagsOnCpu"
+      label="Tags on CPU (NAPA)"
+      tooltip="Find AprilTags on the CPU with NAPA (by Zachary Wilson) instead of the GPU detector, leaving the GPU to object detection. About 2-3 ms of one CPU core a frame; JPEG decode stays on the hardware decoder. The GPU detector's far search and mask don't apply"
+      :cols="interactiveCols"
     />
     <p class="text-caption pt-2">
       The CUDA detector runs at full resolution with fixed parameters; decimate, blur, threads and refine edges do not

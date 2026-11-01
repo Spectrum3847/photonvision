@@ -46,6 +46,19 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
     // 1280x800 frame, but fewer tags found and twice the corner error (tests/systemcore-cpu).
     public boolean lowCpuDecode = false;
 
+    // Spectrum: "Detector": false = AprilTag 3 (WPILib), true = NAPA.
+    public boolean napa = false;
+
+    // Spectrum: NAPA, the CPU AprilTag detector by Zachary Wilson (NapaDetectorJNI; GPL-3.0-only).
+    // Off by default. min tag px 16 / max hamming 1 are what tests/napa-eval recommends on our
+    // frames (NAPA's own default 32 misses 18% of tags). With NAPA, napaMaxHamming replaces the
+    // hamming filter. Far search: the full frame at 32, and napaFarMinTagPx only in tracking crops
+    // and capped sweeps.
+    public int napaMinTagPx = 16;
+    public int napaMaxHamming = 1;
+    public boolean napaFarSearch = false;
+    public int napaFarMinTagPx = 16;
+
     // 3d settings
 
     public AprilTagPipelineSettings() {
@@ -75,6 +88,11 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
         result = prime * result + (doMultiTarget ? 1231 : 1237);
         result = prime * result + (doSingleTargetAlways ? 1231 : 1237);
         result = prime * result + (lowCpuDecode ? 1231 : 1237);
+        result = prime * result + (napa ? 1231 : 1237);
+        result = prime * result + napaMinTagPx;
+        result = prime * result + napaMaxHamming;
+        result = prime * result + (napaFarSearch ? 1231 : 1237);
+        result = prime * result + napaFarMinTagPx;
         return result;
     }
 
@@ -96,6 +114,11 @@ public class AprilTagPipelineSettings extends AdvancedPipelineSettings {
         if (decisionMargin != other.decisionMargin) return false;
         if (doMultiTarget != other.doMultiTarget) return false;
         if (doSingleTargetAlways != other.doSingleTargetAlways) return false;
+        if (napa != other.napa) return false;
+        if (napaMinTagPx != other.napaMinTagPx) return false;
+        if (napaMaxHamming != other.napaMaxHamming) return false;
+        if (napaFarSearch != other.napaFarSearch) return false;
+        if (napaFarMinTagPx != other.napaFarMinTagPx) return false;
         return true;
     }
 }

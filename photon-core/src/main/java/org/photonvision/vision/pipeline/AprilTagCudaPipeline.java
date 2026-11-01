@@ -38,6 +38,7 @@ import org.photonvision.vision.pipe.impl.AprilTagPoseEstimatorPipe.AprilTagPoseE
 import org.photonvision.vision.pipe.impl.CalculateFPSPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe.MultiTargetPNPPipeParams;
+import org.photonvision.vision.pipe.impl.NapaDetector;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
 import org.photonvision.vision.target.ExcludedTags;
 import org.photonvision.vision.target.TagContrast;
@@ -60,6 +61,7 @@ public class AprilTagCudaPipeline
             new Logger(AprilTagCudaPipeline.class, LogGroup.VisionModule);
 
     private final AprilTagDetectionCudaPipe aprilTagDetectionPipe = new AprilTagDetectionCudaPipe();
+    private final NapaDetector napaDetector = new NapaDetector(); // Spectrum
     private final AprilTagPoseEstimatorPipe singleTagPoseEstimatorPipe =
             new AprilTagPoseEstimatorPipe();
     private final MultiTargetPNPPipe multiTagPNPPipe = new MultiTargetPNPPipe();
@@ -105,7 +107,8 @@ public class AprilTagCudaPipeline
         config.quadSigma = (float) settings.blur;
         config.quadDecimate = settings.decimate;
 
-        // The CUDA detector (libspectrum-gpu-apriltag) has its own thresholds; it takes the camera's lens
+        // The CUDA detector (libspectrum-gpu-apriltag) has its own thresholds; it takes the camera's
+        // lens
         // calibration instead, to undistort the edges it refines.
         aprilTagDetectionPipe.setParams(
                 new AprilTagDetectionCudaPipeParams(
@@ -145,11 +148,26 @@ public class AprilTagCudaPipeline
             return new CVPipelineResult(frame.sequenceID, 0, 0, List.of(), frame);
         }
 
-        CVPipeResult<List<AprilTagDetection>> tagDetectionPipeResult =
-                aprilTagDetectionPipe.run(frame.processedImage);
-        sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
-
-        List<AprilTagDetection> detections = tagDetectionPipeResult.output;
+        // Spectrum: "Tags on CPU (NAPA)": NAPA instead of the GPU detector, leaving the GPU to objects.
+        boolean useNapa = settings.tagsOnCpu && NapaDetector.usable();
+        List<AprilTagDetection> detections;
+        if (useNapa) {
+            long t0 = System.nanoTime();
+            napaDetector.configure(
+                    settings.tagFamily,
+                    settings.napaMinTagPx,
+                    settings.napaMaxHamming,
+                    settings.napaFarSearch,
+                    settings.napaFarMinTagPx,
+                    60);
+            detections = napaDetector.detect(frame.processedImage.getMat());
+            sumPipeNanosElapsed += System.nanoTime() - t0;
+        } else {
+            CVPipeResult<List<AprilTagDetection>> tagDetectionPipeResult =
+                    aprilTagDetectionPipe.run(frame.processedImage);
+            sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
+            detections = tagDetectionPipeResult.output;
+        }
         List<AprilTagDetection> usedDetections = new ArrayList<>();
         List<TrackedTarget> targetList = new ArrayList<>();
 
@@ -157,7 +175,7 @@ public class AprilTagCudaPipeline
         for (AprilTagDetection detection : detections) {
             // TODO this should be in a pipe, not in the top level here (Matt)
             if (detection.getDecisionMargin() < settings.decisionMargin) continue;
-            if (detection.getHamming() > settings.hammingDist) continue;
+            if (!useNapa && detection.getHamming() > settings.hammingDist) continue;
 
             usedDetections.add(detection);
 
@@ -180,7 +198,8 @@ public class AprilTagCudaPipeline
 
         // SpectrumJetson (photonvision-54): the tags' white margin and black border, a few times a
         // second, so a bad exposure or brightness shows as a reason (TagContrast).
-        var contrast = TagContrast.measure(frame.processedImage.getMat(), usedDetections, lastContrastNanos);
+        var contrast =
+                TagContrast.measure(frame.processedImage.getMat(), usedDetections, lastContrastNanos);
         if (contrast != null) lastContrastNanos = contrast.atNanos();
 
         // Do multi-tag pose estimation
@@ -283,6 +302,7 @@ public class AprilTagCudaPipeline
     @Override
     public void release() {
         aprilTagDetectionPipe.release();
+        napaDetector.release();
         singleTagPoseEstimatorPipe.release();
         multiTagPNPPipe.release();
         calculateFPSPipe.release();

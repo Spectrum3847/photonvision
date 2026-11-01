@@ -310,6 +310,11 @@ export interface AprilTagPipelineSettings extends PipelineSettings {
   doSingleTargetAlways: boolean;
   lowCpuDecode: boolean;
   tagFpsMax: number; // photonvision-100: 0 = every frame
+  napa: boolean; // Spectrum: NAPA instead of AprilTag 3
+  napaMinTagPx: number;
+  napaMaxHamming: number;
+  napaFarSearch: boolean;
+  napaFarMinTagPx: number;
 }
 export type ConfigurableAprilTagPipelineSettings = Partial<
   Omit<AprilTagPipelineSettings, "pipelineType" | "hammingDist" | "debug">
@@ -335,12 +340,22 @@ export const DefaultAprilTagPipelineSettings: AprilTagPipelineSettings = {
   doMultiTarget: false,
   doSingleTargetAlways: false,
   lowCpuDecode: false,
-  tagFpsMax: 0
+  tagFpsMax: 0,
+  napa: false,
+  napaMinTagPx: 16,
+  napaMaxHamming: 1,
+  napaFarSearch: false,
+  napaFarMinTagPx: 16
 };
 
 export interface AprilTagCudaPipelineSettings extends PipelineSettings {
   pipelineType: PipelineType.AprilTagCuda;
   tagFpsMax: number; // photonvision-100: 0 = every frame
+  tagsOnCpu: boolean; // Spectrum: NAPA on the CPU instead of the GPU detector
+  napaMinTagPx: number;
+  napaMaxHamming: number;
+  napaFarSearch: boolean;
+  napaFarMinTagPx: number;
   hammingDist: number;
   numIterations: number;
   decimate: number;
@@ -366,6 +381,11 @@ export const DefaultAprilTagCudaPipelineSettings: AprilTagCudaPipelineSettings =
   cameraExposureRaw: 20,
   pipelineType: PipelineType.AprilTagCuda,
   tagFpsMax: 0,
+  tagsOnCpu: false,
+  napaMinTagPx: 16,
+  napaMaxHamming: 1,
+  napaFarSearch: false,
+  napaFarMinTagPx: 16,
 
   hammingDist: 0,
   numIterations: 40,

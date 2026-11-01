@@ -3,6 +3,7 @@ import { PipelineType, type AprilTagPipelineSettings, AprilTagFamily } from "@/t
 import PvSelect from "@/components/common/pv-select.vue";
 import PvSlider from "@/components/common/pv-slider.vue";
 import PvSwitch from "@/components/common/pv-switch.vue";
+import NapaSettings from "@/components/dashboard/tabs/NapaSettings.vue";
 import { computed } from "vue";
 import { useStateStore } from "@/stores/StateStore";
 import { useCameraSettingsStore } from "@/stores/settings/CameraSettingsStore";
@@ -108,6 +109,12 @@ const interactiveCols = computed(() =>
       @update:modelValue="
         (value) => useCameraSettingsStore().changeCurrentPipelineSetting({ lowCpuDecode: value }, false)
       "
+    />
+    <NapaSettings
+      flag="napa"
+      label="Detector: NAPA"
+      tooltip="NAPA (by Zachary Wilson) instead of AprilTag 3: ~7x less CPU than AprilTag 3 at decimate 2 and finds more tags. Decimate, blur, threads and refine edges are AprilTag 3's and don't apply. Off: AprilTag 3. Needs libspectrum-napa-apriltag"
+      :cols="interactiveCols"
     />
   </div>
 </template>
