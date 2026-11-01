@@ -123,6 +123,10 @@ const validNewPipelineTypes = computed(() => {
   if (useSettingsStore().general.supportedBackends.length > 0) {
     pipelineTypes.push({ name: "Object Detection", value: WebsocketPipelineType.ObjectDetection });
   }
+  // SpectrumJetson (photonvision-100): tags on every frame + TensorRT objects on some
+  if (useSettingsStore().general.supportedBackends.includes("TENSORRT")) {
+    pipelineTypes.push({ name: "AprilTag + Object", value: WebsocketPipelineType.AprilTagObject });
+  }
   return pipelineTypes;
 });
 // SpectrumJetson (photonvision-46): start from a copy of any camera's pipeline, and create it on
@@ -322,6 +326,10 @@ const pipelineTypesWrapper = computed<{ name: string; value: number }[]>(() => {
   if (useSettingsStore().general.supportedBackends.length > 0) {
     pipelineTypes.push({ name: "Object Detection", value: WebsocketPipelineType.ObjectDetection });
   }
+  // SpectrumJetson (photonvision-100): tags on every frame + TensorRT objects on some
+  if (useSettingsStore().general.supportedBackends.includes("TENSORRT")) {
+    pipelineTypes.push({ name: "AprilTag + Object", value: WebsocketPipelineType.AprilTagObject });
+  }
 
   if (useCameraSettingsStore().isDriverMode) {
     pipelineTypes.push({ name: "Driver Mode", value: WebsocketPipelineType.DriverMode });
@@ -379,6 +387,9 @@ useCameraSettingsStore().$subscribe((mutation, state) => {
       break;
     case PipelineType.AprilTagCuda:
       pipelineType.value = WebsocketPipelineType.AprilTagCuda;
+      break;
+    case PipelineType.AprilTagObject:
+      pipelineType.value = WebsocketPipelineType.AprilTagObject;
       break;
     case PipelineType.Aruco:
       pipelineType.value = WebsocketPipelineType.Aruco;

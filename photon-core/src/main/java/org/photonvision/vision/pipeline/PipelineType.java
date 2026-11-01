@@ -27,7 +27,8 @@ public enum PipelineType {
     AprilTag(2, AprilTagPipeline.class),
     Aruco(3, ArucoPipeline.class),
     ObjectDetection(4, ObjectDetectionPipeline.class),
-    AprilTagCuda(5, AprilTagCudaPipeline.class);
+    AprilTagCuda(5, AprilTagCudaPipeline.class),
+    AprilTagObject(6, AprilTagObjectPipeline.class); // SpectrumJetson (photonvision-100)
 
     public final int baseIndex;
     public final Class clazz;

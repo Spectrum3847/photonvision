@@ -724,6 +724,13 @@ public class RequestHandler {
                     family = NeuralNetworkModelManager.Family.RKNN;
                     break;
                 default:
+                    // SpectrumJetson (photonvision-100): ONNX models for TensorRT on the Jetson
+                    if (NeuralNetworkModelManager.getInstance()
+                            .getSupportedBackends()
+                            .contains(NeuralNetworkModelManager.Family.TENSORRT.toString())) {
+                        family = NeuralNetworkModelManager.Family.TENSORRT;
+                        break;
+                    }
                     ctx.status(400);
                     ctx.result("The current platform does not support object detection models");
                     logger.error("The current platform does not support object detection models");
@@ -771,7 +778,10 @@ public class RequestHandler {
             ModelProperties modelProperties =
                     new ModelProperties(modelPath, nickname, labels, width, height, family, version);
 
-            if (!testMode) {
+            // SpectrumJetson (photonvision-100): a TensorRT model isn't test-loaded here: building
+            // its engine takes minutes. The first pipeline that uses it builds it (and logs why if
+            // it can't).
+            if (!testMode && family != NeuralNetworkModelManager.Family.TENSORRT) {
                 ObjectDetector objDetector = null;
 
                 try {
@@ -779,6 +789,7 @@ public class RequestHandler {
                             switch (family) {
                                 case RUBIK -> new TFLiteModel(modelProperties, TFLiteSource.RUBIK).load();
                                 case RKNN -> new RknnModel(modelProperties).load();
+                                case TENSORRT -> null;
                             };
                 } catch (RuntimeException e) {
                     ctx.status(400);

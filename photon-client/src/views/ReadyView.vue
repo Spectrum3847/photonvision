@@ -83,6 +83,7 @@ const typeNames: Record<number, string> = {
   [PipelineType.Aruco]: "ArUco",
   [PipelineType.ObjectDetection]: "Object detection",
   [PipelineType.AprilTagCuda]: "AprilTag (GPU)",
+  [PipelineType.AprilTagObject]: "AprilTag + Object", // photonvision-100
   [PipelineType.DriverMode]: "Driver mode"
 };
 
@@ -106,7 +107,11 @@ const tiles = computed<Tile[]>(() =>
     const driverMode = index === -1;
     const format = c.validVideoFormats?.[c.pipelineSettings?.cameraVideoModeIndex];
     const type = c.pipelineSettings?.pipelineType;
-    const needs3d = type === PipelineType.AprilTag || type === PipelineType.AprilTagCuda || type === PipelineType.Aruco;
+    const needs3d =
+      type === PipelineType.AprilTag ||
+      type === PipelineType.AprilTagCuda ||
+      type === PipelineType.AprilTagObject ||
+      type === PipelineType.Aruco;
     const calibrated = needs3d
       ? (c.completeCalibrations ?? []).some((cal) => resolutionsAreEqual(cal.resolution, format?.resolution))
       : null;

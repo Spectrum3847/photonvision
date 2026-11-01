@@ -1035,6 +1035,9 @@ public class VisionModule implements AutoCloseable {
     public void setCameraNickname(String newName) {
         visionSource.getSettables().getConfiguration().nickname = newName;
         ntConsumer.updateCameraNickname(newName);
+        synchronized (objectsLock) {
+            if (objectsNtConsumer != null) objectsNtConsumer.updateCameraNickname(newName + "-objects");
+        }
         inputFrameSaver.updateCameraNickname(newName);
         outputFrameSaver.updateCameraNickname(newName);
 
@@ -1183,7 +1186,41 @@ public class VisionModule implements AutoCloseable {
         return config;
     }
 
+    // SpectrumJetson (photonvision-100): "<camera>-objects", an AprilTag + Object pipeline's
+    // object results (PhotonCamera("<camera>-objects") on the robot). Made on first use.
+    private NTDataPublisher objectsNtConsumer;
+    private final Object objectsLock = new Object();
+
+    private void consumeObjectResult(CVPipelineResult result) {
+        synchronized (objectsLock) {
+            consumeObjectResultLocked(result);
+        }
+    }
+
+    private void consumeObjectResultLocked(CVPipelineResult result) {
+        try {
+            if (objectsNtConsumer == null) {
+                objectsNtConsumer =
+                        new NTDataPublisher(
+                                visionSource.getSettables().getConfiguration().nickname + "-objects",
+                                pipelineManager::getRequestedIndex,
+                                i -> {}, // the pipeline is chosen on the camera's own table
+                                () -> false,
+                                b -> {},
+                                this::getFPSLimit,
+                                i -> {},
+                                this::getEnabled,
+                                b -> {});
+            }
+            objectsNtConsumer.accept(result);
+        } finally {
+            result.release();
+        }
+    }
+
     private void consumeResult(CVPipelineResult result) {
+        if (result.objectPipeline != null)
+            result.objectPipeline.setObjectSink(this::consumeObjectResult);
         if (result.tagContrast != null) {
             org.photonvision.vision.target.TagContrast.record(
                     visionSource.getSettables().getConfiguration().nickname, result.tagContrast);

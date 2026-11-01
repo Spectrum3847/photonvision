@@ -12,7 +12,8 @@ export enum PipelineType {
   AprilTag = 5,
   Aruco = 6,
   ObjectDetection = 7,
-  AprilTagCuda = 8
+  AprilTagCuda = 8,
+  AprilTagObject = 9 // SpectrumJetson (photonvision-100)
 }
 
 export enum AprilTagFamily {
@@ -308,6 +309,7 @@ export interface AprilTagPipelineSettings extends PipelineSettings {
   doMultiTarget: boolean;
   doSingleTargetAlways: boolean;
   lowCpuDecode: boolean;
+  tagFpsMax: number; // photonvision-100: 0 = every frame
 }
 export type ConfigurableAprilTagPipelineSettings = Partial<
   Omit<AprilTagPipelineSettings, "pipelineType" | "hammingDist" | "debug">
@@ -332,11 +334,13 @@ export const DefaultAprilTagPipelineSettings: AprilTagPipelineSettings = {
   tagFamily: AprilTagFamily.Family36h11,
   doMultiTarget: false,
   doSingleTargetAlways: false,
-  lowCpuDecode: false
+  lowCpuDecode: false,
+  tagFpsMax: 0
 };
 
 export interface AprilTagCudaPipelineSettings extends PipelineSettings {
   pipelineType: PipelineType.AprilTagCuda;
+  tagFpsMax: number; // photonvision-100: 0 = every frame
   hammingDist: number;
   numIterations: number;
   decimate: number;
@@ -361,6 +365,7 @@ export const DefaultAprilTagCudaPipelineSettings: AprilTagCudaPipelineSettings =
   outputShowMultipleTargets: true,
   cameraExposureRaw: 20,
   pipelineType: PipelineType.AprilTagCuda,
+  tagFpsMax: 0,
 
   hammingDist: 0,
   numIterations: 40,
@@ -424,6 +429,7 @@ export interface ObjectDetectionPipelineSettings extends PipelineSettings {
   nms: number;
   box_thresh: number;
   model: ObjectDetectionModelProperties;
+  objectFpsMax: number; // photonvision-100: 0 = every frame
 }
 
 export type ConfigurableObjectDetectionPipelineSettings = Partial<
@@ -441,7 +447,34 @@ export const DefaultObjectDetectionPipelineSettings: ObjectDetectionPipelineSett
   confidence: 0.9,
   nms: 0.45,
   box_thresh: 0.25,
-  model: {} as ObjectDetectionModelProperties
+  model: {} as ObjectDetectionModelProperties,
+  objectFpsMax: 30
+};
+
+// SpectrumJetson (photonvision-100): AprilTag (GPU) on every frame + a TensorRT object model on
+// some; the objects are published on the camera's "<camera>-objects" table.
+export interface AprilTagObjectPipelineSettings extends Omit<AprilTagCudaPipelineSettings, "pipelineType"> {
+  pipelineType: PipelineType.AprilTagObject;
+  confidence: number;
+  nms: number;
+  model: ObjectDetectionModelProperties;
+  objectFpsMax: number;
+  objectClasses: string;
+  objectMaxTargets: number;
+}
+export type ConfigurableAprilTagObjectPipelineSettings = Partial<
+  Omit<AprilTagObjectPipelineSettings, "pipelineType" | "hammingDist" | "debug">
+> &
+  ConfigurablePipelineSettings;
+export const DefaultAprilTagObjectPipelineSettings: AprilTagObjectPipelineSettings = {
+  ...DefaultAprilTagCudaPipelineSettings,
+  pipelineType: PipelineType.AprilTagObject,
+  confidence: 0.5,
+  nms: 0.45,
+  model: {} as ObjectDetectionModelProperties,
+  objectFpsMax: 15,
+  objectClasses: "",
+  objectMaxTargets: 20
 };
 
 export interface Calibration3dPipelineSettings extends PipelineSettings {
@@ -475,6 +508,7 @@ export type ActivePipelineSettings =
   | ArucoPipelineSettings
   | ObjectDetectionPipelineSettings
   | AprilTagCudaPipelineSettings
+  | AprilTagObjectPipelineSettings
   | Calibration3dPipelineSettings;
 
 export type ActiveConfigurablePipelineSettings =
@@ -484,4 +518,5 @@ export type ActiveConfigurablePipelineSettings =
   | ConfigurableArucoPipelineSettings
   | ConfigurableObjectDetectionPipelineSettings
   | ConfigurableAprilTagCudaPipelineSettings
+  | ConfigurableAprilTagObjectPipelineSettings
   | ConfigurableCalibration3dPipelineSettings;

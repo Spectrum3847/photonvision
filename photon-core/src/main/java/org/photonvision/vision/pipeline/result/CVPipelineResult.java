@@ -36,8 +36,13 @@ public class CVPipelineResult implements Releasable {
     public final Frame inputAndOutputFrame;
     public Optional<MultiTargetPNPResult> multiTagResult;
     public final List<String> objectDetectionClassNames;
+
     /** SpectrumJetson (photonvision-54): how the tags look this frame, when it was measured. */
     public org.photonvision.vision.target.TagContrast.Measurement tagContrast = null;
+
+    // SpectrumJetson (photonvision-100): set by an AprilTag + Object pipeline, so VisionModule can
+    // give it the sink for its "<camera>-objects" results.
+    public org.photonvision.vision.pipeline.AprilTagObjectPipeline objectPipeline = null;
 
     public CVPipelineResult(
             long sequenceID,

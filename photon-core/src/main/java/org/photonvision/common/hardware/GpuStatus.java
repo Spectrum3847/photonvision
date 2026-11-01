@@ -57,8 +57,10 @@ public final class GpuStatus {
             var s = m.getCurrentPipelineSettings();
             if (s == null) continue;
             String name = m.getCameraConfiguration().nickname;
-            if (s.pipelineType == PipelineType.AprilTagCuda) cuda.add(name);
-            else if (s.pipelineType == PipelineType.AprilTag) cpu.add(name);
+            if (s.pipelineType == PipelineType.AprilTagCuda
+                    || s.pipelineType == PipelineType.AprilTagObject) { // photonvision-100
+                cuda.add(name);
+            } else if (s.pipelineType == PipelineType.AprilTag) cpu.add(name);
         }
         var parts = new ArrayList<String>();
         if (detectorLoaded(loaded) && !cuda.isEmpty()) {

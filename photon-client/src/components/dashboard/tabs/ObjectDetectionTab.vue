@@ -78,6 +78,19 @@ const selectedModel = computed<string>({
     />
 
     <pv-slider
+      v-model="currentPipelineSettings.objectFpsMax"
+      class="pt-2"
+      :slider-cols="interactiveCols"
+      label="Object FPS max"
+      tooltip="Run the model on at most this many frames a second (0 = every frame); the frames in between are skipped before decoding. The model shares the GPU with the AprilTag cameras"
+      :min="0"
+      :max="122"
+      :step="1"
+      @update:modelValue="
+        (value) => useCameraSettingsStore().changeCurrentPipelineSetting({ objectFpsMax: value }, false)
+      "
+    />
+    <pv-slider
       v-model="currentPipelineSettings.confidence"
       class="pt-2"
       :slider-cols="interactiveCols"

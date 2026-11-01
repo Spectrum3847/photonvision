@@ -42,6 +42,7 @@ import org.photonvision.tflite.TFLiteJNI.TFLiteSource;
 import org.photonvision.vision.objects.Model;
 import org.photonvision.vision.objects.RknnModel;
 import org.photonvision.vision.objects.TFLiteModel;
+import org.photonvision.vision.objects.TensorRtModel;
 
 /**
  * Manages the loading of neural network models.
@@ -202,13 +203,18 @@ public class NeuralNetworkModelManager {
         switch (Platform.getCurrentPlatform()) {
             case LINUX_QCS6490 -> supportedBackends.add(Family.RUBIK);
             case LINUX_RK3588_64 -> supportedBackends.add(Family.RKNN);
-            default -> {
-                logger.warn(
-                        "No supported neural network backends found for this platform: "
-                                + Platform.getCurrentPlatform());
-                // No supported backends, so we won't load any models
-                return;
-            }
+            default -> {}
+        }
+        // SpectrumJetson (photonvision-100): TensorRT on the Jetson's GPU when libspectrumtrt.so is
+        // installed (TensorRT itself loads only when a model is first used).
+        if (org.photonvision.jni.TensorRtJNI.isInstalled()) {
+            supportedBackends.add(Family.TENSORRT);
+        }
+        if (supportedBackends.isEmpty()) {
+            logger.warn(
+                    "No supported neural network backends found for this platform: "
+                            + Platform.getCurrentPlatform());
+            // No supported backends, so we won't load any models
         }
     }
 
@@ -240,7 +246,8 @@ public class NeuralNetworkModelManager {
 
     public enum Family {
         RKNN(".rknn"),
-        RUBIK(".tflite");
+        RUBIK(".tflite"),
+        TENSORRT(".onnx"); // SpectrumJetson (photonvision-100): built into an engine on the Jetson
 
         private final String fileExtension;
 
@@ -321,6 +328,18 @@ public class NeuralNetworkModelManager {
         ModelProperties properties =
                 ConfigProvider.getInstance().getConfig().getNeuralNetworkProperties().getModel(path);
 
+        // SpectrumJetson (photonvision-100): an ONNX copied in by 12-install-yolo-model.sh carries
+        // its labels and input size in a sidecar <model>.json.
+        if (properties == null && path.toString().endsWith(Family.TENSORRT.extension())) {
+            properties = TensorRtModel.propertiesFromSidecar(path);
+            if (properties != null) {
+                ConfigProvider.getInstance()
+                        .getConfig()
+                        .getNeuralNetworkProperties()
+                        .addModelProperties(properties);
+            }
+        }
+
         if (properties == null) {
             logger.warn(
                     "Model properties are null. This could mean the config for model "
@@ -362,6 +381,9 @@ public class NeuralNetworkModelManager {
                 }
                 case RUBIK -> {
                     models.get(properties.family()).add(new TFLiteModel(properties, TFLiteSource.RUBIK));
+                }
+                case TENSORRT -> {
+                    models.get(properties.family()).add(new TensorRtModel(properties));
                 }
             }
             logger.info(

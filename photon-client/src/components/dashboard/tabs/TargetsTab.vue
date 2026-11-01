@@ -62,6 +62,7 @@ const resetCurrentBuffer = () => {
                 v-if="
                   currentPipelineSettings.pipelineType === PipelineType.AprilTag ||
                   currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda ||
+                  currentPipelineSettings.pipelineType === PipelineType.AprilTagObject ||
                   currentPipelineSettings.pipelineType === PipelineType.Aruco
                 "
                 class="text-center text-white"
@@ -94,6 +95,7 @@ const resetCurrentBuffer = () => {
                 v-if="
                   (currentPipelineSettings.pipelineType === PipelineType.AprilTag ||
                     currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda ||
+                    currentPipelineSettings.pipelineType === PipelineType.AprilTagObject ||
                     currentPipelineSettings.pipelineType === PipelineType.Aruco) &&
                   useCameraSettingsStore().currentPipelineSettings.solvePNPEnabled
                 "
@@ -112,6 +114,7 @@ const resetCurrentBuffer = () => {
                 v-if="
                   currentPipelineSettings.pipelineType === PipelineType.AprilTag ||
                   currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda ||
+                  currentPipelineSettings.pipelineType === PipelineType.AprilTagObject ||
                   currentPipelineSettings.pipelineType === PipelineType.Aruco
                 "
                 class="text-center"
@@ -145,6 +148,7 @@ const resetCurrentBuffer = () => {
                 v-if="
                   (currentPipelineSettings.pipelineType === PipelineType.AprilTag ||
                     currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda ||
+                    currentPipelineSettings.pipelineType === PipelineType.AprilTagObject ||
                     currentPipelineSettings.pipelineType === PipelineType.Aruco) &&
                   useCameraSettingsStore().currentPipelineSettings.solvePNPEnabled
                 "
@@ -162,6 +166,7 @@ const resetCurrentBuffer = () => {
       v-if="
         (currentPipelineSettings.pipelineType === PipelineType.AprilTag ||
           currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda ||
+          currentPipelineSettings.pipelineType === PipelineType.AprilTagObject ||
           currentPipelineSettings.pipelineType === PipelineType.Aruco) &&
         currentPipelineSettings.doMultiTarget &&
         useCameraSettingsStore().isCurrentVideoFormatCalibrated &&

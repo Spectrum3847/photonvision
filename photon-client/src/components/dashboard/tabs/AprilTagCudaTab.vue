@@ -24,13 +24,28 @@ const interactiveCols = computed(() =>
 </script>
 
 <template>
-  <div v-if="currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda">
+  <div
+    v-if="
+      currentPipelineSettings.pipelineType === PipelineType.AprilTagCuda ||
+      currentPipelineSettings.pipelineType === PipelineType.AprilTagObject
+    "
+  >
     <pv-select
       v-model="currentPipelineSettings.tagFamily"
       label="Target family"
       :items="['AprilTag 36h11 (6.5in)']"
       :select-cols="interactiveCols"
       @update:modelValue="(value) => useCameraSettingsStore().changeCurrentPipelineSetting({ tagFamily: value }, false)"
+    />
+    <pv-slider
+      v-model="currentPipelineSettings.tagFpsMax"
+      :slider-cols="interactiveCols"
+      label="Tag FPS max"
+      tooltip="Process at most this many frames a second (0 = every frame). The camera mode doesn't change; the frames in between are skipped before decoding, which frees GPU and CPU (e.g. 122 front, 60 sides). Idle mode's lower rate still applies"
+      :min="0"
+      :max="122"
+      :step="1"
+      @update:modelValue="(value) => useCameraSettingsStore().changeCurrentPipelineSetting({ tagFpsMax: value }, false)"
     />
     <pv-slider
       v-model="currentPipelineSettings.decisionMargin"

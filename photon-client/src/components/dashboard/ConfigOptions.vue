@@ -15,6 +15,7 @@ import TargetsTab from "@/components/dashboard/tabs/TargetsTab.vue";
 import PnPTab from "@/components/dashboard/tabs/PnPTab.vue";
 import Map3DTab from "@/components/dashboard/tabs/Map3DTab.vue";
 import MaskTab from "@/components/dashboard/tabs/MaskTab.vue";
+import ObjectsTab from "@/components/dashboard/tabs/ObjectsTab.vue"; // photonvision-100
 import { PipelineType } from "@/types/PipelineTypes";
 import { WebsocketPipelineType } from "@/types/WebsocketDataTypes";
 import { useDisplay, useTheme } from "vuetify";
@@ -34,6 +35,7 @@ const allTabs = Object.freeze({
   apriltagCudaTab: { tabName: "AprilCudaTag", component: AprilTagCudaTab },
   arucoTab: { tabName: "ArUco", component: ArucoTab },
   objectDetectionTab: { tabName: "Object Detection", component: ObjectDetectionTab },
+  objectsTab: { tabName: "Objects", component: ObjectsTab }, // photonvision-100
   outputTab: { tabName: "Output", component: OutputTab },
   maskTab: { tabName: "Mask", component: MaskTab }, // photonvision-40
   targetsTab: { tabName: "Targets", component: TargetsTab },
@@ -57,6 +59,7 @@ const getTabGroups = (): ConfigOption[][] => {
         allTabs.apriltagCudaTab,
         allTabs.arucoTab,
         allTabs.objectDetectionTab,
+        allTabs.objectsTab,
         allTabs.outputTab,
         allTabs.maskTab
       ],
@@ -72,6 +75,7 @@ const getTabGroups = (): ConfigOption[][] => {
         allTabs.apriltagCudaTab,
         allTabs.arucoTab,
         allTabs.objectDetectionTab,
+        allTabs.objectsTab,
         allTabs.outputTab,
         allTabs.maskTab
       ],
@@ -87,6 +91,7 @@ const getTabGroups = (): ConfigOption[][] => {
         allTabs.apriltagCudaTab,
         allTabs.arucoTab,
         allTabs.objectDetectionTab,
+        allTabs.objectsTab,
         allTabs.outputTab,
         allTabs.maskTab
       ],
@@ -102,7 +107,11 @@ const tabGroups = computed<ConfigOption[][]>(() => {
 
   const allow3d = useCameraSettingsStore().currentPipelineSettings.solvePNPEnabled;
   const isAprilTag = useCameraSettingsStore().currentWebsocketPipelineType === WebsocketPipelineType.AprilTag;
-  const isAprilTagCuda = useCameraSettingsStore().currentWebsocketPipelineType === WebsocketPipelineType.AprilTagCuda;
+  // photonvision-100: an AprilTag + Object pipeline is an AprilTagCuda one plus the Objects tab
+  const isAprilTagObject =
+    useCameraSettingsStore().currentWebsocketPipelineType === WebsocketPipelineType.AprilTagObject;
+  const isAprilTagCuda =
+    isAprilTagObject || useCameraSettingsStore().currentWebsocketPipelineType === WebsocketPipelineType.AprilTagCuda;
   const isAruco = useCameraSettingsStore().currentWebsocketPipelineType === WebsocketPipelineType.Aruco;
   const isObjectDetection =
     useCameraSettingsStore().currentWebsocketPipelineType === WebsocketPipelineType.ObjectDetection;
@@ -121,7 +130,8 @@ const tabGroups = computed<ConfigOption[][]>(() => {
           !(!isAprilTag && tabConfig.tabName === "AprilTag") && //Filter out apriltag unless we actually are doing AprilTags
           !(!isAprilTagCuda && tabConfig.tabName === "AprilCudaTag") && //Filter out apriltag unless we actually are doing AprilTags
           !(!isAruco && tabConfig.tabName === "ArUco") &&
-          !(!isObjectDetection && tabConfig.tabName === "Object Detection") && //Filter out aruco unless we actually are doing Aruco
+          !(!isObjectDetection && tabConfig.tabName === "Object Detection") &&
+          !(!isAprilTagObject && tabConfig.tabName === "Objects") && //Filter out aruco unless we actually are doing Aruco
           !(!isAprilTagCuda && !isObjectDetection && tabConfig.tabName === "Mask") // photonvision-40: pipelines with a mask
       )
     )
