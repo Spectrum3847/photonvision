@@ -294,6 +294,7 @@ public class VisionRunner implements AutoCloseable {
                 lastGrabNanos = System.nanoTime();
 
                 long start = System.nanoTime(); // photonvision-65: monotonic
+                LatencyTrace.begin();
                 long n0 = System.nanoTime();
                 changeSubscriber.processSettingChanges();
                 synchronized (runnableList) {
@@ -354,6 +355,7 @@ public class VisionRunner implements AutoCloseable {
                             pipelineResultConsumer.accept(pipelineResult);
                             long n4 = System.nanoTime();
                             long captured = pipelineResult.getImageCaptureTimestampNanos();
+                            LatencyTrace.end(frameSupplier.getName(), captured, n2, n3, n4);
                             if (captured > 0 && latCount < latNs.length) {
                                 latNs[latCount++] =
                                         org.wpilib.networktables.NetworkTablesJNI.now() - captured;

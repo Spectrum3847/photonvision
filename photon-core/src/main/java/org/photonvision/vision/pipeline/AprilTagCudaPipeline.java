@@ -149,6 +149,8 @@ public class AprilTagCudaPipeline
         }
 
         // Spectrum: "Tags on CPU (NAPA)": NAPA instead of the GPU detector, leaving the GPU to objects.
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace.DET0);
         boolean useNapa = settings.tagsOnCpu && NapaDetector.usable();
         List<AprilTagDetection> detections;
         if (useNapa) {
@@ -168,6 +170,8 @@ public class AprilTagCudaPipeline
             sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
             detections = tagDetectionPipeResult.output;
         }
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace.DET1);
         List<AprilTagDetection> usedDetections = new ArrayList<>();
         List<TrackedTarget> targetList = new ArrayList<>();
 
@@ -289,6 +293,8 @@ public class AprilTagCudaPipeline
             targetList = targetList.subList(0, Packet.MAX_ARRAY_LEN);
         }
 
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace.POSE1);
         var fpsResult = calculateFPSPipe.run(null);
         var fps = fpsResult.output;
 

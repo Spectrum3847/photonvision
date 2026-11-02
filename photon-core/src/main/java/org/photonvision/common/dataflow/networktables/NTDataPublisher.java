@@ -314,5 +314,7 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
 
         // TODO...nt4... is this needed?
         rootTable.getInstance().flush();
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace.NT1);
     }
 }

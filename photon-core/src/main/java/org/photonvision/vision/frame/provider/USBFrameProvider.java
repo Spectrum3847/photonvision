@@ -823,6 +823,7 @@ public class USBFrameProvider extends CpuImageProcessor {
                 return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
             }
             lastTime = captureTimeNs;
+            long grabRetNs = org.photonvision.vision.processes.LatencyTrace.ON ? System.nanoTime() : 0;
             boolean half = halfGray;
             Mat gray = null;
             int rc = 0;
@@ -877,8 +878,13 @@ public class USBFrameProvider extends CpuImageProcessor {
                                 + (half || cpuGray ? ", CPU" : "")
                                 + ")");
             }
+            long publishedNs = toMidExposureNs(captureTimeNs);
+            if (org.photonvision.vision.processes.LatencyTrace.ON) {
+                org.photonvision.vision.processes.LatencyTrace.decoded(
+                        publishedNs, captureTimeNs, grabRetNs, System.nanoTime());
+            }
             return new CapturedFrame(
-                    new CVMat(gray), settables.getFrameStaticProperties(), toMidExposureNs(captureTimeNs));
+                    new CVMat(gray), settables.getFrameStaticProperties(), publishedNs);
         } finally {
             frame.close();
         }
