@@ -30,8 +30,11 @@ import org.photonvision.vision.opencv.ImageRotationMode;
     @Json.SubType(type = AprilTagPipelineSettings.class),
     @Json.SubType(type = ArucoPipelineSettings.class),
     @Json.SubType(type = ObjectDetectionPipelineSettings.class),
-    @Json.SubType(type = AprilTagCudaPipelineSettings.class),
-    @Json.SubType(type = AprilTagObjectPipelineSettings.class) // photonvision-100
+    // SpectrumJetson: a subclass must come before its superclass. avaje writes with an instanceof
+    // chain in this order, so AprilTagObject listed after AprilTagCuda was saved with
+    // "type": "AprilTagCudaPipelineSettings" and came back as the wrong class (ClassCastException).
+    @Json.SubType(type = AprilTagObjectPipelineSettings.class), // photonvision-100
+    @Json.SubType(type = AprilTagCudaPipelineSettings.class)
 })
 public class CVPipelineSettings implements Cloneable {
     public int pipelineIndex = 0;

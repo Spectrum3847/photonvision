@@ -43,6 +43,7 @@ public class PipelineManager implements AutoCloseable {
 
     /** SpectrumJetson: true if this camera had no pipelines and got the team default one. */
     boolean createdDefaultPipeline = false;
+
     protected final Calibrate3dPipeline calibration3dPipeline;
     protected final FocusPipeline focusPipeline = new FocusPipeline();
     protected final DriverModePipeline driverModePipeline = new DriverModePipeline();
@@ -68,14 +69,14 @@ public class PipelineManager implements AutoCloseable {
             DriverModePipelineSettings driverSettings,
             List<CVPipelineSettings> userPipelines,
             int defaultIndex) {
-        this.userPipelineSettings = new ArrayList<>(userPipelines);
+        this.userPipelineSettings = repairLoadedPipelines(userPipelines);
         // This is to respect the default res idx for vendor cameras
 
         this.driverModePipeline.setSettings(driverSettings);
 
         // SpectrumJetson: a new camera starts with the team's pipeline (AprilTagCuda on the
         // Jetson); VisionModule then applies TeamCameraDefaults, which need the camera's modes.
-        if (userPipelines.isEmpty()) {
+        if (userPipelineSettings.isEmpty()) {
             addPipeline(TeamCameraDefaults.defaultPipelineType());
             createdDefaultPipeline = true;
         }
@@ -353,7 +354,7 @@ public class PipelineManager implements AutoCloseable {
         return added;
     }
 
-    private CVPipelineSettings createSettingsForType(PipelineType type, String nickname) {
+    private static CVPipelineSettings createSettingsForType(PipelineType type, String nickname) {
         CVPipelineSettings settings =
                 switch (type) {
                     case Reflective -> new ReflectivePipelineSettings();
@@ -458,6 +459,73 @@ public class PipelineManager implements AutoCloseable {
                 }
             }
         }
+    }
+
+    /**
+     * SpectrumJetson: make every loaded pipeline's settings class match its pipelineType, so a
+     * mismatched or unknown saved shape logs and falls back instead of a ClassCastException in
+     * recreateUserPipeline crash-looping the service. A mismatch becomes default settings of the
+     * saved pipelineType with every field the two classes share copied over; a pipeline with no
+     * usable type is dropped.
+     */
+    static List<CVPipelineSettings> repairLoadedPipelines(List<CVPipelineSettings> loaded) {
+        var out = new ArrayList<CVPipelineSettings>();
+        if (loaded == null) return out;
+        for (var s : loaded) {
+            if (s == null) {
+                logger.error("Dropping a null saved pipeline");
+                continue;
+            }
+            var type = s.pipelineType;
+            CVPipelineSettings fresh = null;
+            try {
+                fresh = type == null ? null : createSettingsForType(type, s.pipelineNickname);
+            } catch (Exception e) {
+                logger.error("Couldn't create settings for saved pipeline type " + type, e);
+            }
+            if (fresh == null) {
+                logger.error(
+                        "Dropping saved pipeline '"
+                                + s.pipelineNickname
+                                + "': unusable pipeline type "
+                                + type
+                                + " ("
+                                + s.getClass().getSimpleName()
+                                + ")");
+                continue;
+            }
+            if (fresh.getClass().equals(s.getClass())) {
+                out.add(s);
+                continue;
+            }
+            logger.error(
+                    "Saved pipeline '"
+                            + s.pipelineNickname
+                            + "' is "
+                            + type
+                            + " but was loaded as "
+                            + s.getClass().getSimpleName()
+                            + "; recreating it as "
+                            + fresh.getClass().getSimpleName()
+                            + " with the shared settings kept");
+            for (Class<?> c = s.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+                if (!c.isAssignableFrom(fresh.getClass())) continue;
+                for (Field f : c.getDeclaredFields()) {
+                    int m = f.getModifiers();
+                    if (java.lang.reflect.Modifier.isStatic(m)
+                            || java.lang.reflect.Modifier.isFinal(m)
+                            || f.getName().equals("pipelineType")) continue;
+                    try {
+                        f.setAccessible(true);
+                        f.set(fresh, f.get(s));
+                    } catch (Exception e) {
+                        logger.warn("Couldn't copy " + f.getName() + ": " + e);
+                    }
+                }
+            }
+            out.add(fresh);
+        }
+        return out;
     }
 
     private static List<Field> getAllFields(Class base) {
