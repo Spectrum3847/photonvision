@@ -168,6 +168,7 @@ public final class CameraThreads {
         var cores = new ArrayList<Integer>();
         var list = parse(setting("SPECTRUM_PIN_CAMERA_CORES", hw().pinCameraCores, "2-5"));
         for (int c = list.nextSetBit(0); c >= 0; c = list.nextSetBit(c + 1)) if (c < n) cores.add(c);
+        migrate();
         sharedCore = intSetting("SPECTRUM_PIN_SHARED_CORE", hw().pinSharedCore, -1);
         fifo = Math.max(0, Math.min(49, intSetting("SPECTRUM_PIN_FIFO", hw().pinCameraFifo, 0)));
         if (cores.isEmpty() || sharedCore < -1 || sharedCore >= n || processCpus == null) {
@@ -202,6 +203,27 @@ public final class CameraThreads {
         Boolean set = hw().pinCameraThreads;
         if (set != null) return set;
         return TeamCameraDefaults.isJetson();
+    }
+
+    /**
+     * The first photonvision-102 build defaulted pinSharedCore to 1 and saved it into settings DBs;
+     * the default became -1 (core 1 cost p99), but those DBs kept 1. Nothing in the UI sets it, so a
+     * 1 saved before pinSettingsVersion existed is that old default: reset it to -1, once.
+     */
+    private static void migrate() {
+        var hw = hw();
+        if (hw.pinSettingsVersion >= 1) return;
+        try {
+            ConfigProvider.getInstance().getConfig(); // throws if there's no config (tests)
+        } catch (Exception e) {
+            return;
+        }
+        if (hw.pinSharedCore == 1) {
+            hw.pinSharedCore = -1;
+            logger.info("Pin camera threads: reset the saved pinSharedCore 1 (the first build's default) to -1");
+        }
+        hw.pinSettingsVersion = 1;
+        ConfigProvider.getInstance().requestSave();
     }
 
     private static org.photonvision.common.configuration.HardwareSettings hw() {
