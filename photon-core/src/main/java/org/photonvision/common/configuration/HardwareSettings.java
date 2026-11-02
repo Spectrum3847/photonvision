@@ -23,6 +23,14 @@ import io.avaje.jsonb.Json;
 public class HardwareSettings {
     public int ledBrightnessPercentage = 100;
 
+    // SpectrumJetson (photonvision-102, CameraThreads): pin camera threads. null = auto (on on a
+    // Jetson); SPECTRUM_PIN_* environment variables override these.
+    public Boolean pinCameraThreads = null;
+    public String pinCameraCores = "2-5";
+    public int pinSharedCore = -1; // -1: shared threads unpinned (core 1 cost p99, 2026-11-02)
+    public int pinCameraFifo = 0;
+    public boolean pinOtherThreads = false;
+
     @Override
     public int hashCode() {
         final int prime = 31;

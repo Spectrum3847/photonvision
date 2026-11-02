@@ -191,7 +191,14 @@ public class AprilTagObjectPipeline extends AprilTagCudaPipeline {
                 fallbackExecutor =
                         Executors.newSingleThreadExecutor(
                                 r -> {
-                                    var t = new Thread(r, "AprilTag+Object detect");
+                                    var t =
+                                            new Thread(
+                                                    () -> {
+                                                        // photonvision-102
+                                                        org.photonvision.vision.processes.CameraThreads.shared();
+                                                        r.run();
+                                                    },
+                                                    "AprilTag+Object detect");
                                     t.setDaemon(true);
                                     return t;
                                 });

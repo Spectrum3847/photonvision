@@ -152,6 +152,7 @@ public final class TensorRtService {
     }
 
     private void run() {
+        org.photonvision.vision.processes.CameraThreads.shared(); // photonvision-102
         // Beside the models folder, not in it: model exports zip that folder, and engines are big.
         File cache =
                 new File(ConfigProvider.getInstance().getModelsDirectory().getParentFile(), "trt-cache");

@@ -51,7 +51,7 @@ import org.photonvision.common.logging.Logger;
  * <p>photonvision-99, deep idle: with no robot connected at all, no web UI client and no stream
  * viewer for SPECTRUM_DEEP_IDLE_SECONDS (default 300; 0 = off), every camera drops to
  * SPECTRUM_DEEP_IDLE_FPS (default 5) and {@code spectrum-clocks deep} lowers the clocks further
- * (CPU/GPU caps, EMC unlocked, CPU idle states on, cores 2-4 offline). Any robot connection, UI
+ * (CPU/GPU caps, EMC unlocked, CPU idle states on; all cores stay online). Any robot connection, UI
  * client or viewer ends it: the frame rate within 5 ms, the clocks back to the 20 s throttle (or
  * full, if enabled) in milliseconds. {@code spectrum-clocks mode shallow} keeps only the 20 s
  * throttle; mode full keeps everything at full.

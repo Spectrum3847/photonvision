@@ -1126,6 +1126,7 @@ public class USBFrameProvider extends CpuImageProcessor {
     // Runs while the camera loop keeps taking frames on the direct-gray path; stops itself 1 s after
     // the loop stops asking (another pipeline type, a disabled camera, release()).
     private void decodeLoop() {
+        org.photonvision.vision.processes.CameraThreads.shared(); // photonvision-102
         if (!loggedAsync) {
             loggedAsync = true;
             logger.info("Decoding in its own thread, overlapped with the pipeline (SPECTRUM_ASYNC_DECODE)");

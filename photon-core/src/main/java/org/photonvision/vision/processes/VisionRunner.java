@@ -241,8 +241,11 @@ public class VisionRunner implements AutoCloseable {
         long[] s = java.util.Arrays.copyOf(latNs, latCount);
         java.util.Arrays.sort(s);
         return String.format(
-                "median %.2f p95 %.2f max %.2f ms",
-                s[s.length / 2] / 1e6, s[(int) (s.length * 0.95)] / 1e6, s[s.length - 1] / 1e6);
+                "median %.2f p95 %.2f max %.2f ms, p99 %.2f ms", // p99 last: parsers match up to "ms"
+                s[s.length / 2] / 1e6,
+                s[(int) (s.length * 0.95)] / 1e6,
+                s[s.length - 1] / 1e6,
+                s[(int) (s.length * 0.99)] / 1e6);
     }
 
     private void update() {
@@ -305,6 +308,7 @@ public class VisionRunner implements AutoCloseable {
                 }
 
                 var pipeline = pipelineSupplier.get();
+                CameraThreads.visionRunner(frameSupplier.getName(), pipeline); // photonvision-102
 
                 // Tell our camera implementation here what kind of pre-processing we need it to
                 // be doing
