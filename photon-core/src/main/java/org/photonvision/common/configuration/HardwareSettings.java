@@ -33,6 +33,10 @@ public class HardwareSettings {
     // 0: written before 2026-11-02, when the first photonvision-102 build saved pinSharedCore 1 as
     // its default; CameraThreads resets a 1 found then to -1 once and sets this to 1.
     public int pinSettingsVersion = 0;
+    // Spectrum: streaming NAPA (NapaDetector): NAPA runs band by band while the frame is decoded
+    // as it arrives (needs the streaming decoder); identical results, sooner.
+    // SPECTRUM_NAPA_STREAM=0|1 overrides it.
+    public boolean napaStream = false;
 
     @Override
     public int hashCode() {

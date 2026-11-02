@@ -74,6 +74,26 @@ public final class NapaDetectorJNI {
     public static native AprilTagDetection[] detect(
             long handle, long dataAddr, int width, int height, int step);
 
+    /** True when libspectrum-stream.so (the streaming decoder) could be opened. */
+    public static native boolean streamAvailable();
+
+    /**
+     * Streaming decode for a machine without the CUDA library: 0 when the camera's frame was decoded
+     * while it arrived (into the gray Mat), 1 when it wasn't (decode it yourself), -1 not MJPEG or no
+     * stream library.
+     */
+    public static native int streamDecodeGray(
+            long rawFramePtr, long dataAddr, int width, int height, int step);
+
+    /**
+     * As {@link #detect}, for a frame the streaming decoder just wrote into dataAddr on this thread:
+     * returns the result NAPA computed band by band while the frame arrived (identical to detect()),
+     * or detects the whole frame if it wasn't streamed. wantAfterNanos: when this camera next takes a
+     * frame (System.nanoTime; 0 = every frame).
+     */
+    public static native AprilTagDetection[] detectStreamed(
+            long handle, long dataAddr, int width, int height, int step, long wantAfterNanos);
+
     /** frames, base ms, crops, crop ms, sweeps, sweep ms, far tags (totals since create). */
     public static native double[] stats(long handle);
 }

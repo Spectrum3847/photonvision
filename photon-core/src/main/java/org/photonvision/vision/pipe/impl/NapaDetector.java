@@ -81,12 +81,52 @@ public class NapaDetector implements Releasable {
         }
     }
 
+    private static Boolean streamOn = null;
+
+    /**
+     * Streaming NAPA (SpectrumJetson tests/napa-stream): NAPA runs on each camera's streaming-decoder
+     * thread band by band as the frame arrives, so its result is ready ~0.1 ms after the last byte
+     * instead of ~1-2 ms after. Identical results. HardwareSettings napaStream, or
+     * SPECTRUM_NAPA_STREAM=0|1; off by default. Needs libspectrum-stream.so and the streaming decoder
+     * (SPECTRUM_JPEG_DECODER=stream on the Jetson); frames that weren't streamed are detected whole.
+     */
+    public static boolean streamEnabled() {
+        if (streamOn == null) {
+            String env = System.getenv("SPECTRUM_NAPA_STREAM");
+            boolean on;
+            if (env != null && !env.isBlank()) on = env.trim().equals("1") || env.trim().equals("true");
+            else {
+                try {
+                    on =
+                            org.photonvision.common.configuration.ConfigProvider.getInstance()
+                                    .getConfig()
+                                    .getHardwareSettings()
+                                    .napaStream;
+                } catch (Exception e) {
+                    on = false;
+                }
+            }
+            on = on && NapaDetectorJNI.isAvailable() && NapaDetectorJNI.streamAvailable();
+            if (on) logger.info("Streaming NAPA on: tags detected band by band while each frame arrives");
+            streamOn = on;
+        }
+        return streamOn;
+    }
+
     public List<AprilTagDetection> detect(Mat gray) {
         if (handle == 0 || gray == null || gray.empty() || gray.type() != CvType.CV_8UC1)
             return List.of();
         var ret =
-                NapaDetectorJNI.detect(
-                        handle, gray.dataAddr(), gray.cols(), gray.rows(), (int) gray.step1());
+                streamEnabled()
+                        ? NapaDetectorJNI.detectStreamed(
+                                handle,
+                                gray.dataAddr(),
+                                gray.cols(),
+                                gray.rows(),
+                                (int) gray.step1(),
+                                org.photonvision.vision.processes.FrameRateCap.nextWantedNanos())
+                        : NapaDetectorJNI.detect(
+                                handle, gray.dataAddr(), gray.cols(), gray.rows(), (int) gray.step1());
         return ret == null ? List.of() : List.of(ret);
     }
 

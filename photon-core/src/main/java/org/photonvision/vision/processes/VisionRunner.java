@@ -292,6 +292,10 @@ public class VisionRunner implements AutoCloseable {
                     if (!frameRateCap.await(capNanos)) return;
                 } else if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;
                 lastGrabNanos = System.nanoTime();
+                FrameRateCap.setNextWanted( // Spectrum: streaming NAPA skips frames we won't take
+                        capNanos > 0
+                                ? frameRateCap.nextDueNanos()
+                                : IdleMode.active() ? lastGrabNanos + IdleMode.periodNanos() : 0);
 
                 long start = System.nanoTime(); // photonvision-65: monotonic
                 LatencyTrace.begin();

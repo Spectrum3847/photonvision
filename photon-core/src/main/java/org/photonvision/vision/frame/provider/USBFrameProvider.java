@@ -842,7 +842,19 @@ public class USBFrameProvider extends CpuImageProcessor {
             }
             // Spectrum (photonvision-98): the CPU decoder, for a machine without the detector
             // library (the SystemCore) and for the low-CPU half-resolution decode.
-            if (half || cpuGray) {
+            // Spectrum: streaming NAPA without the CUDA library (SystemCore): the streaming decoder
+            // (libspectrum-stream.so via the NAPA library) decoded the frame while it arrived.
+            if (!half && cpuGray && org.photonvision.vision.pipe.impl.NapaDetector.streamEnabled()) {
+                Mat s = new Mat(height, width, CvType.CV_8UC1);
+                if (org.photonvision.jni.NapaDetectorJNI.streamDecodeGray(
+                                frame.getNativeObj(), s.dataAddr(), width, height, (int) s.step1())
+                        == 0) {
+                    gray = s;
+                } else {
+                    s.release();
+                }
+            }
+            if ((half || cpuGray) && gray == null) {
                 Mat[] out = new Mat[1];
                 rc = CpuMjpegDecode.decode(frame.getNativeObj(), width, height, half, out);
                 gray = out[0];

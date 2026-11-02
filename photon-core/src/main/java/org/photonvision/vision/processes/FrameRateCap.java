@@ -33,8 +33,26 @@ import org.photonvision.vision.pipeline.ObjectDetectionPipelineSettings;
  * fps cap into ~48. Idle mode's and deep idle's periods still apply; the longer period wins. With
  * no cap set, VisionRunner uses IdleMode exactly as before.
  */
-final class FrameRateCap {
+public final class FrameRateCap {
     private long nextDueNanos = 0;
+
+    // Spectrum (streaming NAPA): when this camera thread next takes a frame (System.nanoTime), from
+    // its cap or idle mode; 0 = every frame. The streaming decoder then doesn't run NAPA on frames
+    // that will be skipped.
+    private static final ThreadLocal<long[]> nextWanted = ThreadLocal.withInitial(() -> new long[1]);
+
+    /** When this camera thread next takes a frame (System.nanoTime), or 0 for every frame. */
+    public static long nextWantedNanos() {
+        return nextWanted.get()[0];
+    }
+
+    static void setNextWanted(long nanos) {
+        nextWanted.get()[0] = nanos;
+    }
+
+    long nextDueNanos() {
+        return nextDueNanos;
+    }
 
     /** The pipeline's cap as a period in ns; 0 = none. */
     static long capPeriodNanos(CVPipeline<?, ?> pipeline) {
