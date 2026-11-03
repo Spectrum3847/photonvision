@@ -103,7 +103,7 @@ public class AgentRequestHandler {
         var typeParam = ctx.queryParam("type");
         if (typeParam != null) {
             var type = parsePipelineType(typeParam);
-            var cls = type == null ? null : settingsClassFor(type);
+            Class<? extends CVPipelineSettings> cls = type == null ? null : settingsClassFor(type);
             if (cls == null) {
                 error(ctx, 400, "\"type\" must be one of " + pipelineTypeNames());
                 return;
