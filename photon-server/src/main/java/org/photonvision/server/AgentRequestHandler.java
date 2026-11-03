@@ -34,7 +34,14 @@ import org.photonvision.common.dataflow.websocket.UIDataPublisher;
 import org.photonvision.common.dataflow.websocket.UIPhotonConfiguration;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
+import org.photonvision.vision.pipeline.AprilTagPipelineSettings;
+import org.photonvision.vision.pipeline.ArucoPipelineSettings;
+import org.photonvision.vision.pipeline.CVPipelineSettings;
+import org.photonvision.vision.pipeline.ColoredShapePipelineSettings;
+import org.photonvision.vision.pipeline.DriverModePipelineSettings;
+import org.photonvision.vision.pipeline.ObjectDetectionPipelineSettings;
 import org.photonvision.vision.pipeline.PipelineType;
+import org.photonvision.vision.pipeline.ReflectivePipelineSettings;
 import org.photonvision.vision.processes.VisionModule;
 import org.photonvision.vision.processes.VisionSourceManager;
 import org.wpilib.util.Pair;
@@ -54,6 +61,7 @@ public class AgentRequestHandler {
             GET  /api/agent                      this help
             GET  /api/agent/state                full program + camera config, every pipeline's settings
             GET  /api/agent/schema?camera=<c>    fields of the camera's ACTIVE pipeline: name, type, value, enum options
+            GET  /api/agent/schema?type=<t>      same, for a pipeline type's defaults (no camera needed)
             GET  /api/agent/results[?camera=<c>] latest targets/fps/latency per camera (~10Hz snapshot)
             GET  /api/agent/logs?lines=200&contains=<text>   recent log lines (text/plain)
             POST /api/agent/pipeline/settings    {"camera":c, "settings":{"key":value,...}}  edits ACTIVE pipeline
@@ -92,12 +100,35 @@ public class AgentRequestHandler {
     }
 
     public static void onSchema(Context ctx) {
+        var typeParam = ctx.queryParam("type");
+        if (typeParam != null) {
+            var type = parsePipelineType(typeParam);
+            var cls = type == null ? null : settingsClassFor(type);
+            if (cls == null) {
+                error(ctx, 400, "\"type\" must be one of " + pipelineTypeNames());
+                return;
+            }
+            try {
+                var defaults = cls.getDeclaredConstructor().newInstance();
+                var out = describeSettings(defaults);
+                out.put("note", "values shown are defaults for a new " + type.name() + " pipeline");
+                json(ctx, out);
+            } catch (ReflectiveOperationException e) {
+                error(ctx, 500, "Could not instantiate " + cls.getSimpleName() + ": " + e);
+            }
+            return;
+        }
         var module = findModule(ctx.queryParam("camera"));
         if (module.isEmpty()) {
             badCamera(ctx, ctx.queryParam("camera"));
             return;
         }
-        var settings = module.get().getCurrentPipelineSettings();
+        var out = describeSettings(module.get().getCurrentPipelineSettings());
+        out.put("camera", module.get().uniqueName());
+        json(ctx, out);
+    }
+
+    private static LinkedHashMap<String, Object> describeSettings(Object settings) {
         var fields = new ArrayList<Map<String, Object>>();
         for (var f : settings.getClass().getFields()) {
             if (Modifier.isStatic(f.getModifiers())) continue;
@@ -114,15 +145,31 @@ public class AgentRequestHandler {
                 entry.put(
                         "options",
                         Arrays.stream(f.getType().getEnumConstants()).map(Object::toString).toList());
+            } else if (f.getType().getSimpleName().endsWith("Couple")) {
+                entry.put("format", "[low, high]");
+            }
+            if (f.getName().startsWith("camera")) {
+                entry.put("note", "also applied to the physical camera");
             }
             fields.add(entry);
         }
         var out = new LinkedHashMap<String, Object>();
-        out.put("camera", module.get().uniqueName());
         out.put("settingsClass", settings.getClass().getSimpleName());
-        out.put("pipelineIndex", settings.pipelineIndex);
+        if (settings instanceof CVPipelineSettings cv) out.put("pipelineIndex", cv.pipelineIndex);
         out.put("fields", fields);
-        json(ctx, out);
+        return out;
+    }
+
+    private static Class<? extends CVPipelineSettings> settingsClassFor(PipelineType type) {
+        return switch (type) {
+            case Reflective -> ReflectivePipelineSettings.class;
+            case ColoredShape -> ColoredShapePipelineSettings.class;
+            case AprilTag -> AprilTagPipelineSettings.class;
+            case Aruco -> ArucoPipelineSettings.class;
+            case ObjectDetection -> ObjectDetectionPipelineSettings.class;
+            case DriverMode -> DriverModePipelineSettings.class;
+            default -> null;
+        };
     }
 
     public static void onResults(Context ctx) {

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "photonvision": {
+      "command": "python3",
+      "args": ["scripts/photonvision-mcp/server.py"],
+      "env": { "PHOTONVISION_URL": "http://photonvision.local:5800" }
+    }
+  }
+}
