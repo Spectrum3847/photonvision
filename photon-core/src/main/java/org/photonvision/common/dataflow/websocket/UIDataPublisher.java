@@ -34,6 +34,14 @@ import org.photonvision.vision.pipeline.result.FocusPipelineResult;
 public class UIDataPublisher implements CVPipelineResultConsumer {
     private static final Logger logger = new Logger(UIDataPublisher.class, LogGroup.VisionModule);
 
+    /** Latest result snapshot per camera unique name, for the agent HTTP API. */
+    private static final Map<String, Map<String, Object>> latestResults =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static Map<String, Map<String, Object>> getLatestResults() {
+        return new HashMap<>(latestResults);
+    }
+
     private final String uniqueName;
     private long lastUIResultUpdateTime = 0;
 
@@ -77,12 +85,16 @@ public class UIDataPublisher implements CVPipelineResultConsumer {
             dataMap.put("multitagResult", multitagData);
         }
 
-        Map<String, Map<String, Object>> uiMap = new HashMap<>();
-        uiMap.put(uniqueName, dataMap);
-
         if (result instanceof FocusPipelineResult focusResult) {
             dataMap.put("focus", focusResult.focus);
         }
+
+        var agentCopy = new HashMap<>(dataMap);
+        agentCopy.put("timestampMillis", now);
+        latestResults.put(uniqueName, agentCopy);
+
+        Map<String, Map<String, Object>> uiMap = new HashMap<>();
+        uiMap.put(uniqueName, dataMap);
 
         DataChangeService.getInstance()
                 .publishEvent(OutgoingUIEvent.wrappedOf("updatePipelineResult", uiMap));

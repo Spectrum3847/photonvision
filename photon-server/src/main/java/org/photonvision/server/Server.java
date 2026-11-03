@@ -162,6 +162,22 @@ public class Server {
         app.post("/api/objectdetection/rename", RequestHandler::onRenameObjectDetectionModelRequest);
         app.post("/api/objectdetection/nuke", RequestHandler::onNukeObjectDetectionModelsRequest);
 
+        // Agent / scripting API (plain JSON over HTTP, see AgentRequestHandler)
+        app.get("/api/agent", AgentRequestHandler::onHelp);
+        app.get("/api/agent/state", AgentRequestHandler::onState);
+        app.get("/api/agent/schema", AgentRequestHandler::onSchema);
+        app.get("/api/agent/results", AgentRequestHandler::onResults);
+        app.get("/api/agent/logs", AgentRequestHandler::onLogs);
+        app.post("/api/agent/pipeline/settings", AgentRequestHandler::onPipelineSettings);
+        app.post("/api/agent/pipeline/select", AgentRequestHandler::onPipelineSelect);
+        app.post("/api/agent/pipeline/add", AgentRequestHandler::onPipelineAdd);
+        app.post("/api/agent/pipeline/duplicate", AgentRequestHandler::onPipelineDuplicate);
+        app.post("/api/agent/pipeline/delete", AgentRequestHandler::onPipelineDelete);
+        app.post("/api/agent/pipeline/rename", AgentRequestHandler::onPipelineRename);
+        app.post("/api/agent/pipeline/type", AgentRequestHandler::onPipelineType);
+        app.post("/api/agent/drivermode", AgentRequestHandler::onDriverMode);
+        app.post("/api/agent/snapshot", AgentRequestHandler::onSnapshot);
+
         /* Testing API Events */
 
         app.post("/api/test/resetBackend", TestRequestHandler::handleResetRequest);

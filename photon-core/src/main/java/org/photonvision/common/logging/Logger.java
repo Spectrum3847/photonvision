@@ -75,6 +75,11 @@ public class Logger {
     private static final List<Pair<String, LogLevel>> uiBacklog = new ArrayList<>();
     private static boolean connected = false;
 
+    /** Ring buffer of recent plain-text log lines, exposed over HTTP for agents/tools. */
+    public static final int RECENT_LOG_CAPACITY = 2000;
+
+    private static final ArrayDeque<String> recentLogs = new ArrayDeque<>(RECENT_LOG_CAPACITY);
+
     private final String className;
     private final LogGroup group;
 
@@ -182,11 +187,31 @@ public class Logger {
             var formattedMessage = format(message, level, group, clazz, shouldColor);
             a.log(formattedMessage, level);
         }
+        synchronized (recentLogs) {
+            if (recentLogs.size() >= RECENT_LOG_CAPACITY) recentLogs.removeFirst();
+            recentLogs.addLast(format(message, level, group, clazz, false));
+        }
         if (!connected) {
             synchronized (uiBacklog) {
                 uiBacklog.add(Pair.of(format(message, level, group, clazz, false), level));
             }
         }
+    }
+
+    /**
+     * Returns up to the last {@code count} log lines (oldest first), optionally filtered to lines
+     * containing {@code contains}.
+     */
+    public static List<String> getRecentLogs(int count, String contains) {
+        List<String> snapshot;
+        synchronized (recentLogs) {
+            snapshot = new ArrayList<>(recentLogs);
+        }
+        if (contains != null && !contains.isEmpty()) {
+            snapshot = snapshot.stream().filter(l -> l.contains(contains)).toList();
+        }
+        int from = Math.max(0, snapshot.size() - Math.max(0, count));
+        return new ArrayList<>(snapshot.subList(from, snapshot.size()));
     }
 
     public static void sendConnectedBacklog() {

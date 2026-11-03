@@ -45,6 +45,7 @@ import org.photonvision.common.hardware.HardwareManager;
 import org.photonvision.common.logging.LogGroup;
 import org.photonvision.common.logging.Logger;
 import org.photonvision.common.util.SerializationUtils;
+import org.photonvision.vision.pipeline.CVPipelineSettings;
 import org.photonvision.common.util.file.FileUtils;
 import org.photonvision.vision.calibration.CameraCalibrationCoefficients;
 import org.photonvision.vision.camera.CameraQuirk;
@@ -667,6 +668,18 @@ public class VisionModule implements AutoCloseable {
 
         // Push new data to the UI
         saveAndBroadcastAll();
+    }
+
+    /** Returns every user pipeline's settings, serialized the same way as the UI sees them. */
+    public List<Map<String, Object>> getAllPipelineSettingsAsMaps() {
+        return pipelineManager.userPipelineSettings.stream()
+                .map(s -> (Map<String, Object>) SerializationUtils.objectToHashMap(s))
+                .toList();
+    }
+
+    /** The settings object of the currently active pipeline. */
+    public CVPipelineSettings getCurrentPipelineSettings() {
+        return pipelineManager.getCurrentPipelineSettings();
     }
 
     public UICameraConfiguration toUICameraConfig() {
