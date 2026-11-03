@@ -33,6 +33,3 @@ Workflow rules for agents:
 
 Server code: `photon-server/.../server/AgentRequestHandler.java`.
 
-## Inspecting / tuning a running PhotonVision
-See the "Talking to a running PhotonVision" section of AGENTS.md. Use the `photonvision` MCP server
-(from `.mcp.json`) or the `/api/agent/*` HTTP endpoints; start with `get_state` / `GET /api/agent`.
