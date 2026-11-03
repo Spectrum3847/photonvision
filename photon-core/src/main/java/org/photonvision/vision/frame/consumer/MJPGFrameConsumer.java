@@ -19,13 +19,14 @@ package org.photonvision.vision.frame.consumer;
 
 import org.photonvision.vision.frame.StaticFrames;
 import org.photonvision.vision.opencv.CVMat;
-import org.wpilib.networktables.NetworkTablesJNI;
 import org.wpilib.util.PixelFormat;
 import org.wpilib.vision.camera.*;
 import org.wpilib.vision.stream.CameraServer;
 
 public class MJPGFrameConsumer implements AutoCloseable {
-    private static final double MAX_FRAMERATE = -1;
+    // Nobody watches a dashboard stream at full camera rate; capping this avoids copying every
+    // processed frame into cscore. Vision processing / NT output are unaffected.
+    private static final double MAX_FRAMERATE = 30;
     private static final long MAX_FRAME_PERIOD_NS = Math.round(1e9 / MAX_FRAMERATE);
 
     private long lastFrameTimeNs;
@@ -45,8 +46,20 @@ public class MJPGFrameConsumer implements AutoCloseable {
         this(name, 320, 240, port);
     }
 
+    /**
+     * True while at least one client is streaming from this server. cscore only enables a source
+     * while a connected sink is actively pulling frames.
+     */
+    public boolean hasViewers() {
+        return cvSource != null && cvSource.isEnabled();
+    }
+
     public void accept(CVMat image) {
-        long now = NetworkTablesJNI.now();
+        // Skip the frame copy entirely when nobody is watching
+        if (!hasViewers()) return;
+
+        // NetworkTablesJNI.now() is in microseconds, so use nanoTime to match MAX_FRAME_PERIOD_NS
+        long now = System.nanoTime();
 
         if (image == null || image.getMat() == null || image.getMat().empty()) {
             image.copyFrom(StaticFrames.LOST_MAT);

@@ -141,6 +141,12 @@ public class FileSaveFrameConsumer implements Consumer<CVMat> {
         this.saveFrameEntry = subTable.getIntegerTopic(ntEntryName).getEntry(-1); // Default negative
     }
 
+    /** True if a snapshot has been requested (via NT or the UI) but not yet written. */
+    public boolean hasPendingSave() {
+        long currentCount = saveFrameEntry.get();
+        return currentCount != -1 && savedImagesCount < currentCount;
+    }
+
     public void overrideTakeSnapshot() {
         // Simulate NT change
         saveFrameEntry.set(saveFrameEntry.get() + 1);

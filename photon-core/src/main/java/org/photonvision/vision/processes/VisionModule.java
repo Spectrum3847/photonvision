@@ -284,6 +284,7 @@ public class VisionModule implements AutoCloseable {
                 this.targets = targets;
 
                 shouldRun = inputOutputFrame != null;
+                frameLock.notifyAll();
             }
         }
 
@@ -295,6 +296,15 @@ public class VisionModule implements AutoCloseable {
                 final List<TrackedTarget> targets;
                 final boolean shouldRun;
                 synchronized (frameLock) {
+                    // Sleep until updateData() hands us a frame instead of polling every 1ms
+                    if (!this.shouldRun) {
+                        try {
+                            frameLock.wait(100);
+                        } catch (InterruptedException e) {
+                            logger.warn("StreamRunnable was interrupted - exiting");
+                            return;
+                        }
+                    }
                     m_frame = this.latestFrame;
                     this.latestFrame = null;
 
@@ -306,7 +316,14 @@ public class VisionModule implements AutoCloseable {
                 }
                 if (shouldRun) {
                     try {
-                        CVPipelineResult osr = outputStreamPipeline.process(m_frame, settings, targets);
+                        // Resizing + drawing overlays is only needed if a stream has a viewer or a
+                        // snapshot is pending. Otherwise skip it to save CPU during matches.
+                        if (outputVideoStreamer.hasViewers()
+                                || inputVideoStreamer.hasViewers()
+                                || outputFrameSaver.hasPendingSave()
+                                || inputFrameSaver.hasPendingSave()) {
+                            outputStreamPipeline.process(m_frame, settings, targets);
+                        }
                         consumeResults(m_frame, targets);
                     } catch (Exception e) {
                         // Never die
@@ -320,14 +337,6 @@ public class VisionModule implements AutoCloseable {
                         } catch (Exception e) {
                             logger.error("Exception freeing frames", e);
                         }
-                    }
-                } else {
-                    // busy wait! hurray!
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        logger.warn("StreamRunnable was interrupted - exiting");
-                        return;
                     }
                 }
             }
