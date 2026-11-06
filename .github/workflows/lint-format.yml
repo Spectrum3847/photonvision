@@ -1,9 +1,11 @@
 name: Lint and Format
 
 on:
-  # Run on pushes to main and pushed tags, and on pull requests against main, but ignore the docs folder
+  # Spectrum fork: run only on pushes to main and on pull requests into main (not on every branch push)
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
