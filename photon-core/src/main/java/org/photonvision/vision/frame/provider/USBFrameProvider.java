@@ -1030,6 +1030,24 @@ public class USBFrameProvider extends CpuImageProcessor {
      */
     private static final long CAMERA_DELAY_US = envLong("SPECTRUM_CAMERA_DELAY_US", 0);
 
+    /**
+     * Spectrum (sc/mjpeg-napa): how late the driver's buffer timestamp is after the frame's first USB packet,
+     * in microseconds. LimelightOS's uvcvideo (SystemCore) runs with hwtimestamps=0 and completes 32-packet
+     * (4 ms) isochronous URBs, and stamps a frame when it processes the URB that holds its first packet: 2.4 ms
+     * after the packet at the median (kernel trace, SpectrumJetson tests/systemcore-latency), 0-4 ms. This
+     * removes the median; the 0-4 ms spread (sd 1.26 ms) stays (sc-vision's 0.25 ms URBs: sd 0.04 ms).
+     * SPECTRUM_UVC_STAMP_LAG_US overrides; default 2400 with Limelight's uvcvideo (its ll_compressed_* module
+     * parameters), else 0 (our Jetson uvcvideo: urb_packets=4, hwtimestamps=1).
+     */
+    private static final long UVC_STAMP_LAG_US =
+            envLong(
+                    "SPECTRUM_UVC_STAMP_LAG_US",
+                    java.nio.file.Files.exists(
+                                    java.nio.file.Path.of(
+                                            "/sys/module/uvcvideo/parameters/ll_compressed_payload_fast"))
+                            ? 2400
+                            : 0);
+
     private static long envLong(String name, long fallback) {
         try {
             String v = System.getenv(name);
@@ -1053,8 +1071,8 @@ public class USBFrameProvider extends CpuImageProcessor {
     private long toMidExposureNs(long captureTimeNs) {
         if (captureTimeNs == 0) return 0;
         double exposureUs = settables.getExposureTimeUs();
-        if (exposureUs <= 0) return captureTimeNs - CAMERA_DELAY_US * 1000;
-        long shiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US) * 1000;
+        if (exposureUs <= 0) return captureTimeNs - (CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
+        long shiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
         if (!loggedMidExposure) {
             loggedMidExposure = true;
             logger.info(
@@ -1064,6 +1082,8 @@ public class USBFrameProvider extends CpuImageProcessor {
                             + exposureUs / 1000.0
                             + " ms, camera delay "
                             + CAMERA_DELAY_US / 1000.0
+                            + " ms, driver stamp lag "
+                            + UVC_STAMP_LAG_US / 1000.0
                             + " ms)");
         }
         return captureTimeNs - shiftNs;
