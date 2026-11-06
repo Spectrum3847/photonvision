@@ -86,6 +86,21 @@ public final class NapaDetectorJNI {
             long rawFramePtr, long dataAddr, int width, int height, int step);
 
     /**
+     * Spectrum (sc/mjpeg-napa): false = streamDecodeGray hands over a streamed frame without copying its
+     * pixels (only a tag that detectStreamed reads), for frames whose tags the band sink already found and
+     * when nobody watches the stream. Returns false if the library can't.
+     */
+    public static native boolean setStreamCopy(boolean on);
+
+    /**
+     * Spectrum (sc/mjpeg-napa): single-tag pose natively (IPPE for a square + Gauss-Newton refine, ~10 us).
+     * corners: AprilTag order, raw pixels (x0, y0, ...); k: 3x3 intrinsics row-major; dist: OpenCV distortion
+     * (up to 8). Returns {best tx, ty, tz, R (9, row-major), err px, alt tx, ty, tz, R (9), err px} in AprilTag's
+     * tag frame, or null.
+     */
+    public static native double[] poseSquare(double[] corners, double[] k, double[] dist, double tagSize);
+
+    /**
      * As {@link #detect}, for a frame the streaming decoder just wrote into dataAddr on this thread:
      * returns the result NAPA computed band by band while the frame arrived (identical to detect()),
      * or detects the whole frame if it wasn't streamed. wantAfterNanos: when this camera next takes a

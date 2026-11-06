@@ -845,6 +845,16 @@ public class USBFrameProvider extends CpuImageProcessor {
             // Spectrum: streaming NAPA without the CUDA library (SystemCore): the streaming decoder
             // (libspectrum-stream.so via the NAPA library) decoded the frame while it arrived.
             if (!half && cpuGray && org.photonvision.vision.pipe.impl.NapaDetector.streamEnabled()) {
+                // Spectrum (sc/mjpeg-napa): with no stream viewer the pipeline only needs the tags the band
+                // sink found, not the 1 MB image: skip the copy (SPECTRUM_STREAM_NOCOPY=0 turns this off).
+                // The Mat is then only touched in its first row, so its fresh pages aren't faulted in either.
+                if (NO_COPY_OK) {
+                    boolean copy = org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers();
+                    if (copy != lastStreamCopy) {
+                        lastStreamCopy = copy;
+                        if (!org.photonvision.jni.NapaDetectorJNI.setStreamCopy(copy)) NO_COPY_OK = false;
+                    }
+                }
                 Mat s = new Mat(height, width, CvType.CV_8UC1);
                 if (org.photonvision.jni.NapaDetectorJNI.streamDecodeGray(
                                 frame.getNativeObj(), s.dataAddr(), width, height, (int) s.step1())
@@ -1083,6 +1093,10 @@ public class USBFrameProvider extends CpuImageProcessor {
     }
 
     private boolean loggedMidExposure = false;
+
+    // Spectrum (sc/mjpeg-napa): streamDecodeGray without the image copy while nobody watches the stream
+    private static volatile boolean NO_COPY_OK = !"0".equals(System.getenv("SPECTRUM_STREAM_NOCOPY"));
+    private static volatile boolean lastStreamCopy = true;
 
     /**
      * SpectrumJetson (photonvision-13): move a frame's timestamp to mid-exposure. uvcvideo stamps a

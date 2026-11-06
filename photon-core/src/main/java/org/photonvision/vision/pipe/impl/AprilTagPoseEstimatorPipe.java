@@ -53,8 +53,37 @@ public class AprilTagPoseEstimatorPipe
 
     MatOfPoint2f cornersMat = new MatOfPoint2f();
 
+    // Spectrum (sc/mjpeg-napa): the native IPPE + Gauss-Newton pose when the NAPA library is there
+    // (SPECTRUM_NATIVE_POSE=0: WPILib's orthogonal iteration as before). Measured: the Java path (orthogonal
+    // iteration + OpenCV IPPE for the alternate) was 0.28 ms of every frame's latency on the SystemCore.
+    private static final boolean NATIVE_POSE = !"0".equals(System.getenv("SPECTRUM_NATIVE_POSE"));
+
+    private static Transform3d nativeTransform(double[] r, int o) {
+        var m = MatBuilder.fill(
+                Nat.N3(), Nat.N3(), r[o + 3], r[o + 4], r[o + 5], r[o + 6], r[o + 7], r[o + 8], r[o + 9], r[o + 10],
+                r[o + 11]);
+        return new Transform3d(new Translation3d(r[o], r[o + 1], r[o + 2]), new Rotation3d(m));
+    }
+
     @Override
     protected AprilTagPoseEstimate process(AprilTagDetection in) {
+        if (NATIVE_POSE && NapaDetector.usable() && params.calibration() != null) {
+            try {
+                double[] c = new double[8];
+                for (int i = 0; i < 4; i++) {
+                    c[2 * i] = in.getCornerX(i);
+                    c[2 * i + 1] = in.getCornerY(i);
+                }
+                double[] r = org.photonvision.jni.NapaDetectorJNI.poseSquare(
+                        c,
+                        params.calibration().getIntrinsicsArr(),
+                        params.calibration().getDistCoeffsArr(),
+                        params.config().tagSize);
+                if (r != null) return new AprilTagPoseEstimate(nativeTransform(r, 0), nativeTransform(r, 13), r[12], r[25]);
+            } catch (UnsatisfiedLinkError e) {
+                // an older NAPA library: the Java path below
+            }
+        }
         // Save the corner points of our detection to an array
         Point[] corners = new Point[4];
         for (int i = 0; i < 4; i++) {
