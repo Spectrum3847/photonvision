@@ -49,7 +49,8 @@ public class NativeFrameProvider extends CpuImageProcessor {
     private final String name;
     private VisionSourceSettables settables;
 
-    private long handle = 0;
+    // read by the health getters, which run on this camera's vision thread like every close
+    private volatile long handle = 0;
     private VideoMode openMode = null;
     private volatile boolean reopen = false;
     private volatile boolean calibrating = false;
@@ -128,8 +129,12 @@ public class NativeFrameProvider extends CpuImageProcessor {
             rewind = null;
         }
         if (handle != 0) {
-            NapaDetectorJNI.destroy(handle); // stops the camera thread, closes the capture fd
+            // this camera's NativePublish (this is its vision thread) must not use the handle again
+            var np = org.photonvision.vision.pipe.impl.NativePublish.current();
+            if (np != null && np.cameraHandle == handle) np.cameraHandle = 0;
+            long h = handle;
             handle = 0;
+            NapaDetectorJNI.destroy(h); // stops the camera thread, closes the capture fd
             openMode = null;
         }
     }
