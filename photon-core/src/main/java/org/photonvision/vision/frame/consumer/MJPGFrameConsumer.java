@@ -69,12 +69,55 @@ public class MJPGFrameConsumer implements AutoCloseable {
      * (CS_CONNECTION_AUTO_MANAGE).
      */
     public boolean hasViewers() {
-        return cvSource != null && cvSource.isEnabled();
+        return (cvSource != null && cvSource.isEnabled())
+                || (rawSource != null && rawSource.isEnabled());
+    }
+
+    // Spectrum (sc/mjpeg-napa) native camera backend: the camera's own JPEG served as it came (no
+    // decode, no re-encode). The server is switched to a raw MJPEG source while it is fed this way
+    // and
+    // back to the CvSource when Mat frames come again (e.g. the cscore handover for calibration).
+    private org.wpilib.vision.camera.raw.RawSource rawSource;
+    private volatile boolean onRaw = false;
+
+    /** True while any stream fed with Mats (frames the Java pipeline must make) has a viewer. */
+    public static boolean anyMatViewers() {
+        for (var c : OPEN) {
+            try {
+                if (!c.onRaw && c.cvSource != null && c.cvSource.isEnabled()) return true;
+            } catch (RuntimeException e) {
+                // closing concurrently
+            }
+        }
+        return false;
+    }
+
+    /** Serves this JPEG (a direct buffer, position 0, limit = its length) without re-encoding. */
+    public synchronized void acceptJpeg(java.nio.ByteBuffer jpeg, int width, int height) {
+        if (mjpegServer == null) return;
+        if (rawSource == null)
+            rawSource =
+                    new org.wpilib.vision.camera.raw.RawSource(
+                            cvSource.getName() + "_jpeg", PixelFormat.MJPEG, width, height, 30);
+        if (!onRaw) {
+            mjpegServer.setSource(rawSource);
+            mjpegServer.setCompression(-1); // pass the camera's JPEG through
+            onRaw = true;
+        }
+        rawSource.putFrame(jpeg, width, height, 0, PixelFormat.MJPEG);
+    }
+
+    private synchronized void backToMats() {
+        if (!onRaw || mjpegServer == null) return;
+        mjpegServer.setSource(cvSource);
+        mjpegServer.setCompression(75);
+        onRaw = false;
     }
 
     public void accept(CVMat image) {
         long now = NetworkTablesJNI.now();
 
+        if (onRaw) backToMats();
         if (image == null || image.getMat() == null || image.getMat().empty()) {
             image.copyFrom(StaticFrames.LOST_MAT);
         }
@@ -86,11 +129,15 @@ public class MJPGFrameConsumer implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         OPEN.remove(this);
         CameraServer.removeServer(mjpegServer.getName());
         mjpegServer.close();
         cvSource.close();
+        synchronized (this) {
+            if (rawSource != null) rawSource.close();
+            rawSource = null;
+        }
         mjpegServer = null;
         cvSource = null;
     }

@@ -374,6 +374,9 @@ public class VisionModule implements AutoCloseable {
         outputVideoStreamer =
                 new MJPGFrameConsumer(
                         camHostname + "_Port_" + outputStreamPort + "_Output_MJPEG_Server", outputStreamPort);
+        if (visionSource.getFrameProvider()
+                instanceof org.photonvision.vision.frame.provider.NativeFrameProvider nat)
+            nat.setJpegStream(inputVideoStreamer);
     }
 
     private void recreateStreamResultConsumers() {
@@ -387,6 +390,10 @@ public class VisionModule implements AutoCloseable {
                 });
         streamResultConsumers.add(
                 (frame, tgts) -> {
+                    // Spectrum: a native camera's input stream is its own JPEG (NativeFrameProvider pump)
+                    if (visionSource.getFrameProvider()
+                                    instanceof org.photonvision.vision.frame.provider.NativeFrameProvider nat
+                            && nat.streamsNatively()) return;
                     if (frame != null) inputVideoStreamer.accept(frame.colorImage);
                 });
         streamResultConsumers.add(

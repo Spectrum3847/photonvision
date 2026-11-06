@@ -133,7 +133,11 @@ public class NativeFrameProvider extends CpuImageProcessor {
             var np = org.photonvision.vision.pipe.impl.NativePublish.current();
             if (np != null && np.cameraHandle == handle) np.cameraHandle = 0;
             long h = handle;
-            handle = 0;
+            // sequence IDs keep rising across the handover (the Java path continues from the native one)
+            sequenceID = (int) Math.max(sequenceID, NapaDetectorJNI.cameraSequence(h));
+            synchronized (jpegLock) { // the stream pump uses the handle under this lock
+                handle = 0;
+            }
             NapaDetectorJNI.destroy(h); // stops the camera thread, closes the capture fd
             openMode = null;
         }
@@ -142,7 +146,7 @@ public class NativeFrameProvider extends CpuImageProcessor {
     private boolean openNative(VideoMode m) {
         long h = 0;
         for (int attempt = 0; attempt < 10 && h == 0; attempt++) {
-            h = NapaDetectorJNI.cameraOpen(dev, m.width, m.height, m.fps, "tag36h11");
+            h = NapaDetectorJNI.cameraOpenSeq(dev, m.width, m.height, m.fps, "tag36h11", sequenceID);
             if (h == 0) sleepMs(100);
         }
         if (h == 0) return false;
@@ -345,8 +349,88 @@ public class NativeFrameProvider extends CpuImageProcessor {
         reopen = true;
     }
 
+    // ---- stream on demand: the camera's own JPEG to the input stream, no re-encode ----
+    private final Object jpegLock = new Object();
+    private volatile org.photonvision.vision.frame.consumer.MJPGFrameConsumer jpegTarget;
+    private Thread jpegPump;
+    private static final double STREAM_FPS = streamFps();
+
+    private static double streamFps() {
+        try {
+            String v = System.getenv("SPECTRUM_STREAM_FPS");
+            return v == null ? 30 : Double.parseDouble(v);
+        } catch (NumberFormatException e) {
+            return 30;
+        }
+    }
+
+    /** VisionModule: the input stream this camera's JPEGs go to while it is watched. */
+    public synchronized void setJpegStream(
+            org.photonvision.vision.frame.consumer.MJPGFrameConsumer target) {
+        jpegTarget = target;
+        if (jpegPump == null
+                && target != null
+                && !"0".equals(System.getenv("SPECTRUM_STREAM_PASSTHROUGH"))) {
+            jpegPump = new Thread(this::pumpJpeg, "NativeStream-" + name);
+            jpegPump.setDaemon(true);
+            jpegPump.start();
+        }
+    }
+
+    /** True while the input stream is fed natively (the Java pipeline need not feed it). */
+    public boolean streamsNatively() {
+        return jpegPump != null && handle != 0;
+    }
+
+    private void pumpJpeg() {
+        var buf = java.nio.ByteBuffer.allocateDirect(1 << 20);
+        long period = STREAM_FPS > 0 ? (long) (1e9 / STREAM_FPS) : 33_000_000L;
+        long next = System.nanoTime();
+        while (!Thread.currentThread().isInterrupted()) {
+            var t = jpegTarget;
+            boolean sent = false;
+            if (t != null && t.hasViewers()) {
+                synchronized (jpegLock) {
+                    long h = handle;
+                    VideoMode m = openMode;
+                    if (h != 0 && m != null) {
+                        buf.clear();
+                        int n = NapaDetectorJNI.cameraLatestJpeg(h, buf);
+                        if (n < 0) {
+                            buf = java.nio.ByteBuffer.allocateDirect(-n * 2);
+                        } else if (n > 0) {
+                            buf.limit(n);
+                            t.acceptJpeg(buf, m.width, m.height);
+                            sent = true;
+                        }
+                    }
+                }
+            }
+            // nobody watching (or no native capture): check 4 times a second; else the stream rate
+            long now = System.nanoTime();
+            next =
+                    sent
+                            ? Math.max(next + period, now)
+                            : now + (t != null && t.hasViewers() ? 5_000_000L : 250_000_000L);
+            long sleep = next - now;
+            if (sleep > 0) {
+                try {
+                    Thread.sleep(sleep / 1_000_000L, (int) (sleep % 1_000_000L));
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }
+    }
+
     @Override
     public void release() {
+        Thread p;
+        synchronized (this) {
+            p = jpegPump;
+            jpegPump = null;
+        }
+        if (p != null) p.interrupt();
         closeNative();
         closeCscore();
         if (gray != null) {

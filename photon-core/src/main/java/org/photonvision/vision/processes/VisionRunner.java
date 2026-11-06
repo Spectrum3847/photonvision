@@ -318,7 +318,7 @@ public class VisionRunner implements AutoCloseable {
                     }
                     if (nat.isNative()) {
                         double fps =
-                                org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers()
+                                org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyMatViewers()
                                         ? org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS
                                         : NATIVE_IDLE_JAVA_FPS;
                         if (fps > 0) capNanos = Math.max(capNanos, (long) (1e9 / fps));

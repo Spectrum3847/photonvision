@@ -163,6 +163,13 @@ public final class NapaDetectorJNI {
      */
     public static native int cameraLatestJpeg(long handle, java.nio.ByteBuffer direct);
 
+    /** As cameraOpen; the first published result's sequence ID is lastSeq + 1. */
+    public static native long cameraOpenSeq(
+            String dev, int width, int height, int fps, String family, long lastSeq);
+
+    /** The last sequence ID the camera's native publish used. */
+    public static native long cameraSequence(long handle);
+
     // The device itself, without a capture handle (NativeCameraSettables: no cscore UsbCamera)
 
     /**
