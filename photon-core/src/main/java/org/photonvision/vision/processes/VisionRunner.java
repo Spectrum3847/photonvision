@@ -64,6 +64,17 @@ public class VisionRunner implements AutoCloseable {
     private final FrameRateCap frameRateCap = new FrameRateCap(); // photonvision-100
     private long lastLoopErrorLogMs = 0; // photonvision-63: monotonic (System.nanoTime) ms
 
+    // Spectrum (sc/mjpeg-napa) fast path: this camera's native publish (null when off)
+    private final org.photonvision.vision.pipe.impl.NativePublish nativePublish =
+            org.photonvision.vision.pipe.impl.NativePublish.ENABLED
+                    ? new org.photonvision.vision.pipe.impl.NativePublish()
+                    : null;
+
+    /** This camera's native publish state (null when SPECTRUM_NATIVE_PUBLISH is off). */
+    public org.photonvision.vision.pipe.impl.NativePublish getNativePublish() {
+        return nativePublish;
+    }
+
     /**
      * VisionRunner contains a thread to run a pipeline, given a frame, and will give the result to
      * the consumer.
@@ -271,7 +282,12 @@ public class VisionRunner implements AutoCloseable {
                 if (fpsLimit > 0) capNanos = Math.max(capNanos, 1_000_000_000L / fpsLimit);
                 // Spectrum (sc/mjpeg-napa) fast path: results are published natively every frame; the Java
                 // pipeline (UI, stream, health) runs at most NativePublish.JAVA_FPS a second meanwhile
-                if (org.photonvision.vision.pipe.impl.NativePublish.active()
+                org.photonvision.vision.pipe.impl.NativePublish.makeCurrent(nativePublish);
+                if (nativePublish != null
+                        && frameSupplier instanceof org.photonvision.vision.frame.provider.USBFrameProvider usb)
+                    nativePublish.midShiftNs = usb.nativeMidShiftNs;
+                if (nativePublish != null
+                        && nativePublish.active()
                         && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0)
                     capNanos =
                             Math.max(
@@ -399,5 +415,6 @@ public class VisionRunner implements AutoCloseable {
         if (visionProcessThread.isAlive()) {
             stopProcess();
         }
+        if (nativePublish != null) nativePublish.close();
     }
 }

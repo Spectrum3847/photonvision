@@ -235,12 +235,12 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                     settings.napaFarSearch,
                     settings.napaFarMinTagPx,
                     60);
-            if (NativePublish
-                    .ENABLED) { // Spectrum (sc/mjpeg-napa) fast path: what the native publish needs
+            var nativePub = NativePublish.current();
+            if (nativePub != null) { // Spectrum (sc/mjpeg-napa) fast path: this camera's calibration
                 var cal = frameStaticProperties.cameraCalibration;
-                NativePublish.intrinsics = cal != null ? cal.getIntrinsicsArr() : null;
-                NativePublish.distortion = cal != null ? cal.getDistCoeffsArr() : null;
-                NativePublish.tagSizeM = tagWidthMeters;
+                nativePub.intrinsics = cal != null ? cal.getIntrinsicsArr() : null;
+                nativePub.distortion = cal != null ? cal.getDistCoeffsArr() : null;
+                nativePub.tagSizeM = tagWidthMeters;
             }
             detections = napaDetector.detect(in);
             sumPipeNanosElapsed += System.nanoTime() - t0;

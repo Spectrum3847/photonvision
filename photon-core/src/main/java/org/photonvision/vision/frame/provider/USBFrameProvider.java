@@ -1037,10 +1037,54 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     /**
      * SpectrumJetson (photonvision-13): the camera's delay from the end of exposure to its first USB
-     * packet (sensor readout + JPEG start), in microseconds. Not visible from here; measure it on the
-     * robot (spin in front of a tag) and set SPECTRUM_CAMERA_DELAY_US. Default 0.
+     * packet (sensor readout + JPEG start), in microseconds, per camera.
+     *
+     * <p>Spectrum (sc/mjpeg-napa): measured 0.41 +- 0.04 ms on the Thriftiest (LED test; the camera
+     * clock's PTS -> first packet is 0.35 ms on the Thriftiest and the Swyft), so 400 by default
+     * where the frame's time reference is its first USB packet (the driver's stamp less {@link
+     * #UVC_STAMP_LAG_US}, or when the streaming watcher first sees its bytes less {@link
+     * #URB_LAG_US}). Where uvcvideo stamps from the camera clock (hwtimestamps=1, our Jetson driver)
+     * the reference is earlier than the first packet and not yet re-derived: default 0 there; the
+     * Jetson's 09-robot-tuning.sh sets its own value.
+     *
+     * <p>SPECTRUM_CAMERA_DELAY_US: "N" for every camera, or "N,name=N,..." to set cameras whose
+     * nickname or unique name contains name (case-insensitive) apart (the Swyft uses the default
+     * until measured).
      */
-    private static final long CAMERA_DELAY_US = envLong("SPECTRUM_CAMERA_DELAY_US", 0);
+    private static final String CAMERA_DELAY_SPEC = System.getenv("SPECTRUM_CAMERA_DELAY_US");
+
+    static long cameraDelayUs(String spec, String nickname, String uniqueName, long def) {
+        if (spec == null || spec.isBlank()) return def;
+        long match = -1;
+        for (String part : spec.split(",")) {
+            part = part.trim();
+            try {
+                int eq = part.indexOf('=');
+                if (eq < 0) {
+                    if (!part.isEmpty()) def = Long.parseLong(part);
+                } else {
+                    String key = part.substring(0, eq).trim().toLowerCase();
+                    long v = Long.parseLong(part.substring(eq + 1).trim());
+                    if (!key.isEmpty()
+                            && ((nickname != null && nickname.toLowerCase().contains(key))
+                                    || (uniqueName != null && uniqueName.toLowerCase().contains(key)))) match = v;
+                }
+            } catch (NumberFormatException e) {
+                // ignore a bad entry
+            }
+        }
+        return match >= 0 ? match : def;
+    }
+
+    private static boolean hwTimestamps() {
+        try {
+            var hw = java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps");
+            return java.nio.file.Files.exists(hw)
+                    && "1".equals(java.nio.file.Files.readString(hw).trim());
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     /**
      * Spectrum (sc/mjpeg-napa): how late the driver's buffer timestamp is after the frame's first USB
@@ -1053,7 +1097,15 @@ public class USBFrameProvider extends CpuImageProcessor {
      * urb_packets=4, hwtimestamps=1).
      */
     private static final long UVC_STAMP_LAG_US =
-            envLong("SPECTRUM_UVC_STAMP_LAG_US", defaultStampLagUs());
+            envLong("SPECTRUM_UVC_STAMP_LAG_US", hwTimestamps() ? 0 : urbLagUs());
+
+    /**
+     * Spectrum (sc/mjpeg-napa): how late the streaming watcher (fast path) first sees a frame's bytes
+     * after its first USB packet: uvcvideo copies a URB's packets when the URB completes, the moment
+     * it would stamp from it, so the URB lag whatever clock the stamp uses.
+     * SPECTRUM_STREAM_SEEN_LAG_US overrides.
+     */
+    private static final long URB_LAG_US = envLong("SPECTRUM_STREAM_SEEN_LAG_US", urbLagUs());
 
     /**
      * The driver's median stamp lag from its URB size (measured on the SystemCore, kernel trace,
@@ -1062,20 +1114,13 @@ public class USBFrameProvider extends CpuImageProcessor {
      * 32); Limelight's stock one has ll_compressed_* and 32-packet URBs; elsewhere (our Jetson driver
      * with hwtimestamps) 0.
      */
-    private static long defaultStampLagUs() {
+    private static long urbLagUs() {
         try {
             var urb = java.nio.file.Path.of("/sys/module/uvcvideo/parameters/urb_packets");
             int n;
             if (java.nio.file.Files.exists(urb)) {
                 n = Integer.parseInt(java.nio.file.Files.readString(urb).trim());
                 if (n <= 0 || n > 32) n = 32;
-                if (java.nio.file.Files.exists(
-                                java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps"))
-                        && "1"
-                                .equals(
-                                        java.nio.file.Files.readString(
-                                                        java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps"))
-                                                .trim())) return 0; // stamped from the camera clock, not the URB
             } else if (java.nio.file.Files.exists(
                     java.nio.file.Path.of("/sys/module/uvcvideo/parameters/ll_compressed_payload_fast"))) {
                 n = 32;
@@ -1100,6 +1145,10 @@ public class USBFrameProvider extends CpuImageProcessor {
     }
 
     private boolean loggedMidExposure = false;
+    private long cameraDelayUs = -1;
+
+    /** Spectrum (sc/mjpeg-napa): first bytes -> mid-exposure, for this camera's native publish. */
+    public volatile long nativeMidShiftNs = 0;
 
     // Spectrum (sc/mjpeg-napa): streamDecodeGray without the image copy while nobody watches the
     // stream
@@ -1117,13 +1166,17 @@ public class USBFrameProvider extends CpuImageProcessor {
      */
     private long toMidExposureNs(long captureTimeNs) {
         if (captureTimeNs == 0) return 0;
-        double exposureUs = settables.getExposureTimeUs();
-        if (exposureUs <= 0) return captureTimeNs - (CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
-        long shiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
-        // the fast path's native publish stamps from when the frame's first bytes were seen (no driver
-        // stamp lag)
-        org.photonvision.vision.pipe.impl.NativePublish.midShiftNs =
-                ((long) (exposureUs / 2) + CAMERA_DELAY_US) * 1000;
+        if (cameraDelayUs < 0) {
+            var c = settables.getConfiguration();
+            cameraDelayUs =
+                    cameraDelayUs(CAMERA_DELAY_SPEC, c.nickname, c.uniqueName, hwTimestamps() ? 0 : 400);
+        }
+        double exposureUs = Math.max(0, settables.getExposureTimeUs());
+        // the driver's stamp -> first packet -> mid-exposure
+        long shiftNs = ((long) (exposureUs / 2) + cameraDelayUs + UVC_STAMP_LAG_US) * 1000;
+        // the fast path's native publish stamps from when the watcher first saw the frame's bytes:
+        // -> first packet (URB lag) -> mid-exposure
+        nativeMidShiftNs = ((long) (exposureUs / 2) + cameraDelayUs + URB_LAG_US) * 1000;
         if (!loggedMidExposure) {
             loggedMidExposure = true;
             logger.info(
@@ -1132,9 +1185,11 @@ public class USBFrameProvider extends CpuImageProcessor {
                             + " ms earlier, to mid-exposure (exposure "
                             + exposureUs / 1000.0
                             + " ms, camera delay "
-                            + CAMERA_DELAY_US / 1000.0
+                            + cameraDelayUs / 1000.0
                             + " ms, driver stamp lag "
                             + UVC_STAMP_LAG_US / 1000.0
+                            + " ms, streamed first-seen lag "
+                            + URB_LAG_US / 1000.0
                             + " ms)");
         }
         return captureTimeNs - shiftNs;

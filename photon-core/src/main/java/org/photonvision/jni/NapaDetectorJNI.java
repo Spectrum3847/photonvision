@@ -102,6 +102,12 @@ public final class NapaDetectorJNI {
             double[] corners, double[] k, double[] dist, double tagSize);
 
     /**
+     * Spectrum (sc/mjpeg-napa): mean capture (mid-exposure) -> publish of this camera's natively
+     * published results since the last call, ms; -1 if none.
+     */
+    public static native double nativeLatencyMs(long handle);
+
+    /**
      * Spectrum (sc/mjpeg-napa) fast path: the streaming thread publishes each frame's
      * PhotonPipelineResult on the ntcore raw publisher pub (0 = off) as soon as its tags are known.
      * Returns frames published, -1 if unavailable.

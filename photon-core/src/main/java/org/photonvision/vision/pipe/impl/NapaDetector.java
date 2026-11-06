@@ -125,12 +125,13 @@ public class NapaDetector implements Releasable {
                                 gray.rows(),
                                 (int) gray.step1(),
                                 // the fast path publishes every frame natively: the watcher feeds them all
-                                NativePublish.ENABLED
+                                NativePublish.current() != null
                                         ? 0
                                         : org.photonvision.vision.processes.FrameRateCap.nextWantedNanos())
                         : NapaDetectorJNI.detect(
                                 handle, gray.dataAddr(), gray.cols(), gray.rows(), (int) gray.step1());
-        if (streamEnabled()) NativePublish.update(handle);
+        var nativePub = NativePublish.current();
+        if (streamEnabled() && nativePub != null) nativePub.update(handle);
         return ret == null ? List.of() : List.of(ret);
     }
 

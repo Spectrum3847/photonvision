@@ -60,7 +60,7 @@ public class CameraHealthPublisher implements CVPipelineResultConsumer {
     private IntegerPublisher frames, failures, recoveryCount, heartbeat, lastFrameAge;
     private long beats = 0;
 
-    private long windowStartNs = 0, total = 0;
+    private long windowStartNs = 0, total = 0, nativeAtWindowStart = -1;
     private int count = 0;
     private double sumMs = 0, maxMs = 0, sumLatencyMs = 0;
 
@@ -152,11 +152,24 @@ public class CameraHealthPublisher implements CVPipelineResultConsumer {
         double window = (now - windowStartNs) / 1e9;
         if (window < 1.0) return;
         ensurePublishers();
-        fps.set(count / window);
+        // Spectrum (sc/mjpeg-napa) fast path: while this camera's results are published natively (every
+        // frame) the Java pipeline runs at a capped rate; report what the robot gets: the native rate,
+        // count and capture -> publish latency.
+        var nativePub = org.photonvision.vision.pipe.impl.NativePublish.current();
+        if (nativePub != null && nativePub.active() && nativePub.published() >= 0) {
+            long pub = nativePub.published();
+            if (nativeAtWindowStart >= 0) fps.set((pub - nativeAtWindowStart) / window);
+            nativeAtWindowStart = pub;
+            latencyMs.set(nativePub.latencyMs());
+            frames.set(pub);
+        } else {
+            nativeAtWindowStart = -1;
+            fps.set(count / window);
+            latencyMs.set(count > 0 ? sumLatencyMs / count : 0);
+            frames.set(total);
+        }
         pipelineMs.set(count > 0 ? sumMs / count : 0);
         pipelineMsMax.set(maxMs);
-        latencyMs.set(count > 0 ? sumLatencyMs / count : 0);
-        frames.set(total);
         failures.set(decodeFailures.getAsLong());
         recoveryCount.set(recoveries.getAsLong());
         windowStartNs = now;
