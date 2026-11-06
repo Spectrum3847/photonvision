@@ -289,17 +289,22 @@ public class VisionRunner implements AutoCloseable {
                     nativePublish.midShiftNs = usb.nativeMidShiftNs;
                     nativePublish.camShiftNs = usb.nativeCamShiftNs;
                 }
-                if (nativePublish != null
-                        && nativePublish.active()
-                        && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0)
+                boolean nativeOn =
+                        nativePublish != null
+                                && nativePublish.active()
+                                && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0;
+                if (nativeOn)
                     capNanos =
                             Math.max(
                                     capNanos,
                                     (long) (1e9 / org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS));
-                // Spectrum (pv-perf): the decoder thread decodes only around the frames taken
+                // Spectrum (pv-perf): the decoder thread decodes only around the frames taken (and, while
+                // the results are published natively, one frame per take)
                 if (frameSupplier
-                        instanceof org.photonvision.vision.frame.provider.USBFrameProvider usbProvider)
+                        instanceof org.photonvision.vision.frame.provider.USBFrameProvider usbProvider) {
                     usbProvider.setTakePeriodNanos(capNanos);
+                    usbProvider.setAnyFramePerTake(nativeOn);
+                }
                 if (capNanos > 0) {
                     if (!frameRateCap.await(capNanos)) return;
                 } else if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;

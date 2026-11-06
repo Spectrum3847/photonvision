@@ -1303,6 +1303,16 @@ public class USBFrameProvider extends CpuImageProcessor {
         takePeriodNanos = Math.max(0, nanos);
     }
 
+    private volatile boolean anyFramePerTake = false;
+
+    /**
+     * Spectrum (pv-perf): true when the camera loop's frames don't need to be the newest (the fast
+     * path's native publish is on): the decoder then decodes one frame per take, just before it.
+     */
+    public void setAnyFramePerTake(boolean any) {
+        anyFramePerTake = any;
+    }
+
     private volatile boolean loggedAsync = false;
 
     private CapturedFrame takeDecoded(int width, int height) {
@@ -1329,6 +1339,7 @@ public class USBFrameProvider extends CpuImageProcessor {
             }
             CapturedFrame f = decoded;
             decoded = null;
+            decodedLock.notifyAll(); // pv-perf: the decoder may wait for its frame to be taken
             return f;
         }
     }
@@ -1356,6 +1367,21 @@ public class USBFrameProvider extends CpuImageProcessor {
                 if (decoded != null) decoded.colorImage.release(); // the loop didn't want it
                 decoded = f;
                 decodedLock.notifyAll();
+                // Spectrum (pv-perf): when any recent frame will do (the fast path's native publish is
+                // on: the Java loop's frames only feed the UI, the stream and health), decode one frame
+                // per take, not every frame of the take window (~3 at 120 fps, each a 1 MB copy while a
+                // stream is watched).
+                while (anyFramePerTake
+                        && takePeriodNanos > 0
+                        && decoded == f
+                        && System.nanoTime() - lastTakenNs < 1_000_000_000L) {
+                    try {
+                        decodedLock.wait(5);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
             }
         }
         synchronized (decodedLock) {
@@ -1373,6 +1399,7 @@ public class USBFrameProvider extends CpuImageProcessor {
     // after the last take, less about a frame's grab and decode, and decodes only around the frames
     // the loop will take. False if interrupted.
     private static final long DECODE_LEAD_NS = 12_000_000L;
+    private static final long ANY_FRAME_LEAD_NS = 3_000_000L;
 
     private boolean waitForTakeWindow() {
         while (true) {
@@ -1386,6 +1413,8 @@ public class USBFrameProvider extends CpuImageProcessor {
             long period = Math.max(idle, cap);
             if (period == 0) return true;
             long lead = idle >= cap ? DECODE_LEAD_NS : Math.min(DECODE_LEAD_NS, period / 4);
+            // pv-perf: one frame per take: grab the newest just before the take
+            if (anyFramePerTake && idle < cap) lead = Math.min(lead, ANY_FRAME_LEAD_NS);
             long waitNanos = lastTakenNs + period - lead - System.nanoTime();
             if (waitNanos <= 0) return true;
             try {
