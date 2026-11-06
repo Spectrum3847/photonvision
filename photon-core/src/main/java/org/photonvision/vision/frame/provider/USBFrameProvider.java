@@ -1112,6 +1112,8 @@ public class USBFrameProvider extends CpuImageProcessor {
         double exposureUs = settables.getExposureTimeUs();
         if (exposureUs <= 0) return captureTimeNs - (CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
         long shiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
+        // the fast path's native publish stamps from when the frame's first bytes were seen (no driver stamp lag)
+        org.photonvision.vision.pipe.impl.NativePublish.midShiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US) * 1000;
         if (!loggedMidExposure) {
             loggedMidExposure = true;
             logger.info(

@@ -270,6 +270,12 @@ public class VisionRunner implements AutoCloseable {
                 // period (median latency ~43 ms at the SystemCore's 50 fps cap).
                 int fpsLimit = SystemCoreProfile.fpsLimit(fpsLimitSupplier.get());
                 if (fpsLimit > 0) capNanos = Math.max(capNanos, 1_000_000_000L / fpsLimit);
+                // Spectrum (sc/mjpeg-napa) fast path: results are published natively every frame; the Java
+                // pipeline (UI, stream, health) runs at most NativePublish.JAVA_FPS a second meanwhile
+                if (org.photonvision.vision.pipe.impl.NativePublish.active()
+                        && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0)
+                    capNanos =
+                            Math.max(capNanos, (long) (1e9 / org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS));
                 if (capNanos > 0) {
                     if (!frameRateCap.await(capNanos)) return;
                 } else if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;

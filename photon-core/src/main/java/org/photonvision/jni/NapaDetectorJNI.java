@@ -101,6 +101,21 @@ public final class NapaDetectorJNI {
     public static native double[] poseSquare(double[] corners, double[] k, double[] dist, double tagSize);
 
     /**
+     * Spectrum (sc/mjpeg-napa) fast path: the streaming thread publishes each frame's PhotonPipelineResult on the
+     * ntcore raw publisher pub (0 = off) as soon as its tags are known. Returns frames published, -1 if unavailable.
+     */
+    public static native long setNativePublish(
+            long handle,
+            int pub,
+            int inst,
+            double[] k,
+            double[] dist,
+            double tagSize,
+            long midShiftNs,
+            long ntOffsetNs,
+            long sincePongNs);
+
+    /**
      * As {@link #detect}, for a frame the streaming decoder just wrote into dataAddr on this thread:
      * returns the result NAPA computed band by band while the frame arrived (identical to detect()),
      * or detects the whole frame if it wasn't streamed. wantAfterNanos: when this camera next takes a

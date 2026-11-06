@@ -259,7 +259,17 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         if (quality != null && tagQualityPublisher != null) tagQualityPublisher.set(quality);
 
         // random guess at size of the array
-        ts.resultPublisher.set(simplified, 1024);
+        // Spectrum (sc/mjpeg-napa) fast path: the camera's streaming thread publishes rawBytes itself (every frame,
+        // as soon as its tags are known); hand it the publisher and time-sync state, and don't publish twice.
+        if (org.photonvision.vision.pipe.impl.NativePublish.ENABLED) {
+            org.photonvision.vision.pipe.impl.NativePublish.pubHandle = ts.resultPublisher.publisher.getHandle();
+            org.photonvision.vision.pipe.impl.NativePublish.instHandle =
+                    rootTable.getInstance().getHandle();
+            org.photonvision.vision.pipe.impl.NativePublish.ntOffsetNs = offsetNanos;
+            org.photonvision.vision.pipe.impl.NativePublish.sincePongNs =
+                    NetworkTablesManager.getInstance().getTimeSinceLastPong();
+        }
+        if (!org.photonvision.vision.pipe.impl.NativePublish.active()) ts.resultPublisher.set(simplified, 1024);
         // photonvision-79: the same result into the open Rewind recording's vision log.
         org.photonvision.rewind.VisionLog.result(rewindCamera, simplified, nowNanos);
         if (ConfigProvider.getInstance().getConfig().getNetworkConfig().shouldPublishProto) {
@@ -313,7 +323,9 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         ts.heartbeatPublisher.set(acceptedResult.sequenceID);
 
         // TODO...nt4... is this needed?
-        rootTable.getInstance().flush();
+        // (fast path: ntcore rate-limits flushes; the native publish flushes every frame, so a Java flush here
+        // would make some of those wait for the next periodic send)
+        if (!org.photonvision.vision.pipe.impl.NativePublish.active()) rootTable.getInstance().flush();
         org.photonvision.vision.processes.LatencyTrace.mark(
                 org.photonvision.vision.processes.LatencyTrace.NT1);
     }

@@ -39,6 +39,7 @@ import org.photonvision.vision.pipe.impl.CalculateFPSPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe;
 import org.photonvision.vision.pipe.impl.MultiTargetPNPPipe.MultiTargetPNPPipeParams;
 import org.photonvision.vision.pipe.impl.NapaDetector;
+import org.photonvision.vision.pipe.impl.NativePublish;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
 import org.photonvision.vision.processes.SystemCoreProfile;
 import org.photonvision.vision.target.ExcludedTags;
@@ -232,6 +233,12 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                     settings.napaFarSearch,
                     settings.napaFarMinTagPx,
                     60);
+            if (NativePublish.ENABLED) { // Spectrum (sc/mjpeg-napa) fast path: what the native publish needs
+                var cal = frameStaticProperties.cameraCalibration;
+                NativePublish.intrinsics = cal != null ? cal.getIntrinsicsArr() : null;
+                NativePublish.distortion = cal != null ? cal.getDistCoeffsArr() : null;
+                NativePublish.tagSizeM = tagWidthMeters;
+            }
             detections = napaDetector.detect(in);
             sumPipeNanosElapsed += System.nanoTime() - t0;
         } else {

@@ -143,7 +143,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
                             + temp
                             + " degrees)");
 
-            wbTempProp.set(propVal);
+            setChecked(wbTempProp, propVal);
 
             this.lastWhiteBalanceTemp = temp;
 
@@ -163,7 +163,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
             softSet("white_balance_automatic", 0);
 
             if (wbTempProp != null) {
-                wbTempProp.set(this.lastWhiteBalanceTemp);
+                setChecked(wbTempProp, this.lastWhiteBalanceTemp);
             }
         }
     }
@@ -200,7 +200,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
             softSet("auto_exposure_bias", 0);
             softSet("iso_sensitivity_auto", 0); // Disable auto ISO adjustment
             softSet("iso_sensitivity", 0); // Manual ISO adjustment
-            if (autoExposureProp != null) autoExposureProp.set(PROP_AUTO_EXPOSURE_DISABLED);
+            if (autoExposureProp != null) setChecked(autoExposureProp, PROP_AUTO_EXPOSURE_DISABLED);
 
             // Most cameras leave exposure time absolute at the last value from their AE
             // algorithm.
@@ -212,7 +212,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
             softSet("auto_exposure_bias", 12);
             softSet("iso_sensitivity_auto", 1);
             softSet("iso_sensitivity", 1); // Manual ISO adjustment by default
-            if (autoExposureProp != null) autoExposureProp.set(PROP_AUTO_EXPOSURE_ENABLED);
+            if (autoExposureProp != null) setChecked(autoExposureProp, PROP_AUTO_EXPOSURE_ENABLED);
         }
     }
 
@@ -240,7 +240,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
     public void setExposureRaw(double exposureRaw) {
         if (exposureRaw >= 0.0) {
             try {
-                if (autoExposureProp != null) autoExposureProp.set(PROP_AUTO_EXPOSURE_DISABLED);
+                if (autoExposureProp != null) setChecked(autoExposureProp, PROP_AUTO_EXPOSURE_DISABLED);
 
                 int propVal = (int) Math.clamp(exposureRaw, minExposure, maxExposure);
 
@@ -253,7 +253,7 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
                                 + exposureRaw
                                 + " μs)");
 
-                exposureAbsProp.set(propVal);
+                setChecked(exposureAbsProp, propVal);
 
                 this.lastExposureRaw = exposureRaw;
 
@@ -468,13 +468,28 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
      * @param property
      * @param value
      */
+    /**
+     * Spectrum (sc/mjpeg-napa): set a camera control only if it differs from what the camera reports, then read it
+     * back. Some cameras store control values in flash (the Swyft writes its settings sector on every change), and
+     * a control that silently keeps its power-up default (the Thriftiest's sharpness 5 / gamma 150 / backlight 1)
+     * costs ~46% more decode CPU, so a value that doesn't read back is logged.
+     */
+    protected void setChecked(VideoProperty prop, int value) {
+        if (prop.get() == value) return;
+        prop.set(value);
+        int back = prop.get();
+        if (back != value)
+            logger.warn(
+                    "Camera control " + prop.getName() + " on " + camera.getName() + ": set " + value + ", reads " + back);
+    }
+
     protected void softSet(String property, int value) {
         VideoProperty prop = camera.getProperty(property);
         if (prop.getKind() == VideoProperty.Kind.NONE) {
             logger.debug("No property " + property + " for " + camera.getName() + " , skipping.");
         } else {
             try {
-                prop.set(value);
+                setChecked(prop, value);
             } catch (VideoException e) {
                 logger.error("Failed to set " + property + " for " + camera.getName() + " !", e);
             }
