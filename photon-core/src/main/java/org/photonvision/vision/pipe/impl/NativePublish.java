@@ -242,13 +242,27 @@ public final class NativePublish {
     }
 
     private static double javaFps() {
+        return envFps("SPECTRUM_NATIVE_PUBLISH_JAVA_FPS", 30);
+    }
+
+    private static double envFps(String name, double dflt) {
         try {
-            String v = System.getenv("SPECTRUM_NATIVE_PUBLISH_JAVA_FPS");
-            return v == null || v.isBlank() ? 30 : Double.parseDouble(v.trim());
+            String v = System.getenv(name);
+            return v == null || v.isBlank() ? dflt : Double.parseDouble(v.trim());
         } catch (NumberFormatException e) {
-            return 30;
+            return dflt;
         }
     }
+
+    /**
+     * Spectrum (pv-perf): the Java pipeline's cap while native publish is on and nobody looks (no web
+     * UI open, no stream viewer): its frames then only feed health, the legacy NT entries and
+     * Rewind's vision log. SPECTRUM_NATIVE_PUBLISH_IDLE_FPS (default 10; 0 = JAVA_FPS always).
+     */
+    public static final double IDLE_JAVA_FPS = envFps("SPECTRUM_NATIVE_PUBLISH_IDLE_FPS", 10);
+
+    /** Spectrum (pv-perf): the Java pipeline's current period while native publish is on, ns. */
+    public volatile long javaPeriodNs = 0;
 
     /**
      * NapaDetector, after each streamed frame: refresh this camera's native settings, track whether
@@ -320,7 +334,9 @@ public final class NativePublish {
 
     /** Whether the native side published recently (then the Java side doesn't publish rawBytes). */
     public boolean active() {
-        return pubHandle != 0 && System.nanoTime() - lastProgressNs < 200_000_000L;
+        // progress is seen on Java frames: allow three Java periods (pv-perf: 10 fps while idle)
+        long window = Math.max(200_000_000L, 3 * javaPeriodNs);
+        return pubHandle != 0 && System.nanoTime() - lastProgressNs < window;
     }
 
     private volatile long camStamped = 0;
