@@ -284,8 +284,11 @@ public class VisionRunner implements AutoCloseable {
                 // pipeline (UI, stream, health) runs at most NativePublish.JAVA_FPS a second meanwhile
                 org.photonvision.vision.pipe.impl.NativePublish.makeCurrent(nativePublish);
                 if (nativePublish != null
-                        && frameSupplier instanceof org.photonvision.vision.frame.provider.USBFrameProvider usb)
+                        && frameSupplier
+                                instanceof org.photonvision.vision.frame.provider.USBFrameProvider usb) {
                     nativePublish.midShiftNs = usb.nativeMidShiftNs;
+                    nativePublish.camShiftNs = usb.nativeCamShiftNs;
+                }
                 if (nativePublish != null
                         && nativePublish.active()
                         && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0)

@@ -56,6 +56,11 @@ public final class NativePublish {
     public volatile long sincePongNs = 0;
     // from the camera's frame provider: the frame's first bytes -> mid-exposure (exposure/2 + delay)
     public volatile long midShiftNs = 0;
+    // from the camera's frame provider: its camera-clock stamp (PTS) -> mid-exposure (0: no camera
+    // clock)
+    public volatile long camShiftNs = 0;
+    // from AprilTagPipeline: the frame being detected's published (mid-exposure) capture time
+    public volatile long frameCaptureNs = 0;
     // from AprilTagPipeline: calibration and tag size
     public volatile double[] intrinsics = null;
     public volatile double[] distortion = null;
@@ -170,6 +175,16 @@ public final class NativePublish {
                         midShiftNs,
                         ntOffsetNs,
                         sincePongNs);
+        try {
+            // the frame just detected: its camera-clock stamp (the V4L2 stamp, hwtimestamps=1) anchors
+            // the
+            // native side's prediction for the frames it publishes before Java sees them
+            long anchor = camShiftNs > 0 && frameCaptureNs > 0 ? frameCaptureNs + camShiftNs : 0;
+            camStamped =
+                    org.photonvision.jni.NapaDetectorJNI.setNativeCamShift(napaHandle, camShiftNs, anchor);
+        } catch (UnsatisfiedLinkError e) {
+            // an older NAPA library: first-sight stamps only
+        }
         if (n > published) {
             published = n;
             lastProgressNs = System.nanoTime();
@@ -181,6 +196,13 @@ public final class NativePublish {
     /** Whether the native side published recently (then the Java side doesn't publish rawBytes). */
     public boolean active() {
         return pubHandle != 0 && System.nanoTime() - lastProgressNs < 200_000_000L;
+    }
+
+    private volatile long camStamped = 0;
+
+    /** Results the native side stamped from the camera clock so far. */
+    public long camStamped() {
+        return camStamped;
     }
 
     /** Results the native side published so far (for health), -1 before the first. */

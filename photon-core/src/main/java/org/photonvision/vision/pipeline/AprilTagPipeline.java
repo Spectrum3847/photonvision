@@ -241,6 +241,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                 nativePub.intrinsics = cal != null ? cal.getIntrinsicsArr() : null;
                 nativePub.distortion = cal != null ? cal.getDistCoeffsArr() : null;
                 nativePub.tagSizeM = tagWidthMeters;
+                nativePub.frameCaptureNs = frame.timestampNanos; // camera-clock anchor for the fast path
             }
             detections = napaDetector.detect(in);
             sumPipeNanosElapsed += System.nanoTime() - t0;

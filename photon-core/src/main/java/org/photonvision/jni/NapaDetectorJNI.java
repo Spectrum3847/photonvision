@@ -108,6 +108,15 @@ public final class NapaDetectorJNI {
     public static native double nativeLatencyMs(long handle);
 
     /**
+     * Spectrum (sc/mjpeg-napa): the camera-clock stamp (PTS, hwtimestamps=1) -> mid-exposure for this
+     * camera's native publish, ns (0: stamp from the first sight of the frame's bytes), and the
+     * camera-clock stamp of the frame detectStreamed last returned (0: none), which anchors the
+     * prediction of the stamps of the frames published before Java sees them. Returns results stamped
+     * from the camera clock so far.
+     */
+    public static native long setNativeCamShift(long handle, long camShiftNs, long lastFrameCamNs);
+
+    /**
      * Spectrum (sc/mjpeg-napa) fast path: the streaming thread publishes each frame's
      * PhotonPipelineResult on the ntcore raw publisher pub (0 = off) as soon as its tags are known.
      * Returns frames published, -1 if unavailable.
