@@ -76,6 +76,15 @@ public class OutputStreamPipeline implements Releasable {
                 }
             }
         }
+        setPipeParams(frameStaticProperties, settings, draw, resize);
+    }
+
+    /** The draw pipes' divisor (full-resolution targets -> the picture) and the resize divisor. */
+    private void setPipeParams(
+            FrameStaticProperties frameStaticProperties,
+            AdvancedPipelineSettings settings,
+            FrameDivisor draw,
+            FrameDivisor resize) {
         var dualOffsetValues =
                 new DualOffsetValues(
                         settings.offsetDualPointA,
@@ -135,6 +144,15 @@ public class OutputStreamPipeline implements Releasable {
         }
     }
 
+    // pv-perf: resize in place, to an exact size when given, else by the resize pipe's divisor; ns
+    private long resize(org.opencv.core.Mat m, org.opencv.core.Size exact) {
+        if (exact == null) return resizeImagePipe.run(m).nanosElapsed;
+        long t0 = System.nanoTime();
+        if (m.cols() != (int) exact.width || m.rows() != (int) exact.height)
+            org.opencv.imgproc.Imgproc.resize(m, m, exact);
+        return System.nanoTime() - t0;
+    }
+
     public CVPipelineResult process(
             Frame inputAndOutputFrame,
             AdvancedPipelineSettings settings,
@@ -146,19 +164,34 @@ public class OutputStreamPipeline implements Releasable {
                         && fsp != null
                         && fsp.imageWidth > 0
                         && Math.abs(inMat.cols() * 2 - fsp.imageWidth) <= 1;
-        setPipeParams(fsp, settings, halfInput);
+        // Spectrum (pv-perf): a quarter-size picture from the streaming decoder (Frame.streamPreview):
+        // targets are at full resolution, so they're drawn at QUARTER (or SIXTH), and SIXTH is resized
+        // to exactly a sixth
+        boolean quarterInput =
+                !inMat.empty()
+                        && fsp != null
+                        && fsp.imageWidth > 0
+                        && Math.abs(inMat.cols() * 4 - fsp.imageWidth) <= 3;
+        org.opencv.core.Size exact = null;
+        if (quarterInput) {
+            var d = settings.streamingFrameDivisor;
+            var draw = d == FrameDivisor.SIXTH ? FrameDivisor.SIXTH : FrameDivisor.QUARTER;
+            setPipeParams(fsp, settings, draw, FrameDivisor.NONE);
+            if (d == FrameDivisor.SIXTH)
+                exact = new org.opencv.core.Size(fsp.imageWidth / 6, fsp.imageHeight / 6);
+        } else {
+            setPipeParams(fsp, settings, halfInput);
+        }
         var outMat = inputAndOutputFrame.processedImage.getMat();
 
         long sumPipeNanosElapsed = 0L;
 
         // Resize both in place before doing any conversion
         boolean inEmpty = inMat.empty();
-        if (!inEmpty)
-            sumPipeNanosElapsed += pipeProfileNanos[0] = resizeImagePipe.run(inMat).nanosElapsed;
+        if (!inEmpty) sumPipeNanosElapsed += pipeProfileNanos[0] = resize(inMat, exact);
 
         boolean outEmpty = outMat.empty();
-        if (!outEmpty)
-            sumPipeNanosElapsed += pipeProfileNanos[1] = resizeImagePipe.run(outMat).nanosElapsed;
+        if (!outEmpty) sumPipeNanosElapsed += pipeProfileNanos[1] = resize(outMat, exact);
 
         // Only attempt drawing on a non-empty frame
         if (!outEmpty) {

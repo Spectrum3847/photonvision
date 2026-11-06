@@ -93,6 +93,21 @@ public final class NapaDetectorJNI {
     public static native boolean setStreamCopy(boolean on);
 
     /**
+     * Spectrum (pv-perf): streamDecodeGray with this call's own copy choice (1 copy, 0 tag only when
+     * the band sink has the frame's result, -1 setStreamCopy's). -2: the library is too old.
+     */
+    public static native int streamDecodeGrayMode(
+            long rawFramePtr, long dataAddr, int width, int height, int step, int copyMode);
+
+    /**
+     * Spectrum (pv-perf): the stream's small picture of a frame streamDecodeGrayMode handed over by
+     * tag (refAddr: that image): the decoded frame averaged over scale x scale blocks into outAddr
+     * (outW x outH, outStep bytes a row). 0 done, -1 the frame is gone, -2 the library is too old.
+     */
+    public static native int streamPreview(
+            long refAddr, long outAddr, int outW, int outH, int outStep, int scale);
+
+    /**
      * Spectrum (sc/mjpeg-napa): single-tag pose natively (IPPE for a square + Gauss-Newton refine,
      * ~10 us). corners: AprilTag order, raw pixels (x0, y0, ...); k: 3x3 intrinsics row-major; dist:
      * OpenCV distortion (up to 8). Returns {best tx, ty, tz, R (9, row-major), err px, alt tx, ty,

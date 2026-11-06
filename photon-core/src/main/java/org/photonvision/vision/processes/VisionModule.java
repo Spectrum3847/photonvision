@@ -59,6 +59,7 @@ import org.photonvision.vision.frame.Frame;
 import org.photonvision.vision.frame.consumer.FileSaveFrameConsumer;
 import org.photonvision.vision.frame.consumer.MJPGFrameConsumer;
 import org.photonvision.vision.frame.provider.USBFrameProvider;
+import org.photonvision.vision.opencv.CVMat;
 import org.photonvision.vision.pipeline.AdvancedPipelineSettings;
 import org.photonvision.vision.pipeline.CVPipelineSettings;
 import org.photonvision.vision.pipeline.OutputStreamPipeline;
@@ -1238,9 +1239,39 @@ public class VisionModule implements AutoCloseable {
         if (result.inputAndOutputFrame != null
                 && (pipelineManager.getCurrentPipelineSettings()
                         instanceof AdvancedPipelineSettings settings)) {
-            if (streamFrameWanted()) {
-                result.inputAndOutputFrame.unshareProcessed(); // the stream draws on both (photonvision-37)
-                streamRunnable.updateData(result.inputAndOutputFrame, settings, result.targets);
+            boolean snapshot = inputFrameSaver.wantsFrame() || outputFrameSaver.wantsFrame();
+            // Spectrum (pv-perf): tell the camera what the stream needs from its next frames
+            if (visionSource.getFrameProvider() instanceof USBFrameProvider usb) {
+                usb.setStreamWants(
+                        inputVideoStreamer.hasViewers() || outputVideoStreamer.hasViewers(),
+                        snapshot,
+                        previewScale(settings.streamingFrameDivisor));
+            }
+            var frame = result.inputAndOutputFrame;
+            boolean refOnly = USBFrameProvider.isRefOnly(frame.colorImage.getMat());
+            if (refOnly && (frame.streamPreview == null || snapshot)) {
+                // pv-perf: handed over without its pixels (the stream or snapshot asked just now): the
+                // next frames come with a picture
+                result.release();
+            } else if (streamFrameWanted()) {
+                if (refOnly) {
+                    // pv-perf: the decoder's small picture instead of the 1 MB copy
+                    var preview = frame.streamPreview;
+                    frame.streamPreview = null;
+                    var pf =
+                            new Frame(
+                                    frame.sequenceID,
+                                    preview,
+                                    new CVMat(preview.getMat().clone()),
+                                    frame.type,
+                                    frame.timestampNanos,
+                                    frame.frameStaticProperties);
+                    frame.release();
+                    streamRunnable.updateData(pf, settings, result.targets);
+                } else {
+                    frame.unshareProcessed(); // the stream draws on both (photonvision-37)
+                    streamRunnable.updateData(frame, settings, result.targets);
+                }
                 // The streamRunnable manages releasing in this case
             } else {
                 // SpectrumJetson (photonvision-15): no viewer and no snapshot, or not yet time for
@@ -1270,6 +1301,16 @@ public class VisionModule implements AutoCloseable {
         } catch (NumberFormatException e) {
             return 30;
         }
+    }
+
+    /** Spectrum (pv-perf): the stream preview's scale for a divisor (0: full-resolution stream). */
+    static int previewScale(org.photonvision.vision.frame.FrameDivisor d) {
+        if (d == null) return 0;
+        return switch (d) {
+            case HALF -> 2;
+            case QUARTER, SIXTH -> 4;
+            default -> 0;
+        };
     }
 
     private boolean streamFrameWanted() {

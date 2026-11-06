@@ -112,7 +112,7 @@ public class USBFrameProvider extends CpuImageProcessor {
                         && !frame.colorImage.getMat().empty();
         if (usable && stuckTestActive()) {
             // Test hook: pretend this camera is stuck, so the recovery can be tried on purpose.
-            frame.colorImage.release();
+            releaseCaptured(frame);
             frame = new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
             usable = false;
         }
@@ -827,6 +827,8 @@ public class USBFrameProvider extends CpuImageProcessor {
             boolean half = halfGray;
             Mat gray = null;
             int rc = 0;
+            Mat previewMat = null; // pv-perf: the stream's small picture, when made
+            int pScale = previewScale;
             if (!half && !cpuGray) {
                 gray = new Mat(height, width, CvType.CV_8UC1);
                 try {
@@ -849,18 +851,56 @@ public class USBFrameProvider extends CpuImageProcessor {
                 // sink found, not the 1 MB image: skip the copy (SPECTRUM_STREAM_NOCOPY=0 turns this off).
                 // The Mat is then only touched in its first row, so its fresh pages aren't faulted in
                 // either.
+                // Spectrum (pv-perf): per camera, and while native publish is on a watched stream gets a
+                // small picture from the decoder (preview) instead of the 1 MB copy
+                boolean preview =
+                        PREVIEW_OK
+                                && MODE_OK
+                                && NO_COPY_OK
+                                && anyFramePerTake
+                                && streamWatched
+                                && !snapshotPending
+                                && pScale >= 2;
+                boolean needCopy = !NO_COPY_OK || ((streamWatched || snapshotPending) && !preview);
+                if (needCopy) NEEDS_COPY.add(this);
+                else NEEDS_COPY.remove(this);
                 if (NO_COPY_OK) {
-                    boolean copy = org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers();
+                    boolean copy =
+                            MODE_OK
+                                    ? !NEEDS_COPY.isEmpty()
+                                    : org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers();
                     if (copy != lastStreamCopy) {
                         lastStreamCopy = copy;
                         if (!org.photonvision.jni.NapaDetectorJNI.setStreamCopy(copy)) NO_COPY_OK = false;
                     }
                 }
                 Mat s = new Mat(height, width, CvType.CV_8UC1);
-                if (org.photonvision.jni.NapaDetectorJNI.streamDecodeGray(
-                                frame.getNativeObj(), s.dataAddr(), width, height, (int) s.step1())
-                        == 0) {
+                int src = -2;
+                if (MODE_OK) {
+                    try {
+                        src =
+                                org.photonvision.jni.NapaDetectorJNI.streamDecodeGrayMode(
+                                        frame.getNativeObj(),
+                                        s.dataAddr(),
+                                        width,
+                                        height,
+                                        (int) s.step1(),
+                                        needCopy ? 1 : 0);
+                    } catch (LinkageError e) {
+                        src = -2;
+                    }
+                    if (src == -2) {
+                        MODE_OK = false;
+                        logger.info("Stream preview off: the streaming decoder library is too old");
+                    }
+                }
+                if (src == -2)
+                    src =
+                            org.photonvision.jni.NapaDetectorJNI.streamDecodeGray(
+                                    frame.getNativeObj(), s.dataAddr(), width, height, (int) s.step1());
+                if (src == 0) {
                     gray = s;
+                    if (preview && isRefOnly(s)) previewMat = makePreview(s, width, height, pScale);
                 } else {
                     s.release();
                 }
@@ -906,10 +946,73 @@ public class USBFrameProvider extends CpuImageProcessor {
                 org.photonvision.vision.processes.LatencyTrace.decoded(
                         publishedNs, captureTimeNs, grabRetNs, System.nanoTime());
             }
-            return new CapturedFrame(new CVMat(gray), settables.getFrameStaticProperties(), publishedNs);
+            var captured =
+                    new CapturedFrame(new CVMat(gray), settables.getFrameStaticProperties(), publishedNs);
+            if (previewMat != null) {
+                captured.preview = new CVMat(previewMat);
+                captured.previewScale = pScale;
+            }
+            return captured;
         } finally {
             frame.close();
         }
+    }
+
+    // Spectrum (pv-perf): stream previews (see grabMjpegAsGray)
+    private static final boolean PREVIEW_ENV = !"0".equals(System.getenv("SPECTRUM_STREAM_PREVIEW"));
+    private static volatile boolean PREVIEW_OK = PREVIEW_ENV;
+    private static volatile boolean MODE_OK = true;
+    private static final java.util.Set<USBFrameProvider> NEEDS_COPY =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile boolean streamWatched = false, snapshotPending = false;
+    private volatile int previewScale = 0;
+
+    /**
+     * Spectrum (pv-perf): from VisionModule, for every result: whether this camera's stream has a
+     * viewer, whether a snapshot is pending (it needs the full image), and the stream's preview scale
+     * (2 or 4; 0 = full-resolution stream, no preview).
+     */
+    public void setStreamWants(boolean watched, boolean snapshot, int scale) {
+        streamWatched = watched;
+        snapshotPending = snapshot;
+        previewScale = scale;
+    }
+
+    private static final byte[] REF_MAGIC = {'S', 'J', 'R', 'E', 'F', 'v', '1'};
+
+    /** Spectrum (pv-perf): the frame was handed over by tag only (no pixels). */
+    public static boolean isRefOnly(Mat m) {
+        if (m == null || m.empty() || m.cols() < 16 || m.type() != CvType.CV_8UC1) return false;
+        byte[] b = new byte[REF_MAGIC.length];
+        m.get(0, 0, b);
+        return java.util.Arrays.equals(b, REF_MAGIC);
+    }
+
+    private Mat makePreview(Mat ref, int width, int height, int scale) {
+        Mat p = new Mat(height / scale, width / scale, CvType.CV_8UC1);
+        int rc;
+        try {
+            rc =
+                    org.photonvision.jni.NapaDetectorJNI.streamPreview(
+                            ref.dataAddr(), p.dataAddr(), p.cols(), p.rows(), (int) p.step1(), scale);
+        } catch (LinkageError e) {
+            rc = -2;
+        }
+        if (rc == -2) {
+            PREVIEW_OK = false;
+            logger.info("Stream preview off: the streaming decoder library is too old");
+        }
+        if (rc != 0) {
+            p.release();
+            return null;
+        }
+        return p;
+    }
+
+    private static void releaseCaptured(CapturedFrame f) {
+        if (f == null) return;
+        f.colorImage.release();
+        if (f.preview != null) f.preview.release();
     }
 
     /** SpectrumJetson (photonvision-18): off after repeated failures, like directGray. */
@@ -1360,11 +1463,11 @@ public class USBFrameProvider extends CpuImageProcessor {
             if (!waitForTakeWindow()) break;
             CapturedFrame f = grabMjpegAsGray(decodeWidth, decodeHeight, lastTime);
             if (f.captureTimestamp == 0 || f.colorImage.getMat().empty()) {
-                f.colorImage.release();
+                releaseCaptured(f);
                 continue; // timed out or dropped; grabMjpegAsGray logged and counted it
             }
             synchronized (decodedLock) {
-                if (decoded != null) decoded.colorImage.release(); // the loop didn't want it
+                if (decoded != null) releaseCaptured(decoded); // the loop didn't want it
                 decoded = f;
                 decodedLock.notifyAll();
                 // Spectrum (pv-perf): when any recent frame will do (the fast path's native publish is
@@ -1386,7 +1489,7 @@ public class USBFrameProvider extends CpuImageProcessor {
         }
         synchronized (decodedLock) {
             if (decoded != null) {
-                decoded.colorImage.release();
+                releaseCaptured(decoded);
                 decoded = null;
             }
             decoder = null;
@@ -1428,6 +1531,7 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     @Override
     public void release() {
+        NEEDS_COPY.remove(this); // pv-perf
         if (rewind != null) {
             rewind.stop();
             rewind = null;

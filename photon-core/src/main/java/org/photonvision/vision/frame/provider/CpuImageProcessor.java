@@ -36,6 +36,9 @@ public abstract class CpuImageProcessor extends FrameProvider {
         CVMat colorImage;
         FrameStaticProperties staticProps;
         long captureTimestamp;
+        // Spectrum (pv-perf): the stream's small picture (Frame.streamPreview), or null
+        CVMat preview = null;
+        int previewScale = 1;
 
         public CapturedFrame(
                 CVMat colorImage, FrameStaticProperties staticProps, long captureTimestampNanos) {
@@ -102,15 +105,23 @@ public abstract class CpuImageProcessor extends FrameProvider {
             outputMat = new CVMat();
         }
 
-        return new Frame(
-                sequenceID,
-                input.colorImage,
-                outputMat,
-                m_processType,
-                input.captureTimestamp,
-                input.staticProps != null
-                        ? input.staticProps.rotate(m_rImagePipe.getParams().rotation())
-                        : input.staticProps);
+        var frame =
+                new Frame(
+                        sequenceID,
+                        input.colorImage,
+                        outputMat,
+                        m_processType,
+                        input.captureTimestamp,
+                        input.staticProps != null
+                                ? input.staticProps.rotate(m_rImagePipe.getParams().rotation())
+                                : input.staticProps);
+        if (input.preview != null) {
+            // Spectrum (pv-perf): rotated like the frame
+            m_rImagePipe.run(input.preview.getMat());
+            frame.streamPreview = input.preview;
+            frame.streamPreviewScale = input.previewScale;
+        }
+        return frame;
     }
 
     @Override

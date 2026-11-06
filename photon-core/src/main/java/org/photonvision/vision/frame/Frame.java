@@ -36,6 +36,15 @@ public class Frame implements Releasable {
 
     public final FrameStaticProperties frameStaticProperties;
 
+    /**
+     * Spectrum (pv-perf): the stream's small picture of this frame (full resolution / {@link
+     * #streamPreviewScale}), when the streaming decoder handed the frame over without its pixels
+     * (native publish on, the stream watched): the stream shows this instead. Null otherwise.
+     */
+    public CVMat streamPreview = null;
+
+    public int streamPreviewScale = 1;
+
     public Frame(
             long sequenceID,
             CVMat color,
@@ -113,5 +122,6 @@ public class Frame implements Releasable {
 
         colorImage.release();
         processedImage.release();
+        if (streamPreview != null) streamPreview.release();
     }
 }
