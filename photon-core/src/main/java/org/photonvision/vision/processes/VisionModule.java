@@ -405,6 +405,8 @@ public class VisionModule implements AutoCloseable {
                 this.targets = targets;
 
                 shouldRun = inputOutputFrame != null;
+                // Spectrum (pv-perf): wake the stream thread (it waits instead of polling)
+                if (shouldRun) frameLock.notifyAll();
             }
         }
 
@@ -416,6 +418,17 @@ public class VisionModule implements AutoCloseable {
                 final List<TrackedTarget> targets;
                 final boolean shouldRun;
                 synchronized (frameLock) {
+                    // Spectrum (pv-perf): wait for a frame instead of polling every 1 ms (~1000 wake-ups a
+                    // second per camera, all the time, even with no stream viewer: updateData is only called
+                    // while someone watches or a snapshot is pending, photonvision-15).
+                    while (!this.shouldRun) {
+                        try {
+                            frameLock.wait();
+                        } catch (InterruptedException e) {
+                            logger.warn("StreamRunnable was interrupted - exiting");
+                            return;
+                        }
+                    }
                     m_frame = this.latestFrame;
                     this.latestFrame = null;
 
@@ -441,14 +454,6 @@ public class VisionModule implements AutoCloseable {
                         } catch (Exception e) {
                             logger.error("Exception freeing frames", e);
                         }
-                    }
-                } else {
-                    // busy wait! hurray!
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        logger.warn("StreamRunnable was interrupted - exiting");
-                        return;
                     }
                 }
             }
