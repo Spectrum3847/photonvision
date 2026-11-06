@@ -97,9 +97,29 @@ public class NativeFrameProvider extends CpuImageProcessor {
         return handle != 0;
     }
 
+    // test hook: while this file exists, every native camera is handed to cscore as for calibration
+    private static final java.io.File HANDOVER_TEST_FILE =
+            new java.io.File("/tmp/spectrum-native-handover-test");
+    private long handoverTestCheckedNs = 0;
+    private boolean handoverTest = false;
+
     private boolean wantNative() {
+        long now = System.nanoTime();
+        if (now - handoverTestCheckedNs > 500_000_000L) {
+            handoverTestCheckedNs = now;
+            boolean t = HANDOVER_TEST_FILE.exists();
+            if (t != handoverTest) {
+                handoverTest = t;
+                reopen = true;
+                logger.info("Native camera: handover test " + (t ? "on" : "off"));
+            }
+        }
         VideoMode m = settables.getCurrentVideoMode();
-        return !calibrating && !nativeFailed && m != null && m.pixelFormat == PixelFormat.MJPEG;
+        return !calibrating
+                && !handoverTest
+                && !nativeFailed
+                && m != null
+                && m.pixelFormat == PixelFormat.MJPEG;
     }
 
     private void closeNative() {
@@ -162,7 +182,7 @@ public class NativeFrameProvider extends CpuImageProcessor {
             cscoreSink.setSource(cscore);
             logger.info(
                     "Native camera: cscore handover ("
-                            + (calibrating
+                            + (calibrating || handoverTest
                                     ? "calibration"
                                     : nativeFailed ? "native open failed" : "non-MJPEG mode")
                             + ")");
