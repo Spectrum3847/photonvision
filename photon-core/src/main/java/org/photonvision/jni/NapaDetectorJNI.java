@@ -167,6 +167,12 @@ public final class NapaDetectorJNI {
     public static native long cameraOpenSeq(
             String dev, int width, int height, int fps, String family, long lastSeq);
 
+    /**
+     * Stops the camera's thread and closes the device (destroy still needed); returns the native
+     * publish's final last sequence ID.
+     */
+    public static native long cameraStop(long handle);
+
     /** The last sequence ID the camera's native publish used. */
     public static native long cameraSequence(long handle);
 

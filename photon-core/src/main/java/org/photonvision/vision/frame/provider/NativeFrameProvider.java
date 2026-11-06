@@ -133,11 +133,12 @@ public class NativeFrameProvider extends CpuImageProcessor {
             var np = org.photonvision.vision.pipe.impl.NativePublish.current();
             if (np != null && np.cameraHandle == handle) np.cameraHandle = 0;
             long h = handle;
-            // sequence IDs keep rising across the handover (the Java path continues from the native one)
-            sequenceID = (int) Math.max(sequenceID, NapaDetectorJNI.cameraSequence(h));
             synchronized (jpegLock) { // the stream pump uses the handle under this lock
                 handle = 0;
             }
+            // sequence IDs keep rising across the handover: the Java path continues from the native
+            // publish's last one, read once its thread has stopped
+            sequenceID = (int) Math.max(sequenceID, NapaDetectorJNI.cameraStop(h));
             NapaDetectorJNI.destroy(h); // stops the camera thread, closes the capture fd
             openMode = null;
         }
