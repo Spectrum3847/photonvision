@@ -125,45 +125,29 @@ public final class NativePublish {
         String topicName = javaPub.getTopic().getName();
         String dir = topicName.substring(0, topicName.lastIndexOf('/'));
         if (!dir.equals(policyDir)) {
-            if (inScale != null) {
-                inScale.close();
-                inFullEvery.close();
-                inProcessEvery.close();
-            }
-            inScale = pvInst.getIntegerTopic(dir + "/input/scale").subscribe(0);
-            inFullEvery = pvInst.getIntegerTopic(dir + "/input/fullEvery").subscribe(0);
+            if (inProcessEvery != null) inProcessEvery.close();
             inProcessEvery = pvInst.getIntegerTopic(dir + "/input/processEvery").subscribe(0);
             policyDir = dir;
         }
     }
 
     /**
-     * Spectrum (sc/mjpeg-napa): the frame policy (docs/FRAME-POLICY.md in SpectrumJetson): decode
-     * scale (1 or 2 from the robot; 4 only via SPECTRUM_POLICY_SCALE, for tests), every Nth processed
-     * frame at full scale (0: never forced), process 1 frame in N (the others aren't decoded). The
-     * robot publishes them under /photonvision/<camera>/input/; until it does, SPECTRUM_POLICY_SCALE
-     * / _FULL_EVERY / _PROCESS_EVERY, else full scale, every frame. Scale and skipping apply only
-     * while nobody watches the camera's stream.
+     * Spectrum (sc/mjpeg-napa): the frame policy (docs/FRAME-POLICY.md in SpectrumJetson): frame
+     * skipping only, process 1 frame in N (the others aren't decoded). The robot publishes
+     * /photonvision/<camera>/input/processEvery; until it does, SPECTRUM_POLICY_PROCESS_EVERY, else
+     * every frame. Skipping applies only while nobody watches the camera's stream. (The decode scale
+     * was removed: it saved ~1 point of a core at best.)
      */
-    private static final int DEF_SCALE = envInt("SPECTRUM_POLICY_SCALE", 1);
-
-    private static final int DEF_FULL_EVERY = envInt("SPECTRUM_POLICY_FULL_EVERY", 0);
     private static final int DEF_PROCESS_EVERY = envInt("SPECTRUM_POLICY_PROCESS_EVERY", 1);
 
-    private org.wpilib.networktables.IntegerSubscriber inScale, inFullEvery, inProcessEvery;
+    private org.wpilib.networktables.IntegerSubscriber inProcessEvery;
     private String policyDir;
-    private volatile long scaledFrames = 0;
 
     private volatile int[] activePolicy = {1, 0, 1};
 
-    /** The frame policy in force: {scale, fullEvery, processEvery}. */
+    /** The frame policy in force: {1, 0, processEvery} (scale and fullEvery fixed: skipping only). */
     public int[] activePolicy() {
         return activePolicy;
-    }
-
-    /** Frames decoded at a reduced scale so far. */
-    public long scaledFrames() {
-        return scaledFrames;
     }
 
     private static int envInt(String name, int def) {
@@ -176,16 +160,12 @@ public final class NativePublish {
     }
 
     private synchronized int[] policy() {
-        int scale = DEF_SCALE, fullEvery = DEF_FULL_EVERY, every = DEF_PROCESS_EVERY;
-        if (inScale != null) {
-            long v = inScale.get();
-            if (v == 1 || v == 2) scale = (int) v; // 1/4 only as a test option (environment)
-            v = inFullEvery.get();
-            if (v > 0) fullEvery = (int) v;
-            v = inProcessEvery.get();
+        int every = DEF_PROCESS_EVERY;
+        if (inProcessEvery != null) {
+            long v = inProcessEvery.get();
             if (v > 0) every = (int) v;
         }
-        return new int[] {scale, fullEvery, every};
+        return new int[] {1, 0, every};
     }
 
     private boolean ensureOwnClient(
@@ -235,11 +215,9 @@ public final class NativePublish {
         if (ownInst != null) ownInst.close();
         ownPub = null;
         ownInst = null;
-        if (inScale != null) {
-            inScale.close();
-            inFullEvery.close();
+        if (inProcessEvery != null) {
             inProcessEvery.close();
-            inScale = null;
+            inProcessEvery = null;
             policyDir = null;
         }
     }
@@ -312,8 +290,7 @@ public final class NativePublish {
         try {
             int[] pol = policy();
             activePolicy = pol;
-            scaledFrames =
-                    org.photonvision.jni.NapaDetectorJNI.setNativePolicy(napaHandle, pol[0], pol[1], pol[2]);
+            org.photonvision.jni.NapaDetectorJNI.setNativePolicy(napaHandle, pol[0], pol[1], pol[2]);
         } catch (UnsatisfiedLinkError e) {
             // an older NAPA library: full scale, every frame
         }

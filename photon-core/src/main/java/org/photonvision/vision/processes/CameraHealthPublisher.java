@@ -60,10 +60,10 @@ public class CameraHealthPublisher implements CVPipelineResultConsumer {
     private IntegerPublisher frames, failures, recoveryCount, heartbeat, lastFrameAge;
     // Spectrum (sc/mjpeg-napa): the frame policy in force (fast path) and frames decoded reduced so
     // far
-    private IntegerPublisher policyScale, policyFullEvery, policyProcessEvery, scaledFrames;
+    private IntegerPublisher policyProcessEvery;
     private long beats = 0;
 
-    private long windowStartNs = 0, total = 0, nativeAtWindowStart = -1, scaledAtWindowStart = -1;
+    private long windowStartNs = 0, total = 0, nativeAtWindowStart = -1;
     private int count = 0;
     private double sumMs = 0, maxMs = 0, sumLatencyMs = 0;
 
@@ -166,14 +166,7 @@ public class CameraHealthPublisher implements CVPipelineResultConsumer {
             latencyMs.set(nativePub.latencyMs());
             frames.set(pub);
             int[] pol = nativePub.activePolicy();
-            policyScale.set(pol[0]);
-            policyFullEvery.set(pol[1]);
             policyProcessEvery.set(pol[2]);
-            // frames decoded at a reduced scale in this window (about a second); the native count is
-            // cumulative
-            long sc = nativePub.scaledFrames();
-            scaledFrames.set(scaledAtWindowStart >= 0 ? Math.max(0, sc - scaledAtWindowStart) : 0);
-            scaledAtWindowStart = sc;
         } else {
             nativeAtWindowStart = -1;
             fps.set(count / window);
@@ -201,10 +194,7 @@ public class CameraHealthPublisher implements CVPipelineResultConsumer {
             frames.close();
             failures.close();
             recoveryCount.close();
-            policyScale.close();
-            policyFullEvery.close();
             policyProcessEvery.close();
-            scaledFrames.close();
             problemPub.close();
             statePub.close();
             heartbeat.close();
@@ -227,10 +217,7 @@ public class CameraHealthPublisher implements CVPipelineResultConsumer {
         frames = t.getIntegerTopic("frames").publish();
         failures = t.getIntegerTopic("decodeFailures").publish();
         recoveryCount = t.getIntegerTopic("recoveries").publish();
-        policyScale = t.getIntegerTopic("scale").publish();
-        policyFullEvery = t.getIntegerTopic("fullEvery").publish();
         policyProcessEvery = t.getIntegerTopic("processEvery").publish();
-        scaledFrames = t.getIntegerTopic("scaledFrames").publish();
         problemPub = t.getStringTopic("problem").publish();
         publishedName = name;
     }

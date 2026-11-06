@@ -96,10 +96,11 @@ public final class SystemCoreProfile {
     }
 
     /**
-     * Whether to decode at half resolution: the pipeline's setting (the profile doesn't force it).
+     * Whether to decode at half resolution: never (the size change was removed; the saved pipeline
+     * setting is kept only so old settings still load).
      */
     public static boolean lowCpuDecode(boolean setting) {
-        return setting;
+        return false;
     }
 
     /** The decimation to run. */
