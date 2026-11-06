@@ -298,7 +298,7 @@ public class RewindManager {
         // fail file by file in silence and report success.
         if (QuietMode.quiet()) {
             return "the SSD is in quiet mode after the match (read-only); it's writable again at the next"
-                                 + " enable";
+                    + " enable";
         }
         lastDiskCheckNs = 0;
         return deleteTree(p) ? null : "some files couldn't be deleted (see the log)";

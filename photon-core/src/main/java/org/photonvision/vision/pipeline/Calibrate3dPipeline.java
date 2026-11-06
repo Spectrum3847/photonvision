@@ -17,9 +17,9 @@
 
 package org.photonvision.vision.pipeline;
 
+import io.avaje.jsonb.Json;
 import java.awt.Color;
 import java.nio.file.Path;
-import io.avaje.jsonb.Json;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -330,7 +330,14 @@ public class Calibrate3dPipeline
         int w = fsp != null ? fsp.imageWidth : (int) settings.resolution.width;
         int h = fsp != null ? fsp.imageHeight : (int) settings.resolution.height;
         String key =
-                w + "x" + h + "/" + settings.boardWidth + "x" + settings.boardHeight + "/"
+                w
+                        + "x"
+                        + h
+                        + "/"
+                        + settings.boardWidth
+                        + "x"
+                        + settings.boardHeight
+                        + "/"
                         + settings.gridSize;
         if (session == null || !key.equals(sessionKey)) {
             double fx = fsp != null ? fsp.horizontalFocalLength : 0;
@@ -362,8 +369,8 @@ public class Calibrate3dPipeline
     }
 
     /**
-     * The board's distance (m) and tilt from facing the camera (degrees), from a pose solved with
-     * the camera's current (or generic) focal length and no distortion: rough, but plenty for the
+     * The board's distance (m) and tilt from facing the camera (degrees), from a pose solved with the
+     * camera's current (or generic) focal length and no distortion: rough, but plenty for the
      * distance and tilt quotas. {-1, -1} if it can't be solved.
      */
     private double[] boardPose(FindBoardCornersPipeResult r) {

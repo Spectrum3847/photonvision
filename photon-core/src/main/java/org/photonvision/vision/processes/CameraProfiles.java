@@ -173,7 +173,8 @@ public final class CameraProfiles {
                 null);
     }
 
-    private static CameraCalibrationCoefficients withoutObservations(CameraCalibrationCoefficients c) {
+    private static CameraCalibrationCoefficients withoutObservations(
+            CameraCalibrationCoefficients c) {
         return new CameraCalibrationCoefficients(
                 c.resolution,
                 c.cameraIntrinsics,

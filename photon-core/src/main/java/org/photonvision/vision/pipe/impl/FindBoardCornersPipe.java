@@ -371,11 +371,7 @@ public class FindBoardCornersPipe
 
                 boardFound =
                         hasValidCharucoDetections(
-                                detectedCorners,
-                                ids,
-                                params.boardWidth() - 1,
-                                inFrame.width(),
-                                inFrame.height());
+                                detectedCorners, ids, params.boardWidth() - 1, inFrame.width(), inFrame.height());
 
                 if (!boardFound) {
                     // If we can't find a board, give up

@@ -120,8 +120,7 @@ public class ObjectDetectionPipeline
                     detections.stream()
                             .filter(
                                     d ->
-                                            !settings.detectionMask.ignores(
-                                                    d.bbox().center.x / w, d.bbox().center.y / h))
+                                            !settings.detectionMask.ignores(d.bbox().center.x / w, d.bbox().center.y / h))
                             .toList();
         }
 

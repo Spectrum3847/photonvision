@@ -38,8 +38,7 @@ public final class GpuStatus {
 
     /** The GPU detector library, under its name or its name before 2026-10-31. */
     private static boolean detectorLoaded(String loaded) {
-        return loaded.contains("libspectrum-gpu-apriltag.so")
-                || loaded.contains("lib971apriltag.so");
+        return loaded.contains("libspectrum-gpu-apriltag.so") || loaded.contains("lib971apriltag.so");
     }
 
     /** The GPU's work in a sentence, or "" off a Jetson (no CUDA detector installed). */

@@ -25,11 +25,11 @@ import org.photonvision.common.logging.Logger;
  * in the detector library) is in use, and when to give it up, try it again, or fix the camera.
  *
  * <ul>
- *   <li>30 real decode failures in a row (bad JPEGs) switch to cscore's own, slower, conversion. The
- *       direct path is then tried again every 10 s, and one failed retry switches straight back.
- *       Before, the switch was permanent until the next restart, costing about 1.2 CPU cores.
- *   <li>A size mismatch never switches over. It means the camera is streaming a different video mode
- *       than the one PhotonVision set: on 2026-09-24 cscore's mode restore on connect raced
+ *   <li>30 real decode failures in a row (bad JPEGs) switch to cscore's own, slower, conversion.
+ *       The direct path is then tried again every 10 s, and one failed retry switches straight
+ *       back. Before, the switch was permanent until the next restart, costing about 1.2 CPU cores.
+ *   <li>A size mismatch never switches over. It means the camera is streaming a different video
+ *       mode than the one PhotonVision set: on 2026-09-24 cscore's mode restore on connect raced
  *       PhotonVision's and left a camera at 320x240, while cscore believed 1280x800. cscore's
  *       conversion then silently upscaled 320x240 to 1280x800 for the detector. Instead the frame
  *       is dropped, and once the mismatch has lasted 1 s the caller reconnects the camera (at most
@@ -96,7 +96,8 @@ final class DirectDecode {
     void failed(String why) {
         mismatchSinceNs = 0;
         if (++failures >= MAX_FAILURES) {
-            switchOff(retrying ? "still failing (" + why + ")" : "failed 30 times in a row (" + why + ")");
+            switchOff(
+                    retrying ? "still failing (" + why + ")" : "failed 30 times in a row (" + why + ")");
         }
     }
 

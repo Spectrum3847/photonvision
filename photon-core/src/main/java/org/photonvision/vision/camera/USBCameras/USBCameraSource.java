@@ -70,9 +70,7 @@ public class USBCameraSource extends VisionSource {
         // also TODO - is the config's saved usb info a reasonable guess for quirk detection? seems like
         // yes to me...
         int vid =
-                (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo)
-                        ? cameraInfo.vendorId
-                        : -1;
+                (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo) ? cameraInfo.vendorId : -1;
         int pid =
                 (config.matchedCameraInfo instanceof PVUsbCameraInfo cameraInfo)
                         ? cameraInfo.productId
@@ -85,7 +83,6 @@ public class USBCameraSource extends VisionSource {
         }
 
         if (getCameraConfiguration().cameraQuirks.hasQuirks()) {
-
             logger.info("Quirky camera detected: " + getCameraConfiguration().cameraQuirks.baseName);
         }
 

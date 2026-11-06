@@ -27,9 +27,9 @@ import org.opencv.imgcodecs.Imgcodecs;
  * Spectrum (photonvision-98): MJPEG straight to 8-bit gray on the CPU, with no detector library
  * (the SystemCore; any machine without CUDA). OpenCV's imdecode (libjpeg-turbo inside WPILib's
  * OpenCV) with IMREAD_GRAYSCALE decodes only the brightness channel: no colour upsampling or
- * conversion, and no BGR frame made only to be converted to gray as cscore's gray sink does.
- * {@code half} uses libjpeg's scaled IDCT (IMREAD_REDUCED_GRAYSCALE_2): a half-resolution image
- * straight from the JPEG, for the low-CPU decode.
+ * conversion, and no BGR frame made only to be converted to gray as cscore's gray sink does. {@code
+ * half} uses libjpeg's scaled IDCT (IMREAD_REDUCED_GRAYSCALE_2): a half-resolution image straight
+ * from the JPEG, for the low-CPU decode.
  *
  * <p>Measured on the Jetson's Cortex-A78AE at 1.2 GHz, 1280x800 field frames
  * (tests/systemcore-cpu): colour decode + cvtColor 9.8 ms, gray 5.0 ms, half-res gray 4.2 ms.
@@ -48,9 +48,9 @@ final class CpuMjpegDecode {
 
     /**
      * Decode the MJPEG in cscore's native frame into {@code out[0]}: gray, full size or (half)
-     * ceil(width/2) x ceil(height/2). Returns 0, or as GpuDetectorJNI.decodeMjpegGray: -1 not
-     * MJPEG, -2 bad JPEG, -3 not the video mode's size; -4 the native frame doesn't look like a
-     * WPI_RawFrame (another WPILib's layout): don't use this decoder.
+     * ceil(width/2) x ceil(height/2). Returns 0, or as GpuDetectorJNI.decodeMjpegGray: -1 not MJPEG,
+     * -2 bad JPEG, -3 not the video mode's size; -4 the native frame doesn't look like a WPI_RawFrame
+     * (another WPILib's layout): don't use this decoder.
      */
     static int decode(long rawFramePtr, int width, int height, boolean half, Mat[] out) {
         if (rawFramePtr == 0) return -4;
@@ -70,7 +70,9 @@ final class CpuMjpegDecode {
         var buf = new MatOfByte(jpeg);
         Mat img;
         try {
-            img = Imgcodecs.imdecode(buf, half ? Imgcodecs.IMREAD_REDUCED_GRAYSCALE_2 : Imgcodecs.IMREAD_GRAYSCALE);
+            img =
+                    Imgcodecs.imdecode(
+                            buf, half ? Imgcodecs.IMREAD_REDUCED_GRAYSCALE_2 : Imgcodecs.IMREAD_GRAYSCALE);
         } finally {
             buf.release();
         }

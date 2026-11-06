@@ -1181,7 +1181,9 @@ public class RequestHandler {
         }
     }
 
-    /** SpectrumJetson (photonvision-54): each camera's tag contrast over the last 2 s (TagContrast). */
+    /**
+     * SpectrumJetson (photonvision-54): each camera's tag contrast over the last 2 s (TagContrast).
+     */
     public static void onTagContrastRequest(Context ctx) {
         var names =
                 VisionSourceManager.getInstance().vmm.getModules().stream()
@@ -1189,8 +1191,7 @@ public class RequestHandler {
                         .toList();
         try {
             ctx.json(
-                    org.photonvision.vision.target.TagContrast.summary(names),
-                    Types.mapOf(Object.class));
+                    org.photonvision.vision.target.TagContrast.summary(names), Types.mapOf(Object.class));
         } catch (Exception e) {
             ctx.status(500);
             ctx.result("Tag contrast failed: " + e.getMessage());

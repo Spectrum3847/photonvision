@@ -41,9 +41,9 @@ public final class TeamCameraDefaults {
 
     /**
      * UVC units of 100 us: 50 = 5 ms. Tuned on the bench 2026-09-24: less motion blur than 8.3 ms
-     * (83, one 120 Hz mains-flicker period), detections still solid with the decision margin
-     * cutoff at 15, and no measurable flicker under the shop lights (frame-to-frame brightness
-     * change 0.6%, tests/flicker-check). Recheck flicker under event lighting.
+     * (83, one 120 Hz mains-flicker period), detections still solid with the decision margin cutoff
+     * at 15, and no measurable flicker under the shop lights (frame-to-frame brightness change 0.6%,
+     * tests/flicker-check). Recheck flicker under event lighting.
      */
     public static final double EXPOSURE_RAW = 50;
 
@@ -61,8 +61,8 @@ public final class TeamCameraDefaults {
     public static final FrameDivisor STREAM_DIVISOR = FrameDivisor.SIXTH;
 
     /**
-     * Multi-tag solve on the Jetson (PhotonLib's multi-tag result). It only runs while 3D is on,
-     * and 3D needs a calibration, so {@link #enable3dIfCalibrated} turns 3D on once there is one.
+     * Multi-tag solve on the Jetson (PhotonLib's multi-tag result). It only runs while 3D is on, and
+     * 3D needs a calibration, so {@link #enable3dIfCalibrated} turns 3D on once there is one.
      */
     public static final boolean MULTI_TAG = true;
 
@@ -75,8 +75,8 @@ public final class TeamCameraDefaults {
     }
 
     /**
-     * Same check as Platform's private isJetsonSBC(); kept here so photon-targeting stays
-     * identical to upstream.
+     * Same check as Platform's private isJetsonSBC(); kept here so photon-targeting stays identical
+     * to upstream.
      */
     static boolean isJetson() {
         try {
@@ -108,9 +108,9 @@ public final class TeamCameraDefaults {
     }
 
     /**
-     * Video mode indexes differ per camera, so pick by content: the preferred resolution in MJPEG
-     * at its highest fps; else the largest MJPEG mode running at least 60 fps; else the largest
-     * mode. Returns -1 if the camera reported no modes.
+     * Video mode indexes differ per camera, so pick by content: the preferred resolution in MJPEG at
+     * its highest fps; else the largest MJPEG mode running at least 60 fps; else the largest mode.
+     * Returns -1 if the camera reported no modes.
      */
     public static int pickVideoMode(List<VideoMode> modes) {
         return pickVideoMode(modes, PREFERRED_WIDTH, PREFERRED_HEIGHT);
@@ -139,8 +139,8 @@ public final class TeamCameraDefaults {
 
     /**
      * Turns 3D (and multi-tag) on for an AprilTag pipeline whose resolution has a calibration. 3D
-     * without a calibration doesn't work, which is why new cameras start with it off. Only ever
-     * turns settings on. Returns true if it changed anything.
+     * without a calibration doesn't work, which is why new cameras start with it off. Only ever turns
+     * settings on. Returns true if it changed anything.
      */
     public static boolean enable3dIfCalibrated(
             CVPipelineSettings s,
@@ -151,7 +151,7 @@ public final class TeamCameraDefaults {
         }
         if (s.cameraVideoModeIndex < 0 || s.cameraVideoModeIndex >= modes.size()) return false;
         VideoMode m = modes.get(s.cameraVideoModeIndex);
-        if ( calibrations == null) return false;
+        if (calibrations == null) return false;
         boolean calibrated =
                 calibrations.stream()
                         .anyMatch(

@@ -23,12 +23,12 @@ import java.util.Arrays;
  * Spectrum (photonvision-91): line up per-corner flags with the detections they belong to.
  *
  * <p>PhotonVision's observations are indexed by <b>detection</b> (the corners that were seen, in
- * the order the detector returned them). The photon-mrcal JNI in use (dev-v2027.0.2) returns
- * {@code cornersUsed} per detection too, and that is used as is. A board-indexed array (one
- * slot per board corner id, a different length from the detections: older builds, and the 2026
- * calibrations the SpectrumJetson tests/calibration-analysis looked at) is remapped by id. The
- * residuals are what didn't line up: upstream's list skipped the outliers, so from the first
- * outlier on, residual i belonged to a later corner (fixed in Calibrate3dPipe).
+ * the order the detector returned them). The photon-mrcal JNI in use (dev-v2027.0.2) returns {@code
+ * cornersUsed} per detection too, and that is used as is. A board-indexed array (one slot per board
+ * corner id, a different length from the detections: older builds, and the 2026 calibrations the
+ * SpectrumJetson tests/calibration-analysis looked at) is remapped by id. The residuals are what
+ * didn't line up: upstream's list skipped the outliers, so from the first outlier on, residual i
+ * belonged to a later corner (fixed in Calibrate3dPipe).
  */
 public final class CornerAlignment {
     private CornerAlignment() {}

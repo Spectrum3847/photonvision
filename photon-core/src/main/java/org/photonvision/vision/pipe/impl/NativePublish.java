@@ -18,14 +18,15 @@
 package org.photonvision.vision.pipe.impl;
 
 /**
- * Spectrum (sc/mjpeg-napa) fast path: with streaming NAPA, the camera's streaming-decoder thread publishes each
- * frame's PhotonPipelineResult itself (NapaDetectorJNI.setNativePublish: native pose + the fork's serde on this
- * camera's rawBytes publisher) the moment its tags are known, so the Java pipeline is off the per-frame path. The
- * Java pipeline keeps running for the UI, the stream and health, at most {@link #JAVA_FPS} frames a second, and
- * doesn't publish rawBytes itself while the native side does.
+ * Spectrum (sc/mjpeg-napa) fast path: with streaming NAPA, the camera's streaming-decoder thread
+ * publishes each frame's PhotonPipelineResult itself (NapaDetectorJNI.setNativePublish: native pose
+ * + the fork's serde on this camera's rawBytes publisher) the moment its tags are known, so the
+ * Java pipeline is off the per-frame path. The Java pipeline keeps running for the UI, the stream
+ * and health, at most {@link #JAVA_FPS} frames a second, and doesn't publish rawBytes itself while
+ * the native side does.
  *
- * <p>SPECTRUM_NATIVE_PUBLISH=1 turns it on (prototype: one camera); SPECTRUM_NATIVE_PUBLISH_JAVA_FPS (default 30)
- * caps the Java pipeline meanwhile.
+ * <p>SPECTRUM_NATIVE_PUBLISH=1 turns it on (prototype: one camera);
+ * SPECTRUM_NATIVE_PUBLISH_JAVA_FPS (default 30) caps the Java pipeline meanwhile.
  */
 public final class NativePublish {
     public static final boolean ENABLED = "1".equals(System.getenv("SPECTRUM_NATIVE_PUBLISH"));
@@ -57,7 +58,10 @@ public final class NativePublish {
         }
     }
 
-    /** NapaDetector, after each streamed frame: refresh the native side's settings, track whether it publishes. */
+    /**
+     * NapaDetector, after each streamed frame: refresh the native side's settings, track whether it
+     * publishes.
+     */
     static void update(long napaHandle) {
         if (!ENABLED || napaHandle == 0) return;
         long n =

@@ -27,8 +27,8 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
 import org.opencv.core.MatOfDouble;
 import org.opencv.core.MatOfInt;
-import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.core.Rect;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.photonvision.common.dataflow.CVPipelineResultConsumer;
 import org.photonvision.vision.pipeline.result.CVPipelineResult;
@@ -61,7 +61,8 @@ public class FocusMeter implements CVPipelineResultConsumer {
 
     /** The latest measurement: grid is row-major, cell 4 is the centre. */
     @Json
-    public record Reading(double[] grid, double centre, double best, int width, int height, long ageMs) {}
+    public record Reading(
+            double[] grid, double centre, double best, int width, int height, long ageMs) {}
 
     private final ExecutorService worker =
             Executors.newSingleThreadExecutor(

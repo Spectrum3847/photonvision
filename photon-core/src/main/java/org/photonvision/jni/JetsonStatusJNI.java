@@ -18,17 +18,17 @@
 package org.photonvision.jni;
 
 /**
- * SpectrumJetson: status from the detector library (libspectrum-gpu-apriltag, loaded by GpuDetectorJNI) for
- * JetsonTelemetry. Safe to call without the library, or with an older one that lacks it: returns
- * null.
+ * SpectrumJetson: status from the detector library (libspectrum-gpu-apriltag, loaded by
+ * GpuDetectorJNI) for JetsonTelemetry. Safe to call without the library, or with an older one that
+ * lacks it: returns null.
  */
 public final class JetsonStatusJNI {
     private JetsonStatusJNI() {}
 
     /**
-     * The JPEG decoder's state: {active decoder (1 nvjpg, 0 libjpeg-turbo), hardware decoder
-     * switched off (1/0), checks ok, checks that differed, checks skipped}. Counts are since
-     * PhotonVision started. Null if the library doesn't provide it.
+     * The JPEG decoder's state: {active decoder (1 nvjpg, 0 libjpeg-turbo), hardware decoder switched
+     * off (1/0), checks ok, checks that differed, checks skipped}. Counts are since PhotonVision
+     * started. Null if the library doesn't provide it.
      */
     public static long[] jpegStatus() {
         try {

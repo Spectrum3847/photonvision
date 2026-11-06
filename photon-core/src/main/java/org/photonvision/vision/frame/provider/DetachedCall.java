@@ -38,8 +38,8 @@ final class DetachedCall {
 
     /**
      * Starts {@code call} on a daemon thread named {@code name} and waits up to {@code waitMs} for
-     * it. True if it finished in that time; false if it's still running (it keeps running), or if
-     * the last one is still running (then nothing new is started).
+     * it. True if it finished in that time; false if it's still running (it keeps running), or if the
+     * last one is still running (then nothing new is started).
      */
     boolean run(String name, Runnable call, long waitMs) throws InterruptedException {
         Thread t;

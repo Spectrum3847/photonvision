@@ -57,16 +57,17 @@ public class GpuDetectorJNI {
     public static native AprilTagDetection[] processimage(long handle, long p);
 
     /**
-     * SpectrumJetson (photonvision-40, detector-07): the detection mask. mode 0 off, 1 ignore inside the
-     * boxes, 2 search only inside them; rects: x, y, w, h fractions of the image, 4 per box. Takes
-     * effect on the next frame.
+     * SpectrumJetson (photonvision-40, detector-07): the detection mask. mode 0 off, 1 ignore inside
+     * the boxes, 2 search only inside them; rects: x, y, w, h fractions of the image, 4 per box.
+     * Takes effect on the next frame.
      */
     public static native void setMask(long handle, int mode, double[] rects);
 
     /**
      * SpectrumJetson (photonvision-04): all 8 coefficients of the OpenCV rational model
      * PhotonVision's calibration produces (k1 k2 p1 p2 k3 k4 k5 k6). setparams() drops k4..k6. Only
-     * the SpectrumJetson gpu build of libspectrum-gpu-apriltag has this; callers fall back to setparams().
+     * the SpectrumJetson gpu build of libspectrum-gpu-apriltag has this; callers fall back to
+     * setparams().
      */
     public static native void setparams8(
             long handle,
@@ -85,8 +86,8 @@ public class GpuDetectorJNI {
 
     /**
      * SpectrumJetson (photonvision-09): decodes a camera's MJPEG frame (a cscore RawFrame, by its
-     * native address) straight to 8-bit gray into a Mat Java allocated (WxH CV_8UC1). 0 ok, -1 not
-     * an MJPEG frame, -2 bad JPEG, -3 the Mat isn't the frame's size.
+     * native address) straight to 8-bit gray into a Mat Java allocated (WxH CV_8UC1). 0 ok, -1 not an
+     * MJPEG frame, -2 bad JPEG, -3 the Mat isn't the frame's size.
      */
     public static native int decodeMjpegGray(long rawFramePtr, long cvMatPtr);
 

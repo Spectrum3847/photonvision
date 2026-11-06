@@ -42,15 +42,15 @@ import org.photonvision.vision.processes.VisionSourceManager;
  * ThriftiestFirmware}.
  *
  * <ul>
- *   <li>The cameras: {@code swyft-fw.py list --json} (USB port, serial, firmware revision, or
- *       stuck in the boot loader). It only reads USB descriptors, so it's safe while streaming.
+ *   <li>The cameras: {@code swyft-fw.py list --json} (USB port, serial, firmware revision, or stuck
+ *       in the boot loader). It only reads USB descriptors, so it's safe while streaming.
  *   <li>Firmware files (.rfw, Swyft's download) are uploaded once and kept on the settings
  *       partition ({@link #store()}), checked with {@code swyft-fw.py check-image}.
  *   <li>A flash runs {@code swyft-flash-job.sh} as a transient systemd unit: it stops PhotonVision
  *       (whose camera watchdog would reset the camera mid-write), flashes with a backup of the
- *       camera's flash into {@link #store()}/backups, and starts PhotonVision again. Its progress is
- *       in {@link #JOB_STATUS}. After a flash the camera's video stays off until the robot is power
- *       cycled (a Jetson reboot isn't enough: docs/SWYFT-CAMERA-FIRMWARE.md).
+ *       camera's flash into {@link #store()}/backups, and starts PhotonVision again. Its progress
+ *       is in {@link #JOB_STATUS}. After a flash the camera's video stays off until the robot is
+ *       power cycled (a Jetson reboot isn't enough: docs/SWYFT-CAMERA-FIRMWARE.md).
  * </ul>
  *
  * The scripts are the repo's own, found through /opt/photonvision/health-check.sh, the link
@@ -78,7 +78,8 @@ public final class SwyftFirmware {
 
     /** Runs swyft-fw.py with these arguments and returns its JSON output. */
     private static String tool(String... args) throws IOException {
-        var cmd = new ArrayList<String>(List.of("python3", scripts().resolve("swyft-fw.py").toString()));
+        var cmd =
+                new ArrayList<String>(List.of("python3", scripts().resolve("swyft-fw.py").toString()));
         cmd.addAll(List.of(args));
         var p = new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD).start();
         String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -187,7 +188,9 @@ public final class SwyftFirmware {
                 throw new IOException("Too big for the camera's 128 KiB flash");
             Files.write(tmp, bytes);
             var check = JsonObject.create(); // a copy: parsed avaje nodes are read-only
-            json.fromJsonObject(tool("check-image", "--json", tmp.toString())).elements().forEach(check::add);
+            json.fromJsonObject(tool("check-image", "--json", tmp.toString()))
+                    .elements()
+                    .forEach(check::add);
             if (!check.extract("error", "").isEmpty()) throw new IOException(check.extract("error", ""));
             Files.move(tmp, store().resolve(name), StandardCopyOption.REPLACE_EXISTING);
             check.add("file", name); // not the temporary name

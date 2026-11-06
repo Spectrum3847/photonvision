@@ -259,8 +259,7 @@ public class Calibrate3dPipeTest {
             assertTrue(q.rms() > 0 && q.rms() < 1.0, "refit rms " + q.rms());
         } else {
             // mrcal's was kept (the refit folded or failed): its uncertainty is mrcal's
-            double min =
-                    refit.estimateUncertainty().stream().mapToDouble(p -> p.z).min().orElseThrow();
+            double min = refit.estimateUncertainty().stream().mapToDouble(p -> p.z).min().orElseThrow();
             assertEquals(mrcalMin, min, 1e-6);
         }
     }

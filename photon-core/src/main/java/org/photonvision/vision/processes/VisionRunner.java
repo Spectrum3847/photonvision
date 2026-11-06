@@ -185,7 +185,6 @@ public class VisionRunner implements AutoCloseable {
         return future;
     }
 
-
     // Spectrum: where each loop's time goes, logged every 10 s (frame = grab incl. decode,
     // pipeline = pipeline.run, consumers = pipelineResultConsumer: NT, UI, health, ...).
     private long tSettings, tFrame, tPipeline, tConsumers, tLoops, tLoggedNs = System.nanoTime();
@@ -275,7 +274,9 @@ public class VisionRunner implements AutoCloseable {
                 if (org.photonvision.vision.pipe.impl.NativePublish.active()
                         && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0)
                     capNanos =
-                            Math.max(capNanos, (long) (1e9 / org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS));
+                            Math.max(
+                                    capNanos,
+                                    (long) (1e9 / org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS));
                 if (capNanos > 0) {
                     if (!frameRateCap.await(capNanos)) return;
                 } else if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;
@@ -349,8 +350,7 @@ public class VisionRunner implements AutoCloseable {
                             long captured = pipelineResult.getImageCaptureTimestampNanos();
                             LatencyTrace.end(frameSupplier.getName(), captured, n2, n3, n4);
                             if (captured > 0 && latCount < latNs.length) {
-                                latNs[latCount++] =
-                                        org.wpilib.networktables.NetworkTablesJNI.now() - captured;
+                                latNs[latCount++] = org.wpilib.networktables.NetworkTablesJNI.now() - captured;
                             }
                             tSettings += n1 - n0;
                             tFrame += n2 - n1;

@@ -29,10 +29,10 @@ import org.photonvision.common.logging.Logger;
  * <ul>
  *   <li>detector threads at most {@link #MAX_THREADS} (the rest stay free for robot code);
  *   <li>decimation at least 2. MJPEG is decoded straight to full-resolution gray on the CPU
- *       (CpuMjpegDecode). The low-CPU half-resolution decode stays off unless the pipeline asks
- *       for it: on 1280x800 field frames it saved only 0.9 ms of 4.9 ms decode, the detector cost
- *       was the same as decimate 2, and it found 86% of the GPU detector's tags against 96%, with
- *       twice the corner error (tests/systemcore-cpu);
+ *       (CpuMjpegDecode). The low-CPU half-resolution decode stays off unless the pipeline asks for
+ *       it: on 1280x800 field frames it saved only 0.9 ms of 4.9 ms decode, the detector cost was
+ *       the same as decimate 2, and it found 86% of the GPU detector's tags against 96%, with twice
+ *       the corner error (tests/systemcore-cpu);
  *   <li>at most {@link #MAX_FPS} frames a second processed, and decoded (the decoder thread waits
  *       for the loop, as in IdleMode).
  * </ul>
@@ -95,7 +95,9 @@ public final class SystemCoreProfile {
         return active() ? Math.max(1, Math.min(wanted, MAX_THREADS)) : wanted;
     }
 
-    /** Whether to decode at half resolution: the pipeline's setting (the profile doesn't force it). */
+    /**
+     * Whether to decode at half resolution: the pipeline's setting (the profile doesn't force it).
+     */
     public static boolean lowCpuDecode(boolean setting) {
         return setting;
     }

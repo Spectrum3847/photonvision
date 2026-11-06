@@ -33,8 +33,8 @@ public final class AprilTagPixelConvention {
     private AprilTagPixelConvention() {}
 
     /**
-     * The detection in OpenCV's convention: corners and centre shifted by -0.5 px, and the
-     * homography (tag coordinates to image) with them, H' = T*H, T = [[1,0,-0.5],[0,1,-0.5],[0,0,1]].
+     * The detection in OpenCV's convention: corners and centre shifted by -0.5 px, and the homography
+     * (tag coordinates to image) with them, H' = T*H, T = [[1,0,-0.5],[0,1,-0.5],[0,0,1]].
      */
     public static AprilTagDetection toOpenCv(AprilTagDetection d) {
         double[] h = d.getHomography();

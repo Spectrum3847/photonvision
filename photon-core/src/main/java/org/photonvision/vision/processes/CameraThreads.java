@@ -220,7 +220,8 @@ public final class CameraThreads {
         }
         if (hw.pinSharedCore == 1) {
             hw.pinSharedCore = -1;
-            logger.info("Pin camera threads: reset the saved pinSharedCore 1 (the first build's default) to -1");
+            logger.info(
+                    "Pin camera threads: reset the saved pinSharedCore 1 (the first build's default) to -1");
         }
         hw.pinSettingsVersion = 1;
         ConfigProvider.getInstance().requestSave();

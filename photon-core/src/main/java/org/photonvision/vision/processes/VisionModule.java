@@ -246,7 +246,8 @@ public class VisionModule implements AutoCloseable {
             // Spectrum: a known camera model also gets its profile (CameraProfiles): exposure,
             // resolution, a generic starting calibration, and the FOV computed from it.
             var profile =
-                    CameraProfiles.forCamera(visionSource.getSettables().getConfiguration().matchedCameraInfo);
+                    CameraProfiles.forCamera(
+                            visionSource.getSettables().getConfiguration().matchedCameraInfo);
             profile.ifPresent(p -> applyCameraProfile(p, first));
             logger.info(
                     "New camera: applied team defaults ("
@@ -266,7 +267,8 @@ public class VisionModule implements AutoCloseable {
                                     if (!modes.isEmpty()) {
                                         int idx =
                                                 profile
-                                                        .map(p -> TeamCameraDefaults.pickVideoMode(modes, p.width(), p.height()))
+                                                        .map(
+                                                                p -> TeamCameraDefaults.pickVideoMode(modes, p.width(), p.height()))
                                                         .orElseGet(() -> TeamCameraDefaults.pickVideoMode(modes));
                                         if (idx >= 0) {
                                             first.cameraVideoModeIndex = idx;
@@ -1357,17 +1359,16 @@ public class VisionModule implements AutoCloseable {
                     .ifPresent(
                             c -> {
                                 double fov = CameraProfiles.diagonalFovDegrees(c);
-                                logger.info(
-                                        "New camera: diagonal FOV " + fov + " deg from the calibration");
+                                logger.info("New camera: diagonal FOV " + fov + " deg from the calibration");
                                 settables.setFOV(fov);
                             });
         }
     }
 
     /**
-     * SpectrumJetson: turn 3D and multi-tag on for every AprilTag pipeline whose resolution now
-     * has a calibration (TeamCameraDefaults). Called when a calibration is saved and when a new
-     * camera's resolution is picked. Never turns anything off.
+     * SpectrumJetson: turn 3D and multi-tag on for every AprilTag pipeline whose resolution now has a
+     * calibration (TeamCameraDefaults). Called when a calibration is saved and when a new camera's
+     * resolution is picked. Never turns anything off.
      */
     private void enable3dWhereCalibrated() {
         var modes = visionSource.getSettables().getAllVideoModes();
@@ -1456,7 +1457,8 @@ public class VisionModule implements AutoCloseable {
      * (photonvision-54: the Thriftiest Cam is listed with gain but has none).
      */
     public boolean hasGainControl() {
-        return cameraQuirks.hasQuirk(CameraQuirk.Gain) && visionSource.getSettables().hasControl("gain");
+        return cameraQuirks.hasQuirk(CameraQuirk.Gain)
+                && visionSource.getSettables().hasControl("gain");
     }
 
     /** SpectrumJetson (photonvision-34): the focus score for this camera's lens. */

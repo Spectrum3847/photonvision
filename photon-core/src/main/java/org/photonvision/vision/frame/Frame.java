@@ -80,9 +80,9 @@ public class Frame implements Releasable {
     }
 
     /**
-     * SpectrumJetson (photonvision-37): GrayscalePipe shares a gray frame's pixels between
-     * colorImage and processedImage. Before anything draws on either (the stream thread draws on
-     * both), give processedImage its own copy.
+     * SpectrumJetson (photonvision-37): GrayscalePipe shares a gray frame's pixels between colorImage
+     * and processedImage. Before anything draws on either (the stream thread draws on both), give
+     * processedImage its own copy.
      */
     public void unshareProcessed() {
         var in = colorImage.getMat();

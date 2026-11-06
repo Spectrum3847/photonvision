@@ -40,9 +40,9 @@ import java.util.List;
  * "None" when none of these apply.
  *
  * <p>All of these sysfs names are from JetPack 6 (r36) and are not yet checked on JetPack 7 (r39,
- * kernel 6.8): the soctherm_oc hwmon and the cooling-device type names may differ there. Each source
- * is found by searching and fails soft: whatever isn't found is left out of the reason, and with
- * none found {@link #available()} is false and nothing is published.
+ * kernel 6.8): the soctherm_oc hwmon and the cooling-device type names may differ there. Each
+ * source is found by searching and fails soft: whatever isn't found is left out of the reason, and
+ * with none found {@link #available()} is false and nothing is published.
  */
 public final class JetsonThrottle {
     private JetsonThrottle() {}
@@ -53,7 +53,6 @@ public final class JetsonThrottle {
     private static final List<Path> ocCounters = new ArrayList<>();
     private static final List<String[]> alerts = new ArrayList<>(); // {name, cur_state path}
     private static final List<Path> cpuCaps = new ArrayList<>(), gpuCaps = new ArrayList<>();
-
     private static long lastOcTotal = -1, lastOcIncreaseNs = 0;
 
     /** Whether any throttle source was found (false off a Jetson). */

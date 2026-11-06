@@ -65,7 +65,8 @@ public final class FarSearch {
 
     private static volatile Settings settings = load();
 
-    // Set once setFarSearch reached the library: it's loaded (by the CUDA pipe) and has the far search.
+    // Set once setFarSearch reached the library: it's loaded (by the CUDA pipe) and has the far
+    // search.
     private static volatile boolean applied = false;
     private static volatile long nextTryMs = 0;
 

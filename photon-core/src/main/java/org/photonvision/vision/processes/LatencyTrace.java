@@ -23,11 +23,10 @@ import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Spectrum (photonvision-103): per-frame stage timestamps for the latency breakdown
- * (SpectrumJetson tests/latency-breakdown). Off unless SPECTRUM_LATENCY_TRACE names a CSV file;
- * off costs one static boolean check per mark. All times are System.nanoTime (CLOCK_MONOTONIC);
- * the frame's own timestamps are in NetworkTables' epoch, so each row carries nt_minus_mono to
- * convert them.
+ * Spectrum (photonvision-103): per-frame stage timestamps for the latency breakdown (SpectrumJetson
+ * tests/latency-breakdown). Off unless SPECTRUM_LATENCY_TRACE names a CSV file; off costs one
+ * static boolean check per mark. All times are System.nanoTime (CLOCK_MONOTONIC); the frame's own
+ * timestamps are in NetworkTables' epoch, so each row carries nt_minus_mono to convert them.
  */
 public final class LatencyTrace {
     private static final String PATH = System.getenv("SPECTRUM_LATENCY_TRACE");

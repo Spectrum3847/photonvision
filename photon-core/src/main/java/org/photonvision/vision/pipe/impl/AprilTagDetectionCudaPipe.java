@@ -118,8 +118,7 @@ public class AprilTagDetectionCudaPipe
                 // Pass the full rational model; setparams() drops k4..k6, which biases the
                 // detector's edge refinement toward the image edges.
                 try {
-                    m_cudadetector.setparams8(
-                            handle, fx, cx, fy, cy, k1, k2, p1, p2, k3, d[5], d[6], d[7]);
+                    m_cudadetector.setparams8(handle, fx, cx, fy, cy, k1, k2, p1, p2, k3, d[5], d[6], d[7]);
                     sent = true;
                 } catch (UnsatisfiedLinkError e) {
                     System.out.println(

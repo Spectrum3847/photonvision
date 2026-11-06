@@ -58,9 +58,9 @@ public abstract class VisionSourceSettables {
     public abstract void setExposureRaw(double exposureRaw);
 
     /**
-     * SpectrumJetson (photonvision-13): the camera's current exposure time in microseconds, or -1
-     * if unknown (auto exposure, or a camera type that doesn't report it). Used to move frame
-     * timestamps to mid-exposure.
+     * SpectrumJetson (photonvision-13): the camera's current exposure time in microseconds, or -1 if
+     * unknown (auto exposure, or a camera type that doesn't report it). Used to move frame timestamps
+     * to mid-exposure.
      */
     public double getExposureTimeUs() {
         return -1;
@@ -81,8 +81,8 @@ public abstract class VisionSourceSettables {
     public abstract void setGain(int gain);
 
     /**
-     * SpectrumJetson (photonvision-54): whether the camera has this control. True when it can't
-     * tell (not connected yet, or not a USB camera), so callers keep what the camera's quirks say.
+     * SpectrumJetson (photonvision-54): whether the camera has this control. True when it can't tell
+     * (not connected yet, or not a USB camera), so callers keep what the camera's quirks say.
      */
     public boolean hasControl(String name) {
         return true;

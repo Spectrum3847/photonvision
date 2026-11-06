@@ -17,7 +17,6 @@
 
 package org.photonvision.vision.target;
 
-import org.wpilib.vision.apriltag.AprilTagDetection;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +27,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.imgproc.Imgproc;
+import org.wpilib.vision.apriltag.AprilTagDetection;
 
 /**
  * SpectrumJetson (photonvision-54): how the tags themselves look, so a bad exposure, brightness or
@@ -64,10 +64,18 @@ public final class TagContrast {
         for (var d : detections) {
             double[] c = d.getCorners();
             double side = 0;
-            for (int i = 0; i < 4; i++) side += Math.hypot(c[2 * ((i + 1) % 4)] - c[2 * i], c[2 * ((i + 1) % 4) + 1] - c[2 * i + 1]);
+            for (int i = 0; i < 4; i++)
+                side +=
+                        Math.hypot(c[2 * ((i + 1) % 4)] - c[2 * i], c[2 * ((i + 1) % 4) + 1] - c[2 * i + 1]);
             if (side / 4 < MIN_SIDE_PX) continue;
-            var unit = new MatOfPoint2f(new Point(0, 0), new Point(1, 0), new Point(1, 1), new Point(0, 1));
-            var quad = new MatOfPoint2f(new Point(c[0], c[1]), new Point(c[2], c[3]), new Point(c[4], c[5]), new Point(c[6], c[7]));
+            var unit =
+                    new MatOfPoint2f(new Point(0, 0), new Point(1, 0), new Point(1, 1), new Point(0, 1));
+            var quad =
+                    new MatOfPoint2f(
+                            new Point(c[0], c[1]),
+                            new Point(c[2], c[3]),
+                            new Point(c[4], c[5]),
+                            new Point(c[6], c[7]));
             Mat h = Imgproc.getPerspectiveTransform(unit, quad);
             double cell = 1.0 / 8;
             // Points along each side of the unit square, half a cell in (black) and out (white).
@@ -125,8 +133,8 @@ public final class TagContrast {
     }
 
     /**
-     * Per camera: the median over the last 2 s of white, black, contrast, clipped share and tag count,
-     * and a verdict with what to change. "no tags" if none were measured in the last 3 s.
+     * Per camera: the median over the last 2 s of white, black, contrast, clipped share and tag
+     * count, and a verdict with what to change. "no tags" if none were measured in the last 3 s.
      */
     public static synchronized Map<String, Map<String, Object>> summary(List<String> cameras) {
         var out = new LinkedHashMap<String, Map<String, Object>>();
@@ -134,7 +142,10 @@ public final class TagContrast {
         for (String camera : cameras) {
             var m = new LinkedHashMap<String, Object>();
             var q = byCamera.get(camera);
-            var recent = q == null ? List.<Measurement>of() : q.stream().filter(x -> now - x.atNanos() < 3_000_000_000L).toList();
+            var recent =
+                    q == null
+                            ? List.<Measurement>of()
+                            : q.stream().filter(x -> now - x.atNanos() < 3_000_000_000L).toList();
             if (recent.isEmpty()) {
                 m.put("verdict", "no tags");
                 m.put("advice", "No tag big enough to measure (24 px or more) in the last 3 s.");

@@ -565,8 +565,8 @@ public class USBFrameProvider extends CpuImageProcessor {
      * Found on the bench 2026-10-31 with async-profiler (-e cpu, SIGPROF) attached: both cameras'
      * threads ended 8 s apart, both VisionRunners hung in SetPath, and only a PhotonVision restart
      * brought the cameras back. Now SetPath runs on its own thread; the VisionRunner waits at most
-     * {@link #SET_PATH_WAIT_MS} for it (a working camera thread answers in well under a second),
-     * and if it hasn't returned {@link #CAMERA_THREAD_DEAD_NS} later, the camera thread is gone and
+     * {@link #SET_PATH_WAIT_MS} for it (a working camera thread answers in well under a second), and
+     * if it hasn't returned {@link #CAMERA_THREAD_DEAD_NS} later, the camera thread is gone and
      * nothing on this UsbCamera can work again: this camera's VisionModule is rebuilt (a new
      * UsbCamera, with a new cscore thread).
      */
@@ -847,7 +847,8 @@ public class USBFrameProvider extends CpuImageProcessor {
             if (!half && cpuGray && org.photonvision.vision.pipe.impl.NapaDetector.streamEnabled()) {
                 // Spectrum (sc/mjpeg-napa): with no stream viewer the pipeline only needs the tags the band
                 // sink found, not the 1 MB image: skip the copy (SPECTRUM_STREAM_NOCOPY=0 turns this off).
-                // The Mat is then only touched in its first row, so its fresh pages aren't faulted in either.
+                // The Mat is then only touched in its first row, so its fresh pages aren't faulted in
+                // either.
                 if (NO_COPY_OK) {
                     boolean copy = org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers();
                     if (copy != lastStreamCopy) {
@@ -905,8 +906,7 @@ public class USBFrameProvider extends CpuImageProcessor {
                 org.photonvision.vision.processes.LatencyTrace.decoded(
                         publishedNs, captureTimeNs, grabRetNs, System.nanoTime());
             }
-            return new CapturedFrame(
-                    new CVMat(gray), settables.getFrameStaticProperties(), publishedNs);
+            return new CapturedFrame(new CVMat(gray), settables.getFrameStaticProperties(), publishedNs);
         } finally {
             frame.close();
         }
@@ -974,13 +974,13 @@ public class USBFrameProvider extends CpuImageProcessor {
     }
 
     /**
-     * SpectrumJetson (photonvision-27, -37): the camera streams another size than cscore's mode.
-     * Seen at ~1 in 10 starts with 4 cameras: cscore opens the camera at its lowest mode, then
-     * PhotonVision's mode makes it reopen the device, and VIDIOC_S_FMT fails with EBUSY (the
-     * previous handle not yet released). cscore keeps the new mode as its mode anyway, so setting it
-     * again is a no-op, and a reconnect (FORCE_CLOSE) only restarts streaming without setting the
-     * format. Switching to another mode and back makes two real changes, each reopening the device
-     * and setting its format.
+     * SpectrumJetson (photonvision-27, -37): the camera streams another size than cscore's mode. Seen
+     * at ~1 in 10 starts with 4 cameras: cscore opens the camera at its lowest mode, then
+     * PhotonVision's mode makes it reopen the device, and VIDIOC_S_FMT fails with EBUSY (the previous
+     * handle not yet released). cscore keeps the new mode as its mode anyway, so setting it again is
+     * a no-op, and a reconnect (FORCE_CLOSE) only restarts streaming without setting the format.
+     * Switching to another mode and back makes two real changes, each reopening the device and
+     * setting its format.
      */
     private void reconnectForVideoMode(int width, int height, int attempt) {
         reconnectCamera(
@@ -1005,7 +1005,8 @@ public class USBFrameProvider extends CpuImageProcessor {
         VideoMode other = null;
         try {
             for (VideoMode m : camera.enumerateVideoModes()) {
-                if (m.pixelFormat == want.pixelFormat && (m.width != want.width || m.height != want.height)) {
+                if (m.pixelFormat == want.pixelFormat
+                        && (m.width != want.width || m.height != want.height)) {
                     other = m;
                     break;
                 }
@@ -1014,7 +1015,8 @@ public class USBFrameProvider extends CpuImageProcessor {
             other = null;
         }
         if (other != null) {
-            logger.warn(why + ": reopening it (switching through " + other.width + "x" + other.height + ")");
+            logger.warn(
+                    why + ": reopening it (switching through " + other.width + "x" + other.height + ")");
             camera.setVideoMode(other);
             camera.setVideoMode(want);
             return;
@@ -1035,27 +1037,30 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     /**
      * SpectrumJetson (photonvision-13): the camera's delay from the end of exposure to its first USB
-     * packet (sensor readout + JPEG start), in microseconds. Not visible from here; measure it on
-     * the robot (spin in front of a tag) and set SPECTRUM_CAMERA_DELAY_US. Default 0.
+     * packet (sensor readout + JPEG start), in microseconds. Not visible from here; measure it on the
+     * robot (spin in front of a tag) and set SPECTRUM_CAMERA_DELAY_US. Default 0.
      */
     private static final long CAMERA_DELAY_US = envLong("SPECTRUM_CAMERA_DELAY_US", 0);
 
     /**
-     * Spectrum (sc/mjpeg-napa): how late the driver's buffer timestamp is after the frame's first USB packet,
-     * in microseconds. LimelightOS's uvcvideo (SystemCore) runs with hwtimestamps=0 and completes 32-packet
-     * (4 ms) isochronous URBs, and stamps a frame when it processes the URB that holds its first packet: 2.4 ms
-     * after the packet at the median (kernel trace, SpectrumJetson tests/systemcore-latency), 0-4 ms. This
-     * removes the median; the 0-4 ms spread (sd 1.26 ms) stays (sc-vision's 0.25 ms URBs: sd 0.04 ms).
-     * SPECTRUM_UVC_STAMP_LAG_US overrides; default 2400 with Limelight's uvcvideo (its ll_compressed_* module
-     * parameters), else 0 (our Jetson uvcvideo: urb_packets=4, hwtimestamps=1).
+     * Spectrum (sc/mjpeg-napa): how late the driver's buffer timestamp is after the frame's first USB
+     * packet, in microseconds. LimelightOS's uvcvideo (SystemCore) runs with hwtimestamps=0 and
+     * completes 32-packet (4 ms) isochronous URBs, and stamps a frame when it processes the URB that
+     * holds its first packet: 2.4 ms after the packet at the median (kernel trace, SpectrumJetson
+     * tests/systemcore-latency), 0-4 ms. This removes the median; the 0-4 ms spread (sd 1.26 ms)
+     * stays (sc-vision's 0.25 ms URBs: sd 0.04 ms). SPECTRUM_UVC_STAMP_LAG_US overrides; default 2400
+     * with Limelight's uvcvideo (its ll_compressed_* module parameters), else 0 (our Jetson uvcvideo:
+     * urb_packets=4, hwtimestamps=1).
      */
-    private static final long UVC_STAMP_LAG_US = envLong("SPECTRUM_UVC_STAMP_LAG_US", defaultStampLagUs());
+    private static final long UVC_STAMP_LAG_US =
+            envLong("SPECTRUM_UVC_STAMP_LAG_US", defaultStampLagUs());
 
     /**
-     * The driver's median stamp lag from its URB size (measured on the SystemCore, kernel trace, SpectrumJetson
-     * tests/systemcore-latency/urb-compare.sh): 32-packet URBs (stock) 2.5 ms, our urb_packets=4 0.13 ms,
-     * urb_packets=2 0.005 ms. Our uvcvideo has the urb_packets parameter (0 = 32); Limelight's stock one has
-     * ll_compressed_* and 32-packet URBs; elsewhere (our Jetson driver with hwtimestamps) 0.
+     * The driver's median stamp lag from its URB size (measured on the SystemCore, kernel trace,
+     * SpectrumJetson tests/systemcore-latency/urb-compare.sh): 32-packet URBs (stock) 2.5 ms, our
+     * urb_packets=4 0.13 ms, urb_packets=2 0.005 ms. Our uvcvideo has the urb_packets parameter (0 =
+     * 32); Limelight's stock one has ll_compressed_* and 32-packet URBs; elsewhere (our Jetson driver
+     * with hwtimestamps) 0.
      */
     private static long defaultStampLagUs() {
         try {
@@ -1065,10 +1070,12 @@ public class USBFrameProvider extends CpuImageProcessor {
                 n = Integer.parseInt(java.nio.file.Files.readString(urb).trim());
                 if (n <= 0 || n > 32) n = 32;
                 if (java.nio.file.Files.exists(
-                        java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps"))
-                        && "1".equals(java.nio.file.Files.readString(
-                                java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps")).trim()))
-                    return 0;  // stamped from the camera clock, not the URB
+                                java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps"))
+                        && "1"
+                                .equals(
+                                        java.nio.file.Files.readString(
+                                                        java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps"))
+                                                .trim())) return 0; // stamped from the camera clock, not the URB
             } else if (java.nio.file.Files.exists(
                     java.nio.file.Path.of("/sys/module/uvcvideo/parameters/ll_compressed_payload_fast"))) {
                 n = 32;
@@ -1094,26 +1101,29 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     private boolean loggedMidExposure = false;
 
-    // Spectrum (sc/mjpeg-napa): streamDecodeGray without the image copy while nobody watches the stream
+    // Spectrum (sc/mjpeg-napa): streamDecodeGray without the image copy while nobody watches the
+    // stream
     private static volatile boolean NO_COPY_OK = !"0".equals(System.getenv("SPECTRUM_STREAM_NOCOPY"));
     private static volatile boolean lastStreamCopy = true;
 
     /**
      * SpectrumJetson (photonvision-13): move a frame's timestamp to mid-exposure. uvcvideo stamps a
      * frame when its first USB packet arrives, which is after the whole exposure and the camera's
-     * internal delay. Robot code fuses the pose at this time, so a late stamp shows up as error
-     * while turning (2.5 ms at 360 deg/s is ~1 degree). The exposure is known exactly here and
-     * changes when it's retuned, so it's corrected here rather than as a constant on the robot.
-     * Only the published time moves; {@code lastTime} keeps the driver's time for "newest frame"
-     * checks. WPILib 2027 timestamps are nanoseconds.
+     * internal delay. Robot code fuses the pose at this time, so a late stamp shows up as error while
+     * turning (2.5 ms at 360 deg/s is ~1 degree). The exposure is known exactly here and changes when
+     * it's retuned, so it's corrected here rather than as a constant on the robot. Only the published
+     * time moves; {@code lastTime} keeps the driver's time for "newest frame" checks. WPILib 2027
+     * timestamps are nanoseconds.
      */
     private long toMidExposureNs(long captureTimeNs) {
         if (captureTimeNs == 0) return 0;
         double exposureUs = settables.getExposureTimeUs();
         if (exposureUs <= 0) return captureTimeNs - (CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
         long shiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US + UVC_STAMP_LAG_US) * 1000;
-        // the fast path's native publish stamps from when the frame's first bytes were seen (no driver stamp lag)
-        org.photonvision.vision.pipe.impl.NativePublish.midShiftNs = ((long) (exposureUs / 2) + CAMERA_DELAY_US) * 1000;
+        // the fast path's native publish stamps from when the frame's first bytes were seen (no driver
+        // stamp lag)
+        org.photonvision.vision.pipe.impl.NativePublish.midShiftNs =
+                ((long) (exposureUs / 2) + CAMERA_DELAY_US) * 1000;
         if (!loggedMidExposure) {
             loggedMidExposure = true;
             logger.info(
@@ -1165,8 +1175,7 @@ public class USBFrameProvider extends CpuImageProcessor {
     // the decode sat in every frame's latency. Now a decoder thread grabs and decodes each frame
     // as it arrives into a one-frame slot (a newer frame replaces an unclaimed one), and the loop
     // takes the newest. SPECTRUM_ASYNC_DECODE=0 goes back to decoding in the loop.
-    private static final boolean ASYNC_DECODE =
-            !"0".equals(System.getenv("SPECTRUM_ASYNC_DECODE"));
+    private static final boolean ASYNC_DECODE = !"0".equals(System.getenv("SPECTRUM_ASYNC_DECODE"));
 
     private final Object decodedLock = new Object();
     private CapturedFrame decoded = null; // the newest decoded frame not yet taken
@@ -1188,7 +1197,8 @@ public class USBFrameProvider extends CpuImageProcessor {
             long deadline = System.nanoTime() + (long) (CSCORE_DEFAULT_FRAME_TIMEOUT * 1e9);
             while (decoded == null) {
                 long left = deadline - System.nanoTime();
-                if (left <= 0) return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+                if (left <= 0)
+                    return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
                 try {
                     decodedLock.wait(Math.max(1, left / 1_000_000));
                 } catch (InterruptedException e) {
@@ -1208,7 +1218,8 @@ public class USBFrameProvider extends CpuImageProcessor {
         org.photonvision.vision.processes.CameraThreads.shared(); // photonvision-102
         if (!loggedAsync) {
             loggedAsync = true;
-            logger.info("Decoding in its own thread, overlapped with the pipeline (SPECTRUM_ASYNC_DECODE)");
+            logger.info(
+                    "Decoding in its own thread, overlapped with the pipeline (SPECTRUM_ASYNC_DECODE)");
         }
         while (!Thread.currentThread().isInterrupted()
                 && System.nanoTime() - lastTakenNs < 1_000_000_000L

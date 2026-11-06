@@ -107,9 +107,9 @@ public class RobotClockSync {
 
     /**
      * Whether this is the robot controller itself (SystemCore, roboRIO): its clock is the robot's.
-     * TODO(SystemCore): the SystemCore is a Raspberry Pi Compute Module 5 (BCM2712), NOT a QCS6490
-     * as this test assumed (upstream's QCS6490 platform is the Rubik Pi coprocessor). So today only
-     * the roboRIO is recognised; a SystemCore still runs the sync. Replace the QCS6490 test with the
+     * TODO(SystemCore): the SystemCore is a Raspberry Pi Compute Module 5 (BCM2712), NOT a QCS6490 as
+     * this test assumed (upstream's QCS6490 platform is the Rubik Pi coprocessor). So today only the
+     * roboRIO is recognised; a SystemCore still runs the sync. Replace the QCS6490 test with the
      * SystemCore's own /proc/device-tree/model or /etc/os-release marker once read on a real one.
      */
     static boolean isRobotController() {

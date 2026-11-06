@@ -223,7 +223,9 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         // AprilTag 3).
         boolean useNapa = settings.napa && !half && NapaDetector.usable();
         List<AprilTagDetection> detections;
-        org.photonvision.vision.processes.LatencyTrace.mark(org.photonvision.vision.processes.LatencyTrace.DET0); // Spectrum: per-frame latency trace (photonvision-103)
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace
+                        .DET0); // Spectrum: per-frame latency trace (photonvision-103)
         if (useNapa) {
             long t0 = System.nanoTime();
             napaDetector.configure(
@@ -233,7 +235,8 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                     settings.napaFarSearch,
                     settings.napaFarMinTagPx,
                     60);
-            if (NativePublish.ENABLED) { // Spectrum (sc/mjpeg-napa) fast path: what the native publish needs
+            if (NativePublish
+                    .ENABLED) { // Spectrum (sc/mjpeg-napa) fast path: what the native publish needs
                 var cal = frameStaticProperties.cameraCalibration;
                 NativePublish.intrinsics = cal != null ? cal.getIntrinsicsArr() : null;
                 NativePublish.distortion = cal != null ? cal.getDistCoeffsArr() : null;
@@ -247,7 +250,8 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
             sumPipeNanosElapsed += tagDetectionPipeResult.nanosElapsed;
             detections = tagDetectionPipeResult.output;
         }
-        org.photonvision.vision.processes.LatencyTrace.mark(org.photonvision.vision.processes.LatencyTrace.DET1);
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace.DET1);
         if (half) {
             double sx = frameStaticProperties.imageWidth / (double) in.cols();
             double sy = frameStaticProperties.imageHeight / (double) in.rows();
@@ -368,7 +372,8 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
             targetList = targetList.subList(0, Packet.MAX_ARRAY_LEN);
         }
 
-        org.photonvision.vision.processes.LatencyTrace.mark(org.photonvision.vision.processes.LatencyTrace.POSE1);
+        org.photonvision.vision.processes.LatencyTrace.mark(
+                org.photonvision.vision.processes.LatencyTrace.POSE1);
         var fpsResult = calculateFPSPipe.run(null);
         var fps = fpsResult.output;
 

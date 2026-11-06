@@ -192,7 +192,9 @@ public final class ThriftiestFirmware {
                 throw new IOException("Too big for the camera's 512 KiB flash");
             Files.write(tmp, bytes);
             var check = JsonObject.create(); // a copy: parsed avaje nodes are read-only
-            json.fromJsonObject(tool("check-image", "--json", tmp.toString())).elements().forEach(check::add);
+            json.fromJsonObject(tool("check-image", "--json", tmp.toString()))
+                    .elements()
+                    .forEach(check::add);
             if (!check.extract("error", "").isEmpty()) throw new IOException(check.extract("error", ""));
             Files.move(tmp, store().resolve(name), StandardCopyOption.REPLACE_EXISTING);
             check.add("file", name); // not the temporary name

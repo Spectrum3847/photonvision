@@ -47,9 +47,9 @@ import org.wpilib.networktables.StringPublisher;
  *   <li>{@code jpegDecoder} ("nvjpg" or "libjpeg-turbo"), {@code jpegHardwareOff} (the hardware
  *       decoder was switched off after a failed check), {@code jpegChecksOk}, {@code
  *       jpegChecksDiffer} (counts since PhotonVision started)
- *   <li>{@code throttle}: why the Jetson is slowing itself down, e.g. "None", "OVER-CURRENT",
- *       "HIGH TEMP (cpu)" (JetsonThrottle, photonvision-20); {@code overCurrentEvents} since boot
- *       where the Jetson counts them
+ *   <li>{@code throttle}: why the Jetson is slowing itself down, e.g. "None", "OVER-CURRENT", "HIGH
+ *       TEMP (cpu)" (JetsonThrottle, photonvision-20); {@code overCurrentEvents} since boot where
+ *       the Jetson counts them
  *   <li>{@code heartbeat}: goes up by one every publish
  * </ul>
  *

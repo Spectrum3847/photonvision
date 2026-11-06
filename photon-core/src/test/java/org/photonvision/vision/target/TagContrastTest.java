@@ -19,7 +19,6 @@ package org.photonvision.vision.target;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import org.wpilib.vision.apriltag.AprilTagDetection;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -30,6 +29,7 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.photonvision.common.LoadJNI;
+import org.wpilib.vision.apriltag.AprilTagDetection;
 
 /** SpectrumJetson (photonvision-54): TagContrast on synthetic tags with known pixel values. */
 public class TagContrastTest {
@@ -56,7 +56,9 @@ public class TagContrastTest {
 
     @Test
     public void goodTag() {
-        Point[] q = {new Point(200, 140), new Point(360, 140), new Point(360, 300), new Point(200, 300)};
+        Point[] q = {
+            new Point(200, 140), new Point(360, 140), new Point(360, 300), new Point(200, 300)
+        };
         var m = TagContrast.measure(tag(200, 30, q), List.of(detection(q)), 0);
         assertNotNull(m);
         assertEquals(1, m.tags());
@@ -68,7 +70,9 @@ public class TagContrastTest {
     @Test
     public void tiltedTagClipped() {
         // A tag at an angle, its margin blown out to 255.
-        Point[] q = {new Point(180, 150), new Point(380, 120), new Point(400, 330), new Point(170, 310)};
+        Point[] q = {
+            new Point(180, 150), new Point(380, 120), new Point(400, 330), new Point(170, 310)
+        };
         var m = TagContrast.measure(tag(255, 60, q), List.of(detection(q)), 0);
         assertNotNull(m);
         assertEquals(255, m.white(), 1);
@@ -78,10 +82,16 @@ public class TagContrastTest {
 
     @Test
     public void smallTagsAndRateLimit() {
-        Point[] small = {new Point(300, 200), new Point(320, 200), new Point(320, 220), new Point(300, 220)};
-        assertNull(TagContrast.measure(tag(200, 30, small), List.of(detection(small)), 0), "under 24 px");
-        Point[] q = {new Point(200, 140), new Point(360, 140), new Point(360, 300), new Point(200, 300)};
-        assertNull(TagContrast.measure(tag(200, 30, q), List.of(detection(q)), System.nanoTime()), "too soon");
+        Point[] small = {
+            new Point(300, 200), new Point(320, 200), new Point(320, 220), new Point(300, 220)
+        };
+        assertNull(
+                TagContrast.measure(tag(200, 30, small), List.of(detection(small)), 0), "under 24 px");
+        Point[] q = {
+            new Point(200, 140), new Point(360, 140), new Point(360, 300), new Point(200, 300)
+        };
+        assertNull(
+                TagContrast.measure(tag(200, 30, q), List.of(detection(q)), System.nanoTime()), "too soon");
     }
 
     @Test

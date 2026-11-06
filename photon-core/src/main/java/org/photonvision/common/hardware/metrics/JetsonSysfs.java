@@ -36,9 +36,9 @@ public final class JetsonSysfs {
      * GPU load, per mille (what tegrastats shows as GR3D_FREQ). Candidates in order:
      *
      * <ul>
-     *   <li>{@code /sys/devices/platform/bus@0/17000000.gpu/load}: r36-verified. On r39 the
-     *       directory is verified (railgate_enable, tpc_pg_mask, devfreq/ live there) but the {@code
-     *       load} file itself is guessed from r36: check it on the Jetson.
+     *   <li>{@code /sys/devices/platform/bus@0/17000000.gpu/load}: r36-verified. On r39 the directory
+     *       is verified (railgate_enable, tpc_pg_mask, devfreq/ live there) but the {@code load} file
+     *       itself is guessed from r36: check it on the Jetson.
      *   <li>any {@code *.gpu/load} under {@code /sys/devices/platform} or {@code bus@0}: guessed, in
      *       case the GPU's address or bus node changes.
      *   <li>{@code /sys/devices/gpu.0/load}: older L4T.
@@ -109,10 +109,12 @@ public final class JetsonSysfs {
 
     /**
      * A thermal zone's name without the "-thermal" suffix. r36 types were "cpu-thermal",
-     * "soc0-thermal"; on r39 cpu-thermal, gpu-thermal and tj-thermal are verified, and the SoC and
-     * CV zones were reported as soc0..2 and cv0..2, so both spellings are matched.
+     * "soc0-thermal"; on r39 cpu-thermal, gpu-thermal and tj-thermal are verified, and the SoC and CV
+     * zones were reported as soc0..2 and cv0..2, so both spellings are matched.
      */
     static String zoneName(String type) {
-        return type.endsWith("-thermal") ? type.substring(0, type.length() - "-thermal".length()) : type;
+        return type.endsWith("-thermal")
+                ? type.substring(0, type.length() - "-thermal".length())
+                : type;
     }
 }

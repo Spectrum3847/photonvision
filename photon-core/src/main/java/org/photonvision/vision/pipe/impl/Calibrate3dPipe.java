@@ -98,6 +98,7 @@ public class Calibrate3dPipe
     public String lastSolver() {
         return lastSolver;
     }
+
     private final MatOfPoint2f projectedMat = new MatOfPoint2f();
 
     /**
@@ -198,9 +199,7 @@ public class Calibrate3dPipe
                     perViewErrors,
                     // Spectrum (photonvision-91): 8 coefficients, as mrcal gives; 5 can't follow
                     // our lenses out to the corners (SpectrumJetson tests/calibration-analysis)
-                    Calib3d.CALIB_USE_LU
-                            + Calib3d.CALIB_USE_INTRINSIC_GUESS
-                            + Calib3d.CALIB_RATIONAL_MODEL);
+                    Calib3d.CALIB_USE_LU + Calib3d.CALIB_USE_INTRINSIC_GUESS + Calib3d.CALIB_RATIONAL_MODEL);
             lastFxSigma = stdDeviationsIntrinsics.get(0, 0)[0];
             lastSolver = "OpenCV";
         } catch (Exception e) {
@@ -214,8 +213,7 @@ public class Calibrate3dPipe
         JsonMatOfDouble cameraMatrixMat = JsonMatOfDouble.fromMat(cameraMatrix);
         // Spectrum (photonvision-91): the 8 rational coefficients (OpenCV returns 14, the rest zero)
         double[] dist8 = Arrays.copyOf(distortionCoefficients.toArray(), 8);
-        JsonMatOfDouble distortionCoefficientsMat =
-                new JsonMatOfDouble(1, 8, CvType.CV_64FC1, dist8);
+        JsonMatOfDouble distortionCoefficientsMat = new JsonMatOfDouble(1, 8, CvType.CV_64FC1, dist8);
 
         // Opencv is lame, so we can only assume all points are inliers
         var inliners =
@@ -328,11 +326,7 @@ public class Calibrate3dPipe
         if (params.keepEdgeCorners) {
             var refit =
                     refitKeepingEdgeCorners(
-                            observationCorners,
-                            cameraMatrixMat,
-                            distortionCoefficientsMat,
-                            used,
-                            imageSavePath);
+                            observationCorners, cameraMatrixMat, distortionCoefficientsMat, used, imageSavePath);
             if (refit != null) {
                 cameraMatrixMat.release();
                 distortionCoefficientsMat.release();
@@ -475,8 +469,8 @@ public class Calibrate3dPipe
      * readout.
      *
      * <p>It carries no optimization inputs: mrcal's projection uncertainty is only valid at the
-     * optimum of mrcal's own problem (its model, warp and outlier set), and evaluated at the refit
-     * it came out ~20x too large. So a refit calibration reports no uncertainty map.
+     * optimum of mrcal's own problem (its model, warp and outlier set), and evaluated at the refit it
+     * came out ~20x too large. So a refit calibration reports no uncertainty map.
      *
      * @return the refit calibration, or null to keep mrcal's
      */
@@ -640,9 +634,7 @@ public class Calibrate3dPipe
                     stdDeviationsIntrinsics,
                     stdDeviationsExtrinsics,
                     perViewErrors,
-                    Calib3d.CALIB_USE_LU
-                            + Calib3d.CALIB_USE_INTRINSIC_GUESS
-                            + Calib3d.CALIB_RATIONAL_MODEL);
+                    Calib3d.CALIB_USE_LU + Calib3d.CALIB_USE_INTRINSIC_GUESS + Calib3d.CALIB_RATIONAL_MODEL);
             lastFxSigma = stdDeviationsIntrinsics.get(0, 0)[0];
             return k.get(0, 0)[0] > 0 && k.get(1, 1)[0] > 0;
         } catch (Exception e) {
@@ -737,7 +729,6 @@ public class Calibrate3dPipe
             var reprojectionError = new ArrayList<Point>();
             var projectedPoints = projectedMat.toList();
             for (int pointIdx = 0; pointIdx < projectedPoints.size(); pointIdx++) {
-
                 // error = (measured - expected)
                 var measured = projectedPoints.get(pointIdx);
                 var expected = iPoints.get(pointIdx);

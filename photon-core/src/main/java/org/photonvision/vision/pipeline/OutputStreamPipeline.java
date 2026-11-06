@@ -56,8 +56,8 @@ public class OutputStreamPipeline implements Releasable {
     /**
      * Spectrum (photonvision-98): with {@code halfInput} (a half-resolution frame from the low-CPU
      * decode) targets are still at full resolution, so they're drawn at twice the divisor, and the
-     * frame is resized by half the divisor (NONE streams the half-size frame as it is).
-     * Without a 1/3 divisor, SIXTH streams as QUARTER.
+     * frame is resized by half the divisor (NONE streams the half-size frame as it is). Without a 1/3
+     * divisor, SIXTH streams as QUARTER.
      */
     protected void setPipeParams(
             FrameStaticProperties frameStaticProperties,
@@ -85,21 +85,15 @@ public class OutputStreamPipeline implements Releasable {
 
         draw2dTargetsPipe.setParams(
                 new Draw2dTargetsPipe.Draw2dTargetsParams(
-                        settings.outputShouldDraw,
-                        settings.outputMaximumTargets,
-                        draw));
+                        settings.outputShouldDraw, settings.outputMaximumTargets, draw));
 
         draw2dAprilTagsPipe.setParams(
                 new Draw2dAprilTagsPipe.Draw2dAprilTagsParams(
-                        settings.outputShouldDraw,
-                        settings.outputMaximumTargets,
-                        draw));
+                        settings.outputShouldDraw, settings.outputMaximumTargets, draw));
 
         draw2dArucoPipe.setParams(
                 new Draw2dArucoPipe.Draw2dArucoParams(
-                        settings.outputShouldDraw,
-                        settings.outputMaximumTargets,
-                        draw));
+                        settings.outputShouldDraw, settings.outputMaximumTargets, draw));
 
         draw2dCrosshairPipe.setParams(
                 new Draw2dCrosshairPipe.Draw2dCrosshairParams(
@@ -132,8 +126,7 @@ public class OutputStreamPipeline implements Releasable {
                         settings.targetModel,
                         draw));
 
-        resizeImagePipe.setParams(
-                new ResizeImagePipe.ResizeImageParams(resize));
+        resizeImagePipe.setParams(new ResizeImagePipe.ResizeImageParams(resize));
 
         if (settings instanceof Calibration3dPipelineSettings pipelineSettings) {
             drawCalibrationPipe.setParams(

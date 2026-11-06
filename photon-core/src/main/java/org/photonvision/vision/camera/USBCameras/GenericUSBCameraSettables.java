@@ -217,8 +217,8 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
     }
 
     /**
-     * SpectrumJetson (photonvision-13): V4L2's exposure_time_absolute is in 100 us units, so the
-     * last manual setting gives the exposure; unknown under auto exposure.
+     * SpectrumJetson (photonvision-13): V4L2's exposure_time_absolute is in 100 us units, so the last
+     * manual setting gives the exposure; unknown under auto exposure.
      */
     @Override
     public double getExposureTimeUs() {
@@ -469,10 +469,11 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
      * @param value
      */
     /**
-     * Spectrum (sc/mjpeg-napa): set a camera control only if it differs from what the camera reports, then read it
-     * back. Some cameras store control values in flash (the Swyft writes its settings sector on every change), and
-     * a control that silently keeps its power-up default (the Thriftiest's sharpness 5 / gamma 150 / backlight 1)
-     * costs ~46% more decode CPU, so a value that doesn't read back is logged.
+     * Spectrum (sc/mjpeg-napa): set a camera control only if it differs from what the camera reports,
+     * then read it back. Some cameras store control values in flash (the Swyft writes its settings
+     * sector on every change), and a control that silently keeps its power-up default (the
+     * Thriftiest's sharpness 5 / gamma 150 / backlight 1) costs ~46% more decode CPU, so a value that
+     * doesn't read back is logged.
      */
     protected void setChecked(VideoProperty prop, int value) {
         if (prop.get() == value) return;
@@ -480,7 +481,14 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
         int back = prop.get();
         if (back != value)
             logger.warn(
-                    "Camera control " + prop.getName() + " on " + camera.getName() + ": set " + value + ", reads " + back);
+                    "Camera control "
+                            + prop.getName()
+                            + " on "
+                            + camera.getName()
+                            + ": set "
+                            + value
+                            + ", reads "
+                            + back);
     }
 
     protected void softSet(String property, int value) {
@@ -505,8 +513,8 @@ public class GenericUSBCameraSettables extends VisionSourceSettables {
      */
     /**
      * SpectrumJetson (photonvision-54): the quirks list says the Thrifty OV9281 (1bcf:28c5) has gain
-     * (upstream #2478), but ours reports no gain control, so the Camera Gain slider did nothing.
-     * Asks the camera, once it's connected (cscore lists its controls only then).
+     * (upstream #2478), but ours reports no gain control, so the Camera Gain slider did nothing. Asks
+     * the camera, once it's connected (cscore lists its controls only then).
      */
     @Override
     public boolean hasControl(String name) {
