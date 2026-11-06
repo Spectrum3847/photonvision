@@ -294,11 +294,18 @@ public class VisionRunner implements AutoCloseable {
                         nativePublish != null
                                 && nativePublish.active()
                                 && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0;
-                if (nativeOn)
-                    capNanos =
-                            Math.max(
-                                    capNanos,
-                                    (long) (1e9 / org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS));
+                if (nativeOn) {
+                    // Spectrum (pv-perf): slower still while nobody looks (no web UI, no stream viewer)
+                    double fps = org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS;
+                    double idle = org.photonvision.vision.pipe.impl.NativePublish.IDLE_JAVA_FPS;
+                    if (idle > 0
+                            && idle < fps
+                            && ClockThrottle.uiClients() == 0
+                            && !org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers()) fps = idle;
+                    long period = (long) (1e9 / fps);
+                    nativePublish.javaPeriodNs = period;
+                    capNanos = Math.max(capNanos, period);
+                } else if (nativePublish != null) nativePublish.javaPeriodNs = 0;
                 // Spectrum (pv-perf): the decoder thread decodes only around the frames taken (and, while
                 // the results are published natively, one frame per take)
                 if (frameSupplier
