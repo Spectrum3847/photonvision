@@ -95,6 +95,63 @@ public class RewindRecorder {
     private long fpsWindowStartNs = 0;
     private int fpsWindowFrames = 0;
 
+    // Spectrum (sc/mjpeg-napa) native camera backend: the camera's own thread writes the video (a
+    // ring + a
+    // low-priority writer, NapaDetectorJNI.cameraRecord); this only follows the sessions.
+    private long nativeHandle = 0;
+
+    private RewindRecorder(long nativeHandle, Supplier<String> nickname) {
+        this.camera = null;
+        this.nickname = nickname;
+        this.nativeHandle = nativeHandle;
+        this.logger = new Logger(RewindRecorder.class, nickname.get(), LogGroup.Camera);
+        this.sink = null;
+        this.thread = new Thread(this::runNative, "Rewind-native-" + nickname.get());
+        this.thread.setDaemon(true);
+        this.thread.start();
+        RewindManager.getInstance().register(this);
+    }
+
+    /** For a camera captured natively (SPECTRUM_NATIVE_CAMERA): the native side records it. */
+    public static RewindRecorder forNative(long nativeHandle, Supplier<String> nickname) {
+        return new RewindRecorder(nativeHandle, nickname);
+    }
+
+    private static final int NATIVE_RING_MB =
+            Integer.parseInt(System.getenv().getOrDefault("SPECTRUM_REWIND_RING_MB", "32"));
+
+    private void runNative() {
+        RewindManager.Session recording = null;
+        while (running) {
+            RewindManager.Session s = RewindManager.getInstance().currentSession();
+            if (s != recording) {
+                if (s == null) {
+                    org.photonvision.jni.NapaDetectorJNI.cameraRecord(nativeHandle, null, 0, 0);
+                    logger.info("Rewind: native recording stopped");
+                } else {
+                    try {
+                        Path dir = s.dir().resolve(RewindManager.safeName(nickname.get()));
+                        Files.createDirectories(dir);
+                        long minIntervalNs = RewindManager.getInstance().minFrameIntervalNs();
+                        double fps = minIntervalNs > 0 ? 1e9 / minIntervalNs : 0;
+                        String prefix =
+                                dir.resolve(s.name() + "_" + dir.getFileName() + "_n" + nextSegmentIndex(dir))
+                                        .toString();
+                        boolean ok =
+                                org.photonvision.jni.NapaDetectorJNI.cameraRecord(
+                                        nativeHandle, prefix, NATIVE_RING_MB, fps);
+                        logger.info("Rewind: native recording to " + prefix + (ok ? "" : " FAILED"));
+                    } catch (IOException e) {
+                        logger.error("Rewind: native recording failed", e);
+                    }
+                }
+                recording = s;
+            }
+            sleep(100);
+        }
+        org.photonvision.jni.NapaDetectorJNI.cameraRecord(nativeHandle, null, 0, 0);
+    }
+
     public RewindRecorder(UsbCamera camera, Supplier<String> nickname) {
         this.camera = camera;
         this.nickname = nickname;
@@ -121,7 +178,7 @@ public class RewindRecorder {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        sink.close();
+        if (sink != null) sink.close();
     }
 
     private void run() {

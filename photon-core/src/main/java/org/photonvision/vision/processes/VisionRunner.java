@@ -288,6 +288,7 @@ public class VisionRunner implements AutoCloseable {
                                 instanceof org.photonvision.vision.frame.provider.USBFrameProvider usb) {
                     nativePublish.midShiftNs = usb.nativeMidShiftNs;
                     nativePublish.camShiftNs = usb.nativeCamShiftNs;
+                    nativePublish.cameraHandle = usb.nativeCameraHandle();
                 }
                 boolean nativeOn =
                         nativePublish != null

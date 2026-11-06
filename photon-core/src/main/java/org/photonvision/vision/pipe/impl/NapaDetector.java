@@ -78,7 +78,28 @@ public class NapaDetector implements Releasable {
             NapaDetectorJNI.setParams(handle, minTagPx, maxHamming, far, 32, farMinTagPx, sweeps);
             sent = want;
             sentSweeps = sweeps;
+            sentCam = 0; // the native camera's detector gets them too (below)
         }
+        lastParams = new Object[] {minTagPx, maxHamming, far, farMinTagPx, sweeps};
+    }
+
+    private Object[] lastParams;
+    private long sentCam = 0;
+
+    /**
+     * Spectrum (sc/mjpeg-napa) native camera backend: its detector follows this pipeline's settings.
+     */
+    private void configureCamera(long cam) {
+        if (cam == sentCam || lastParams == null) return;
+        NapaDetectorJNI.setParams(
+                cam,
+                (int) lastParams[0],
+                (int) lastParams[1],
+                (boolean) lastParams[2],
+                32,
+                (int) lastParams[3],
+                (double) lastParams[4]);
+        sentCam = cam;
     }
 
     private static Boolean streamOn = null;
@@ -116,6 +137,21 @@ public class NapaDetector implements Releasable {
     public List<AprilTagDetection> detect(Mat gray) {
         if (handle == 0 || gray == null || gray.empty() || gray.type() != CvType.CV_8UC1)
             return List.of();
+        // Spectrum (sc/mjpeg-napa) native camera backend: the camera's own thread detects and publishes
+        // every
+        // frame; this (the UI's / Java pipeline's low-rate frame) is detected whole on the camera's
+        // handle, and
+        // the handle gets this camera's settings, calibration and time-sync state.
+        var nativePubCam = NativePublish.current();
+        if (nativePubCam != null && nativePubCam.cameraHandle != 0) {
+            long cam = nativePubCam.cameraHandle;
+            configureCamera(cam);
+            var r =
+                    NapaDetectorJNI.detect(
+                            cam, gray.dataAddr(), gray.cols(), gray.rows(), (int) gray.step1());
+            nativePubCam.update(cam);
+            return r == null ? List.of() : List.of(r);
+        }
         var ret =
                 streamEnabled()
                         ? NapaDetectorJNI.detectStreamed(

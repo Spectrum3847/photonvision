@@ -56,6 +56,8 @@ public final class NativePublish {
     public volatile long sincePongNs = 0;
     // from the camera's frame provider: the frame's first bytes -> mid-exposure (exposure/2 + delay)
     public volatile long midShiftNs = 0;
+    // native camera backend: the NAPA handle that owns this camera (0: not native)
+    public volatile long cameraHandle = 0;
     // from the camera's frame provider: its camera-clock stamp (PTS) -> mid-exposure (0: no camera
     // clock)
     public volatile long camShiftNs = 0;

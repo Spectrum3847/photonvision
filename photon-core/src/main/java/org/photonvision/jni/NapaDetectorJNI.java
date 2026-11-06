@@ -122,6 +122,41 @@ public final class NapaDetectorJNI {
      */
     public static native byte[][] drainNativeResults(long handle);
 
+    // Spectrum (sc/mjpeg-napa) native camera backend (SpectrumJetson
+    // docs/SYSTEMCORE-NATIVE-BACKEND.md)
+
+    /**
+     * Opens the camera (its /dev/video path) natively: MJPEG width x height at fps, its own capture
+     * thread; decode, streaming NAPA, pose and publish there. Returns a NAPA handle (the setNative*
+     * calls, setParams, detect and destroy work on it; destroy closes the camera), or 0.
+     */
+    public static native long cameraOpen(String dev, int width, int height, int fps, String family);
+
+    /** Sets a V4L2 control, reading it first: 1 written, 0 already that value, -1 error. */
+    public static native int cameraSetControl(long handle, int id, int value);
+
+    /** A V4L2 control's value, or Integer.MIN_VALUE. */
+    public static native int cameraGetControl(long handle, int id);
+
+    /**
+     * The latest full-size gray image into dataAddr (width x height, stride width). Returns its
+     * camera stamp (ns), or 0 when none is ready yet.
+     */
+    public static native long cameraLatestGray(long handle, long dataAddr, int width, int height);
+
+    /**
+     * {frames, bad frames, skipped by the policy, ms since the last frame (-1: none), Rewind frames
+     * kept}.
+     */
+    public static native long[] cameraStats(long handle);
+
+    /**
+     * Rewind video from the camera's own thread: prefix (path without _NNNN; null stops), ring MB (32
+     * if <= 0), record fps (0: every frame). True when recording.
+     */
+    public static native boolean cameraRecord(
+            long handle, String prefix, int ringMb, double recordFps);
+
     /**
      * Spectrum (sc/mjpeg-napa): this camera's frame policy for streamed frames: decode scale 1, 2 or
      * 4, every fullEvery-th processed frame at full scale (0: never), process 1 frame in

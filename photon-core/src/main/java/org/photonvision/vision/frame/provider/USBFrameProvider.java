@@ -94,8 +94,107 @@ public class USBFrameProvider extends CpuImageProcessor {
     private long stuckTestCheckedNs = 0;
     private boolean stuckTest = false;
 
+    // ---- Spectrum (sc/mjpeg-napa) native camera backend (SpectrumJetson
+    // docs/SYSTEMCORE-NATIVE-BACKEND.md) ----
+    // SPECTRUM_NATIVE_CAMERA=1 (with SPECTRUM_NATIVE_PUBLISH=1): this camera's frames are captured,
+    // decoded,
+    // detected, posed and published by a native thread that owns the V4L2 queue; cscore keeps the
+    // device open only
+    // for its controls (no sink enabled, so it never streams). The Java pipeline gets the latest
+    // image at its own
+    // low rate (UI, stream, settings). Any failure: this camera stays on the cscore path (the fast
+    // path).
+    private static final boolean NATIVE_CAMERA =
+            "1".equals(System.getenv("SPECTRUM_NATIVE_CAMERA"))
+                    && org.photonvision.vision.pipe.impl.NativePublish.ENABLED;
+
+    private long nativeHandle = 0;
+    private boolean nativeFailed = false;
+    private org.opencv.core.Mat nativeGray;
+    private RewindRecorder nativeRewind;
+
+    /** The native camera's NAPA handle (0: not native). */
+    public long nativeCameraHandle() {
+        return nativeHandle;
+    }
+
+    private boolean openNative() {
+        if (nativeFailed) return false;
+        try {
+            var mode = settables.getCurrentVideoMode();
+            if (mode == null || mode.pixelFormat != PixelFormat.MJPEG) {
+                logger.info("Native camera: not an MJPEG mode; staying on cscore");
+                nativeFailed = true;
+                return false;
+            }
+            // cscore: keep the device open (controls) but stream nothing
+            camera.setConnectionStrategy(VideoSource.ConnectionStrategy.KEEP_OPEN);
+            cvSink.setEnabled(false);
+            synchronized (this) {
+                if (graySink != null) graySink.setEnabled(false);
+            }
+            if (rewind != null) {
+                rewind.stop(); // its cscore sink would start cscore streaming
+                rewind = null;
+            }
+            String dev = camera.getPath();
+            long h = 0;
+            for (int attempt = 0;
+                    attempt < 20 && h == 0;
+                    attempt++) { // cscore stops its stream asynchronously
+                h =
+                        org.photonvision.jni.NapaDetectorJNI.cameraOpen(
+                                dev, mode.width, mode.height, mode.fps, "tag36h11");
+                if (h == 0) Thread.sleep(100);
+            }
+            if (h == 0) {
+                logger.error("Native camera: could not open " + dev + "; staying on cscore");
+                nativeFailed = true;
+                cvSink.setEnabled(!useGray);
+                synchronized (this) {
+                    if (graySink != null) graySink.setEnabled(useGray);
+                }
+                camera.setConnectionStrategy(VideoSource.ConnectionStrategy.AUTO_MANAGE);
+                return false;
+            }
+            nativeHandle = h;
+            nativeGray = new org.opencv.core.Mat(mode.height, mode.width, org.opencv.core.CvType.CV_8UC1);
+            nativeRewind = RewindRecorder.forNative(h, () -> settables.getConfiguration().nickname);
+            logger.info(
+                    "Native camera: " + dev + " captured natively (" + mode.width + "x" + mode.height + ")");
+            return true;
+        } catch (UnsatisfiedLinkError | InterruptedException e) {
+            nativeFailed = true;
+            return false;
+        }
+    }
+
+    private CapturedFrame nativeFrame() {
+        long end = System.nanoTime() + 200_000_000L;
+        while (System.nanoTime() < end) {
+            long stamp =
+                    org.photonvision.jni.NapaDetectorJNI.cameraLatestGray(
+                            nativeHandle, nativeGray.dataAddr(), nativeGray.cols(), nativeGray.rows());
+            if (stamp != 0) {
+                lastTime = stamp;
+                return new CapturedFrame(
+                        new CVMat(nativeGray.clone()),
+                        settables.getFrameStaticProperties(),
+                        toMidExposureNs(stamp));
+            }
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
+    }
+
     @Override
     public CapturedFrame getInputMat() {
+        if (NATIVE_CAMERA && (nativeHandle != 0 || openNative())) return nativeFrame();
         if (restartIfCameraThreadDead()) {
             // photonvision-88: the module is being rebuilt; don't grab from (or reset) this camera.
             try {
@@ -1428,6 +1527,19 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     @Override
     public void release() {
+        if (nativeRewind != null) {
+            nativeRewind.stop();
+            nativeRewind = null;
+        }
+        if (nativeHandle != 0) {
+            org.photonvision.jni.NapaDetectorJNI.destroy(
+                    nativeHandle); // stops the camera thread, closes it
+            nativeHandle = 0;
+        }
+        if (nativeGray != null) {
+            nativeGray.release();
+            nativeGray = null;
+        }
         if (rewind != null) {
             rewind.stop();
             rewind = null;
