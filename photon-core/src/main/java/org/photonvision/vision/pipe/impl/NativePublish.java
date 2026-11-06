@@ -83,6 +83,8 @@ public final class NativePublish {
     private org.wpilib.networktables.NetworkTableInstance ownInst;
     private org.wpilib.networktables.RawPublisher ownPub;
     private org.wpilib.networktables.DoubleArrayPublisher ownQualityPub;
+    // Rewind's folder name for this camera (from NTDataPublisher)
+    public volatile String rewindCamera;
     // the tagQuality publisher the native side sends each result's quality on (0: none)
     public volatile int qualityHandle = 0;
     private String ownTopic, ownServer;
@@ -148,6 +150,13 @@ public final class NativePublish {
     private org.wpilib.networktables.IntegerSubscriber inScale, inFullEvery, inProcessEvery;
     private String policyDir;
     private volatile long scaledFrames = 0;
+
+    private volatile int[] activePolicy = {1, 0, 1};
+
+    /** The frame policy in force: {scale, fullEvery, processEvery}. */
+    public int[] activePolicy() {
+        return activePolicy;
+    }
 
     /** Frames decoded at a reduced scale so far. */
     public long scaledFrames() {
@@ -268,6 +277,26 @@ public final class NativePublish {
         } catch (UnsatisfiedLinkError e) {
             // an older NAPA library: first-sight stamps only
         }
+        // Rewind: while it records, the native results (with their quality) go into its vision log
+        String cam = rewindCamera;
+        if (cam != null && org.photonvision.rewind.VisionLog.isOpen()) {
+            try {
+                byte[][] items = org.photonvision.jni.NapaDetectorJNI.drainNativeResults(napaHandle);
+                if (items != null)
+                    for (byte[] it : items) {
+                        var bb = java.nio.ByteBuffer.wrap(it).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                        long t = bb.getLong();
+                        int nq = bb.getInt();
+                        double[] q = new double[nq];
+                        for (int i = 0; i < nq; i++) q[i] = bb.getDouble();
+                        byte[] packet = new byte[bb.remaining()];
+                        bb.get(packet);
+                        org.photonvision.rewind.VisionLog.rawResult(cam, packet, q, t);
+                    }
+            } catch (UnsatisfiedLinkError e) {
+                // an older NAPA library
+            }
+        }
         try {
             org.photonvision.jni.NapaDetectorJNI.setNativeQualityPub(napaHandle, qualityHandle);
         } catch (UnsatisfiedLinkError e) {
@@ -275,6 +304,7 @@ public final class NativePublish {
         }
         try {
             int[] pol = policy();
+            activePolicy = pol;
             scaledFrames =
                     org.photonvision.jni.NapaDetectorJNI.setNativePolicy(napaHandle, pol[0], pol[1], pol[2]);
         } catch (UnsatisfiedLinkError e) {

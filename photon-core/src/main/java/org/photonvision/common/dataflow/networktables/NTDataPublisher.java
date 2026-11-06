@@ -275,7 +275,11 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
                     NetworkTablesManager.getInstance().getTimeSinceLastPong());
         if (nativePub == null || !nativePub.active()) ts.resultPublisher.set(simplified, 1024);
         // photonvision-79: the same result into the open Rewind recording's vision log.
-        org.photonvision.rewind.VisionLog.result(rewindCamera, simplified, nowNanos);
+        // (fast path: the native results go to the vision log instead, with their own sequence IDs and
+        // quality; NativePublish drains them)
+        if (nativePub == null || !nativePub.active())
+            org.photonvision.rewind.VisionLog.result(rewindCamera, simplified, nowNanos);
+        if (nativePub != null) nativePub.rewindCamera = rewindCamera;
         if (ConfigProvider.getInstance().getConfig().getNetworkConfig().shouldPublishProto) {
             ts.protoResultPublisher.set(simplified);
         }

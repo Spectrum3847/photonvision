@@ -115,6 +115,14 @@ public final class NapaDetectorJNI {
     public static native void setNativeQualityPub(long handle, int pub);
 
     /**
+     * Spectrum (sc/mjpeg-napa): the results this camera's native publish sent since the last call,
+     * for Rewind's vision log: each [publish time ns (8 bytes LE)][quality count (4)][quality
+     * doubles][the serialized result]. Calling it turns the collection on (off 1 s after the last
+     * call). Null if none.
+     */
+    public static native byte[][] drainNativeResults(long handle);
+
+    /**
      * Spectrum (sc/mjpeg-napa): this camera's frame policy for streamed frames: decode scale 1, 2 or
      * 4, every fullEvery-th processed frame at full scale (0: never), process 1 frame in
      * processEvery. Applies while nobody watches the stream. Returns frames decoded reduced so far.

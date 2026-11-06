@@ -56,6 +56,8 @@ public final class VisionLog {
 
     private static DataLog log;
     private static final Map<String, RawLogEntry> results = new HashMap<>();
+    private static final Map<String, org.wpilib.datalog.DoubleArrayLogEntry> qualities =
+            new HashMap<>();
     private static final Map<String, StructLogEntry<Pose3d>> poses = new HashMap<>();
     private static IntegerLogEntry offsetEntry;
     private static BooleanLogEntry connectedEntry;
@@ -90,6 +92,7 @@ public final class VisionLog {
         log.close();
         log = null;
         results.clear();
+        qualities.clear();
         poses.clear();
         lastOffset = null;
         lastConnected = null;
@@ -113,6 +116,31 @@ public final class VisionLog {
                     .computeIfAbsent(camera, VisionLog::poseEntry)
                     .append(new Pose3d(t.getTranslation(), t.getRotation()), nowUs);
         }
+    }
+
+    /** Whether a vision log is open (Rewind recording). */
+    public static synchronized boolean isOpen() {
+        return log != null;
+    }
+
+    /**
+     * Spectrum (sc/mjpeg-napa) fast path: a result the camera's streaming thread published itself, as
+     * sent (the serialized PhotonPipelineResult), with its tagQuality (photonvision-61; null or empty
+     * without tags), at its publish time (nowNs: NT clock). The same entries as {@link #result}, plus
+     * /camera/tagQuality.
+     */
+    public static synchronized void rawResult(
+            String camera, byte[] packet, double[] quality, long nowNs) {
+        if (log == null) return;
+        long nowUs = nowNs / 1000;
+        results
+                .computeIfAbsent(camera, c -> new RawLogEntry(log, "/" + c + "/result", "", RESULT_TYPE))
+                .append(packet, nowUs);
+        if (quality != null && quality.length > 0)
+            qualities
+                    .computeIfAbsent(
+                            camera, c -> new org.wpilib.datalog.DoubleArrayLogEntry(log, "/" + c + "/tagQuality"))
+                    .append(quality, nowUs);
     }
 
     /** From Rewind's tick: the link to the robot, logged when it changes (nanosecond arguments). */
