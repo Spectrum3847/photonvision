@@ -368,6 +368,7 @@ public class NativeFrameProvider extends CpuImageProcessor {
     public synchronized void setJpegStream(
             org.photonvision.vision.frame.consumer.MJPGFrameConsumer target) {
         jpegTarget = target;
+        if (target != null) target.preparePassthrough();
         if (jpegPump == null
                 && target != null
                 && !"0".equals(System.getenv("SPECTRUM_STREAM_PASSTHROUGH"))) {

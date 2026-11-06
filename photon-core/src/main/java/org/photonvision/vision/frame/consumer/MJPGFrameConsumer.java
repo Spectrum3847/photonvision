@@ -101,7 +101,6 @@ public class MJPGFrameConsumer implements AutoCloseable {
                             cvSource.getName() + "_jpeg", PixelFormat.MJPEG, width, height, 30);
         if (!onRaw) {
             mjpegServer.setSource(rawSource);
-            mjpegServer.setCompression(-1); // pass the camera's JPEG through
             onRaw = true;
         }
         rawSource.putFrame(jpeg, width, height, 0, PixelFormat.MJPEG);
@@ -110,8 +109,18 @@ public class MJPGFrameConsumer implements AutoCloseable {
     private synchronized void backToMats() {
         if (!onRaw || mjpegServer == null) return;
         mjpegServer.setSource(cvSource);
-        mjpegServer.setCompression(75);
         onRaw = false;
+    }
+
+    /**
+     * Before any viewer connects: JPEG frames are passed through as they are (each connection keeps
+     * the compression it started with; at 75 cscore decoded and re-encoded every camera JPEG, 33% of
+     * a core at 1280x800 30 fps), Mats are still encoded at 75.
+     */
+    public synchronized void preparePassthrough() {
+        if (mjpegServer == null) return;
+        mjpegServer.setCompression(-1);
+        mjpegServer.setDefaultCompression(75);
     }
 
     public void accept(CVMat image) {
