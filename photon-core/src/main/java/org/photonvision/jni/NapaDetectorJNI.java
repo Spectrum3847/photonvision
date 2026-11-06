@@ -158,6 +158,35 @@ public final class NapaDetectorJNI {
             long handle, String prefix, int ringMb, double recordFps);
 
     /**
+     * The camera's latest JPEG, as the camera sent it (for the stream: no re-encode), into a direct
+     * buffer. Returns its length; 0 when none newer is ready yet; -n when the buffer needs n bytes.
+     */
+    public static native int cameraLatestJpeg(long handle, java.nio.ByteBuffer direct);
+
+    // The device itself, without a capture handle (NativeCameraSettables: no cscore UsbCamera)
+
+    /**
+     * The device's video modes as the driver lists them: {fourcc, width, height, fps} per mode, or
+     * null if it can't be opened.
+     */
+    public static native int[] deviceModes(String dev);
+
+    /**
+     * The device's controls, one "id,type,min,max,step,default,value,flags,name" string each (the
+     * camera's own units), or null if it can't be opened.
+     */
+    public static native String[] deviceControls(String dev);
+
+    /** Sets a control, reading it first: 1 written, 0 already that value, -1 error. */
+    public static native int deviceSetControl(String dev, int id, int value);
+
+    /** A control's value, or Integer.MIN_VALUE. */
+    public static native int deviceGetControl(String dev, int id);
+
+    /** Closes the device's control fd. */
+    public static native void deviceClose(String dev);
+
+    /**
      * Spectrum (sc/mjpeg-napa): this camera's frame policy for streamed frames: decode scale 1, 2 or
      * 4, every fullEvery-th processed frame at full scale (0: never), process 1 frame in
      * processEvery. Applies while nobody watches the stream. Returns frames decoded reduced so far.

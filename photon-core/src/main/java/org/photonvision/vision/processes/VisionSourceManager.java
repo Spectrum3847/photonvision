@@ -594,7 +594,14 @@ public class VisionSourceManager implements AutoCloseable {
 
         VisionSource source =
                 switch (configuration.matchedCameraInfo.type()) {
-                    case UsbCamera -> new USBCameraSource(configuration);
+                    // Spectrum (sc/mjpeg-napa): verified cameras get the native backend (no cscore
+                    // UsbCamera); anything else, or any failure there, the normal cscore source
+                    case UsbCamera -> {
+                        VisionSource nativeSource =
+                                org.photonvision.vision.camera.USBCameras.NativeCameraSource.createOrNull(
+                                        configuration);
+                        yield nativeSource != null ? nativeSource : new USBCameraSource(configuration);
+                    }
                     case ZeroCopyPicam -> new LibcameraGpuSource(configuration);
                     case FileCamera -> new FileVisionSource(configuration);
                 };

@@ -108,8 +108,11 @@ public class USBFrameProvider extends CpuImageProcessor {
     // image at its own
     // low rate (UI, stream, settings). Any failure: this camera stays on the cscore path (the fast
     // path).
+    // Superseded by NativeCameraSource (no UsbCamera at all, photonvision-128): cscore's UsbCamera
+    // keeps uvcvideo's privileges, so this in-cscore variant can't open the camera. Only
+    // SPECTRUM_NATIVE_CAMERA=cscore-legacy turns it on (kept for comparison).
     private static final boolean NATIVE_CAMERA =
-            "1".equals(System.getenv("SPECTRUM_NATIVE_CAMERA"))
+            "cscore-legacy".equals(System.getenv("SPECTRUM_NATIVE_CAMERA"))
                     && org.photonvision.vision.pipe.impl.NativePublish.ENABLED;
 
     private long nativeHandle = 0;
@@ -1218,9 +1221,9 @@ public class USBFrameProvider extends CpuImageProcessor {
      * SPECTRUM_CAMERA_DELAY_US=2500 with hwtimestamps=1 now gets the PTS delay instead (its reference
      * is the PTS too).
      */
-    private static final String CAMERA_DELAY_SPEC = System.getenv("SPECTRUM_CAMERA_DELAY_US");
+    static final String CAMERA_DELAY_SPEC = System.getenv("SPECTRUM_CAMERA_DELAY_US");
 
-    private static final String PTS_DELAY_SPEC = System.getenv("SPECTRUM_CAMERA_PTS_DELAY_US");
+    static final String PTS_DELAY_SPEC = System.getenv("SPECTRUM_CAMERA_PTS_DELAY_US");
 
     static long cameraDelayUs(String spec, String nickname, String uniqueName, long def) {
         if (spec == null || spec.isBlank()) return def;
@@ -1255,7 +1258,7 @@ public class USBFrameProvider extends CpuImageProcessor {
         }
     }
 
-    private static final boolean HW_TIMESTAMPS = hwTimestamps();
+    static final boolean HW_TIMESTAMPS = hwTimestamps();
 
     /**
      * Spectrum (sc/mjpeg-napa): with hwtimestamps=0, the driver's buffer timestamp minus the frame's
@@ -1268,7 +1271,7 @@ public class USBFrameProvider extends CpuImageProcessor {
      * re-measured). SPECTRUM_UVC_STAMP_LAG_US overrides. 0 with hwtimestamps=1 (not used: the PTS
      * delay applies).
      */
-    private static final long UVC_STAMP_LAG_US =
+    static final long UVC_STAMP_LAG_US =
             envLong("SPECTRUM_UVC_STAMP_LAG_US", HW_TIMESTAMPS ? 0 : stampLagUs());
 
     /**
@@ -1277,7 +1280,7 @@ public class USBFrameProvider extends CpuImageProcessor {
      * +0.085 ms mean (sd 0.074 ms; 0.01-0.15 ms with the URB boundary and the wake). Bigger URBs: the
      * URB's length (not measured). SPECTRUM_STREAM_SEEN_LAG_US overrides.
      */
-    private static final long SEEN_LAG_US = envLong("SPECTRUM_STREAM_SEEN_LAG_US", seenLagUs());
+    static final long SEEN_LAG_US = envLong("SPECTRUM_STREAM_SEEN_LAG_US", seenLagUs());
 
     private static int urbPackets() {
         try {
@@ -1328,6 +1331,10 @@ public class USBFrameProvider extends CpuImageProcessor {
      * minimum, 2).
      */
     private long realExposureUs(double nominalUs) {
+        return realExposureUs(settables, nominalUs);
+    }
+
+    static long realExposureUs(VisionSourceSettables settables, double nominalUs) {
         if (nominalUs <= 0) return 0;
         var info = settables.getConfiguration().matchedCameraInfo;
         if (info instanceof org.photonvision.vision.camera.PVCameraInfo.PVUsbCameraInfo usb

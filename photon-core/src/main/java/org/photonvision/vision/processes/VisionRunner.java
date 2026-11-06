@@ -48,6 +48,19 @@ import org.photonvision.vision.pipeline.result.CVPipelineResult;
  */
 @SuppressWarnings("rawtypes")
 public class VisionRunner implements AutoCloseable {
+    // Spectrum (sc/mjpeg-napa) native camera backend: the Java pipeline's rate while no stream is
+    // watched (results, tag quality and health counters come from the native thread every frame)
+    private static final double NATIVE_IDLE_JAVA_FPS = nativeIdleJavaFps();
+
+    private static double nativeIdleJavaFps() {
+        try {
+            String v = System.getenv("SPECTRUM_NATIVE_CAMERA_JAVA_FPS");
+            return v == null || v.isBlank() ? 5 : Double.parseDouble(v.trim());
+        } catch (NumberFormatException e) {
+            return 5;
+        }
+    }
+
     private final Logger logger;
     private final Thread visionProcessThread;
     private final FrameProvider frameSupplier;
@@ -289,6 +302,27 @@ public class VisionRunner implements AutoCloseable {
                     nativePublish.midShiftNs = usb.nativeMidShiftNs;
                     nativePublish.camShiftNs = usb.nativeCamShiftNs;
                     nativePublish.cameraHandle = usb.nativeCameraHandle();
+                }
+                // Spectrum (sc/mjpeg-napa) native camera backend: no cscore UsbCamera; the native thread
+                // does every frame, the Java pipeline only the UI/stream/health frames (fewer while nobody
+                // watches a stream), and calibration gets a temporary cscore camera
+                if (frameSupplier
+                        instanceof org.photonvision.vision.frame.provider.NativeFrameProvider nat) {
+                    nat.setCalibrating(
+                            pipelineSupplier.get()
+                                    instanceof org.photonvision.vision.pipeline.Calibrate3dPipeline);
+                    if (nativePublish != null) {
+                        nativePublish.midShiftNs = nat.nativeMidShiftNs;
+                        nativePublish.camShiftNs = nat.nativeCamShiftNs;
+                        nativePublish.cameraHandle = nat.nativeCameraHandle();
+                    }
+                    if (nat.isNative()) {
+                        double fps =
+                                org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyViewers()
+                                        ? org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS
+                                        : NATIVE_IDLE_JAVA_FPS;
+                        if (fps > 0) capNanos = Math.max(capNanos, (long) (1e9 / fps));
+                    }
                 }
                 boolean nativeOn =
                         nativePublish != null

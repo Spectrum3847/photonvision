@@ -208,25 +208,45 @@ public class VisionModule implements AutoCloseable {
                         () ->
                                 visionSource.getFrameProvider() instanceof USBFrameProvider usb
                                         ? usb.getDecodeFailures()
-                                        : 0,
+                                        : visionSource.getFrameProvider()
+                                                        instanceof
+                                                        org.photonvision.vision.frame.provider.NativeFrameProvider nat
+                                                ? nat.getDecodeFailures()
+                                                : 0,
                         () ->
                                 visionSource.getFrameProvider() instanceof USBFrameProvider usb
                                         ? usb.getRecoveries()
-                                        : 0,
+                                        : visionSource.getFrameProvider()
+                                                        instanceof
+                                                        org.photonvision.vision.frame.provider.NativeFrameProvider nat
+                                                ? nat.getRecoveries()
+                                                : 0,
                         // SpectrumJetson (photonvision-31): e.g. "not enough USB bandwidth (...)".
                         () ->
                                 visionSource.getFrameProvider() instanceof USBFrameProvider usb
                                         ? usb.getProblem()
-                                        : "",
+                                        : visionSource.getFrameProvider()
+                                                        instanceof
+                                                        org.photonvision.vision.frame.provider.NativeFrameProvider nat
+                                                ? nat.getProblem()
+                                                : "",
                         // SpectrumJetson (photonvision-81): e.g. "streaming", "gave-up".
                         () ->
                                 visionSource.getFrameProvider() instanceof USBFrameProvider usb
                                         ? usb.getHealthState()
-                                        : "",
+                                        : visionSource.getFrameProvider()
+                                                        instanceof
+                                                        org.photonvision.vision.frame.provider.NativeFrameProvider nat
+                                                ? nat.getHealthState()
+                                                : "",
                         () ->
                                 visionSource.getFrameProvider() instanceof USBFrameProvider usb
                                         ? usb.getLastFrameAgeMs()
-                                        : -1));
+                                        : visionSource.getFrameProvider()
+                                                        instanceof
+                                                        org.photonvision.vision.frame.provider.NativeFrameProvider nat
+                                                ? nat.getLastFrameAgeMs()
+                                                : -1));
         // SpectrumJetson: the camera's mount (height, pitch, roll) from the tags it sees
         // (photonvision-17).
         resultConsumers.add(
