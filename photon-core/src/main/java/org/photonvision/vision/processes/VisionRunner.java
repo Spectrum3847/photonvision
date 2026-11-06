@@ -185,30 +185,6 @@ public class VisionRunner implements AutoCloseable {
         return future;
     }
 
-    /**
-     * Waits until the next time this VisionRunner should run its pipeline, based on current FPS limit
-     */
-    private void waitUntilNextTick(long startNanos) {
-        // Spectrum (photonvision-98): capped on the SystemCore
-        int fpsLimit = SystemCoreProfile.fpsLimit(fpsLimitSupplier.get());
-
-        if (fpsLimit > 0) {
-            // SpectrumJetson (photonvision-65): a monotonic clock. The date can jump when the Jetson
-            // takes the robot's (RobotClockSync), and a jump back here slept this camera for as long.
-            long sleepTime = 1000 / fpsLimit - (System.nanoTime() - startNanos) / 1_000_000;
-
-            if (sleepTime > 0) {
-                try {
-                    Thread.sleep(sleepTime);
-                } catch (InterruptedException e) {
-                }
-            }
-            return;
-        } else {
-            // Fall through to no limit
-            return;
-        }
-    }
 
     // Spectrum: where each loop's time goes, logged every 10 s (frame = grab incl. decode,
     // pipeline = pipeline.run, consumers = pipelineResultConsumer: NT, UI, health, ...).
@@ -288,6 +264,12 @@ public class VisionRunner implements AutoCloseable {
                 // SpectrumJetson (photonvision-100): the pipeline's own cap (Tag/Object FPS max),
                 // combined with idle mode's; without one, idle mode alone, as before.
                 long capNanos = FrameRateCap.capPeriodNanos(pipelineSupplier.get());
+                // Spectrum (sc/mjpeg-napa): the camera's FPS limit (and the SystemCore profile's cap)
+                // is applied here, before the grab, like Tag FPS max. It used to sleep in
+                // waitUntilNextTick() after the frame was grabbed, which aged every frame by up to a
+                // period (median latency ~43 ms at the SystemCore's 50 fps cap).
+                int fpsLimit = SystemCoreProfile.fpsLimit(fpsLimitSupplier.get());
+                if (fpsLimit > 0) capNanos = Math.max(capNanos, 1_000_000_000L / fpsLimit);
                 if (capNanos > 0) {
                     if (!frameRateCap.await(capNanos)) return;
                 } else if (IdleMode.active() && !IdleMode.waitForNextFrame(lastGrabNanos)) return;
@@ -351,7 +333,7 @@ public class VisionRunner implements AutoCloseable {
 
                     // If we have an FPS limit, check if it's 0, in which case we skip processing and
                     // just send a blank frame, otherwise we sleep until the next tick
-                    waitUntilNextTick(start);
+                    // (the FPS limit is applied before the grab: capNanos above)
                     try {
                         var pipelineResult = pipeline.run(frame, cameraQuirks);
                         long n3 = System.nanoTime();

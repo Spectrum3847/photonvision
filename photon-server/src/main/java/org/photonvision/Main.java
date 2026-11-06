@@ -352,7 +352,18 @@ public class Main implements Callable<Integer> {
 
         logger.info("Starting server...");
         HardwareManager.getInstance().setError(Optional.empty());
-        Server.initialize(DEFAULT_WEBPORT);
+        // SPECTRUM_WEBPORT: another port for the UI, e.g. on a SystemCore, where Limelight's visionserver
+        // owns 5800 (SpectrumJetson scripts/systemcore).
+        int webPort = DEFAULT_WEBPORT;
+        String portEnv = System.getenv("SPECTRUM_WEBPORT");
+        if (portEnv != null && !portEnv.isBlank()) {
+            try {
+                webPort = Integer.parseInt(portEnv.trim());
+            } catch (NumberFormatException e) {
+                logger.warn("SPECTRUM_WEBPORT is not a number: " + portEnv + "; using " + DEFAULT_WEBPORT);
+            }
+        }
+        Server.initialize(webPort);
         return -1; // Don't exit, the server is running
     }
 

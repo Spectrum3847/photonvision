@@ -23,9 +23,16 @@ import org.photonvision.common.util.ShellExec;
 public class SystemMonitorRaspberryPi extends SystemMonitor {
     private final ShellExec runCommand = new ShellExec(true, true);
 
+    // Spectrum: the SystemCore (a Pi 5 / CM5 under LimelightOS) has no vcgencmd. Without this every
+    // metrics poll forked a shell several times a second and logged an error each time.
+    private static final boolean HAS_VCGENCMD =
+            java.util.stream.Stream.of(System.getenv().getOrDefault("PATH", "/usr/bin").split(":"))
+                    .anyMatch(d -> new java.io.File(d, "vcgencmd").canExecute());
+
     @Override
     public String getCpuThrottleReason() {
         int state = 0;
+        if (!HAS_VCGENCMD) return "None";
         String output = vcgencmd("get_throttled");
         try {
             state = Integer.decode(output);
@@ -63,7 +70,7 @@ public class SystemMonitorRaspberryPi extends SystemMonitor {
     }
 
     private String vcgencmd(String cmd) {
-        if (cmd.isBlank()) {
+        if (cmd.isBlank() || !HAS_VCGENCMD) {
             return "";
         }
         String command = "vcgencmd " + cmd;
