@@ -345,10 +345,25 @@ public final class CameraThreads {
                 continue;
             }
             if (ours.contains(tid)) continue;
+            // the streaming decoders' watchers place themselves (SPECTRUM_STREAM_CPUS, e.g. "camera":
+            // on their camera thread's core); moving them here made the two fight every 2 s
+            if (isStreamWatcher(tid)) continue;
             String now = cpusAllowed("self/task/" + tid);
             if (now == null || now.equals(rest)) continue;
             if (!others && parse(now).cardinality() >= processCpuCount) continue;
             run("taskset", "-p", "-c", rest, String.valueOf(tid));
+        }
+    }
+
+    private static boolean isStreamWatcher(int tid) {
+        try {
+            return "SpectrumStream"
+                    .equals(
+                            java.nio.file.Files.readString(
+                                            java.nio.file.Path.of("/proc/self/task/" + tid + "/comm"))
+                                    .trim());
+        } catch (Exception e) {
+            return false;
         }
     }
 
