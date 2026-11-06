@@ -51,7 +51,8 @@ public class AprilTagCudaPipelineSettings extends AdvancedPipelineSettings {
     // frames (NAPA's own default 32 misses 18% of tags). With NAPA, napaMaxHamming replaces the
     // hamming filter. Far search: the full frame at 32, and napaFarMinTagPx only in tracking crops
     // and capped sweeps.
-    public int napaMinTagPx = 16;
+    public int napaMinTagPx =
+            22; // Spectrum: 22 is the measured sweet spot (SpectrumJetson FINDINGS 40)
     public int napaMaxHamming = 1;
     public boolean napaFarSearch = false;
     public int napaFarMinTagPx = 16;

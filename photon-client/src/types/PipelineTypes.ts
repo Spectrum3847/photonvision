@@ -342,7 +342,7 @@ export const DefaultAprilTagPipelineSettings: AprilTagPipelineSettings = {
   lowCpuDecode: false,
   tagFpsMax: 0,
   napa: false,
-  napaMinTagPx: 16,
+  napaMinTagPx: 22,
   napaMaxHamming: 1,
   napaFarSearch: false,
   napaFarMinTagPx: 16
@@ -382,7 +382,7 @@ export const DefaultAprilTagCudaPipelineSettings: AprilTagCudaPipelineSettings =
   pipelineType: PipelineType.AprilTagCuda,
   tagFpsMax: 0,
   tagsOnCpu: false,
-  napaMinTagPx: 16,
+  napaMinTagPx: 22,
   napaMaxHamming: 1,
   napaFarSearch: false,
   napaFarMinTagPx: 16,
