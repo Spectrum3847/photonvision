@@ -100,7 +100,8 @@ public class USBFrameProvider extends CpuImageProcessor {
 
     // ---- Spectrum (sc/mjpeg-napa) native camera backend (SpectrumJetson
     // docs/SYSTEMCORE-NATIVE-BACKEND.md) ----
-    // SPECTRUM_NATIVE_CAMERA=1 (with SPECTRUM_NATIVE_PUBLISH=1): this camera's frames are captured,
+    // SPECTRUM_NATIVE_CAMERA=cscore-legacy (superseded, see below): this camera's frames are
+    // captured,
     // decoded,
     // detected, posed and published by a native thread that owns the V4L2 queue; cscore keeps the
     // device open only

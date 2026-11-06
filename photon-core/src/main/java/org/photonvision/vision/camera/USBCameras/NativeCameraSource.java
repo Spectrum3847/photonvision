@@ -26,7 +26,6 @@ import org.photonvision.vision.camera.PVCameraInfo.PVUsbCameraInfo;
 import org.photonvision.vision.camera.QuirkyCamera;
 import org.photonvision.vision.frame.FrameProvider;
 import org.photonvision.vision.frame.provider.NativeFrameProvider;
-import org.photonvision.vision.pipe.impl.NativePublish;
 import org.photonvision.vision.processes.VisionSource;
 import org.photonvision.vision.processes.VisionSourceSettables;
 import org.wpilib.util.PixelFormat;
@@ -35,9 +34,8 @@ import org.wpilib.util.PixelFormat;
  * Spectrum (sc/mjpeg-napa) native camera backend (SpectrumJetson
  * docs/SYSTEMCORE-NATIVE-BACKEND.md): a USB camera with no cscore UsbCamera. Chosen per camera by
  * {@link #createOrNull}: verified cameras (Thriftiest Cam 1bcf:28c5, Swyft 0bda:3035; more with
- * SPECTRUM_NATIVE_CAMERA_IDS) with MJPEG modes, while native publish is on and the library is
- * there. SPECTRUM_NATIVE_CAMERA=0 turns it off. Anything else, or any failure here, and the camera
- * is a normal USBCameraSource.
+ * SPECTRUM_NATIVE_CAMERA_IDS) with MJPEG modes, when the library is there. SPECTRUM_NATIVE_CAMERA=0
+ * turns it off. Anything else, or any failure here, and the camera is a normal USBCameraSource.
  */
 public class NativeCameraSource extends VisionSource {
     private static final Logger staticLogger = new Logger(NativeCameraSource.class, LogGroup.Camera);
@@ -59,7 +57,7 @@ public class NativeCameraSource extends VisionSource {
 
     /** A native source for this camera, or null (it gets a USBCameraSource). */
     public static VisionSource createOrNull(CameraConfiguration config) {
-        if ("0".equals(System.getenv("SPECTRUM_NATIVE_CAMERA")) || !NativePublish.ENABLED) return null;
+        if ("0".equals(System.getenv("SPECTRUM_NATIVE_CAMERA"))) return null;
         if (!(config.matchedCameraInfo instanceof PVUsbCameraInfo usb)) return null;
         if (!verified(usb.vendorId, usb.productId)) return null;
         String dev = config.getDevicePath();

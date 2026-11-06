@@ -48,19 +48,6 @@ import org.photonvision.vision.pipeline.result.CVPipelineResult;
  */
 @SuppressWarnings("rawtypes")
 public class VisionRunner implements AutoCloseable {
-    // Spectrum (sc/mjpeg-napa) native camera backend: the Java pipeline's rate while no stream is
-    // watched (results, tag quality and health counters come from the native thread every frame)
-    private static final double NATIVE_IDLE_JAVA_FPS = nativeIdleJavaFps();
-
-    private static double nativeIdleJavaFps() {
-        try {
-            String v = System.getenv("SPECTRUM_NATIVE_CAMERA_JAVA_FPS");
-            return v == null || v.isBlank() ? 5 : Double.parseDouble(v.trim());
-        } catch (NumberFormatException e) {
-            return 5;
-        }
-    }
-
     private final Logger logger;
     private final Thread visionProcessThread;
     private final FrameProvider frameSupplier;
@@ -83,7 +70,7 @@ public class VisionRunner implements AutoCloseable {
                     ? new org.photonvision.vision.pipe.impl.NativePublish()
                     : null;
 
-    /** This camera's native publish state (null when SPECTRUM_NATIVE_PUBLISH is off). */
+    /** This camera's native publish state. */
     public org.photonvision.vision.pipe.impl.NativePublish getNativePublish() {
         return nativePublish;
     }
@@ -317,22 +304,13 @@ public class VisionRunner implements AutoCloseable {
                         nativePublish.cameraHandle = nat.nativeCameraHandle();
                     }
                     if (nat.isNative()) {
-                        double fps =
-                                org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyMatViewers()
-                                        ? org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS
-                                        : NATIVE_IDLE_JAVA_FPS;
+                        double fps = org.photonvision.vision.pipe.impl.NativePublish.javaFpsNow();
                         if (fps > 0) capNanos = Math.max(capNanos, (long) (1e9 / fps));
                     }
                 }
-                boolean nativeOn =
-                        nativePublish != null
-                                && nativePublish.active()
-                                && org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS > 0;
-                if (nativeOn)
-                    capNanos =
-                            Math.max(
-                                    capNanos,
-                                    (long) (1e9 / org.photonvision.vision.pipe.impl.NativePublish.JAVA_FPS));
+                double javaFps = org.photonvision.vision.pipe.impl.NativePublish.javaFpsNow();
+                boolean nativeOn = nativePublish != null && nativePublish.active() && javaFps > 0;
+                if (nativeOn) capNanos = Math.max(capNanos, (long) (1e9 / javaFps));
                 // Spectrum (pv-perf): the decoder thread decodes only around the frames taken (and, while
                 // the results are published natively, one frame per take)
                 if (frameSupplier

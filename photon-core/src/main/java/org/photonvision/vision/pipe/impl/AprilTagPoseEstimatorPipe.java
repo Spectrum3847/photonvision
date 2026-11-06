@@ -54,7 +54,8 @@ public class AprilTagPoseEstimatorPipe
     MatOfPoint2f cornersMat = new MatOfPoint2f();
 
     // Spectrum (sc/mjpeg-napa): the native IPPE + Gauss-Newton pose when the NAPA library is there
-    // (SPECTRUM_NATIVE_POSE=0: WPILib's orthogonal iteration as before). Measured: the Java path
+    // (SPECTRUM_NATIVE_POSE=0, a DEBUG switch only, not a setting: WPILib's orthogonal iteration as
+    // before, Java path only). Measured: the Java path
     // (orthogonal
     // iteration + OpenCV IPPE for the alternate) was 0.28 ms of every frame's latency on the
     // SystemCore.

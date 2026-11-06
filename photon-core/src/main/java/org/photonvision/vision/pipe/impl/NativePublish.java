@@ -22,20 +22,25 @@ package org.photonvision.vision.pipe.impl;
  * publishes that camera's PhotonPipelineResult itself (NapaDetectorJNI.setNativePublish: native
  * pose + the fork's serde on the camera's own rawBytes publisher) the moment its tags are known, so
  * the Java pipeline is off the per-frame path. The Java pipeline keeps running for the UI, the
- * stream and health, at most {@link #JAVA_FPS} frames a second, and doesn't publish rawBytes itself
- * while the native side does.
+ * stream and health, at most {@link #JAVA_FPS} frames a second ({@link #STREAM_FPS} while a stream
+ * fed by the Java pipeline is watched), and doesn't publish rawBytes itself while the native side
+ * does.
  *
  * <p>One instance per camera: its VisionRunner owns it and makes it {@link #current()} on its
  * thread, where the camera's pipeline, NapaDetector, NTDataPublisher and CameraHealthPublisher run,
  * so any number of cameras each publish on their own topics with their own calibration and timing.
  * A camera whose frames aren't streamed (no band-sink result) stays on the Java path.
  *
- * <p>SPECTRUM_NATIVE_PUBLISH=1 turns it on; SPECTRUM_NATIVE_PUBLISH_JAVA_FPS (default 30) caps the
- * Java pipeline meanwhile.
+ * <p>Always on (it engages per camera only when that camera's frames are streamed or captured
+ * natively; SPECTRUM_NATIVE_CAMERA=0 opts out of native cameras). SPECTRUM_NATIVE_JAVA_FPS (default
+ * 5) is the Java pipeline's rate meanwhile, for the fast path and native cameras alike.
  */
 public final class NativePublish {
-    public static final boolean ENABLED = "1".equals(System.getenv("SPECTRUM_NATIVE_PUBLISH"));
-    public static final double JAVA_FPS = javaFps();
+    public static final boolean ENABLED = true;
+    public static final double JAVA_FPS = envFps("SPECTRUM_NATIVE_JAVA_FPS", 5);
+    // while someone watches a stream the Java pipeline feeds (the output overlay; the input stream
+    // of a native camera is its own JPEG)
+    public static final double STREAM_FPS = envFps("SPECTRUM_STREAM_FPS", 30);
 
     private static final ThreadLocal<NativePublish> CURRENT = new ThreadLocal<>();
 
@@ -222,13 +227,20 @@ public final class NativePublish {
         }
     }
 
-    private static double javaFps() {
+    private static double envFps(String name, double def) {
         try {
-            String v = System.getenv("SPECTRUM_NATIVE_PUBLISH_JAVA_FPS");
-            return v == null || v.isBlank() ? 30 : Double.parseDouble(v.trim());
+            String v = System.getenv(name);
+            return v == null || v.isBlank() ? def : Double.parseDouble(v.trim());
         } catch (NumberFormatException e) {
-            return 30;
+            return def;
         }
+    }
+
+    /** The Java pipeline's rate while results are published natively. */
+    public static double javaFpsNow() {
+        return org.photonvision.vision.frame.consumer.MJPGFrameConsumer.anyMatViewers()
+                ? STREAM_FPS
+                : JAVA_FPS;
     }
 
     /**
