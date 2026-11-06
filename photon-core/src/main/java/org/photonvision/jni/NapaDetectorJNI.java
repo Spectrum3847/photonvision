@@ -108,6 +108,14 @@ public final class NapaDetectorJNI {
     public static native double nativeLatencyMs(long handle);
 
     /**
+     * Spectrum (sc/mjpeg-napa): this camera's frame policy for streamed frames: decode scale 1, 2 or
+     * 4, every fullEvery-th processed frame at full scale (0: never), process 1 frame in
+     * processEvery. Applies while nobody watches the stream. Returns frames decoded reduced so far.
+     */
+    public static native long setNativePolicy(
+            long handle, int scale, int fullEvery, int processEvery);
+
+    /**
      * Spectrum (sc/mjpeg-napa): the camera-clock stamp (PTS, hwtimestamps=1) -> mid-exposure for this
      * camera's native publish, ns (0: stamp from the first sight of the frame's bytes), and the
      * camera-clock stamp of the frame detectStreamed last returned (0: none), which anchors the
