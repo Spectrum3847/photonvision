@@ -47,6 +47,8 @@ public class UIDataPublisher implements CVPipelineResultConsumer {
 
         // only update the UI at 10hz
         if (lastUIResultUpdateTime + 1000.0 / 10.0 > now) return;
+        // Spectrum (pv-perf): no web UI open, nobody to send it to
+        if (org.photonvision.vision.processes.ClockThrottle.uiClients() == 0) return;
 
         Map<String, Object> dataMap = new HashMap<>();
         dataMap.put("sequenceID", result.sequenceID);

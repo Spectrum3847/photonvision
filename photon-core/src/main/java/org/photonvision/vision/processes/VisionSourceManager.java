@@ -86,7 +86,15 @@ public class VisionSourceManager implements AutoCloseable {
     public VisionModuleManager vmm = new VisionModuleManager();
 
     public void registerTimedTasks() {
-        TimedTaskManager.getInstance().addTask("CameraDeviceExplorer", this::pushUiUpdate, 1000);
+        // Spectrum (pv-perf): the once-a-second list is for the web UI (it enumerates every USB camera
+        // and serializes the list): only while a UI is open. A UI that connects gets it within 1 s.
+        TimedTaskManager.getInstance()
+                .addTask(
+                        "CameraDeviceExplorer",
+                        () -> {
+                            if (ClockThrottle.uiClients() > 0) pushUiUpdate();
+                        },
+                        1000);
     }
 
     /**

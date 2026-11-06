@@ -289,6 +289,7 @@ public class DataSocketHandler {
     }
 
     public void broadcastMessage(Object message, WsContext userToSkip) throws JsonException {
+        if (users.isEmpty()) return; // Spectrum (pv-perf): don't serialize for nobody
         ByteBuffer b = ByteBuffer.wrap(msgpackJsonb.toJsonBytes(message));
 
         if (userToSkip == null) {

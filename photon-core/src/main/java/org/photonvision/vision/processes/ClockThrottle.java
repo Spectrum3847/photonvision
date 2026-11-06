@@ -185,6 +185,11 @@ public final class ClockThrottle {
         if (n > 0) wake();
     }
 
+    /** Spectrum (pv-perf): web UI websocket clients now; UI-only work is skipped while 0. */
+    public static int uiClients() {
+        return uiClients;
+    }
+
     /**
      * photonvision-99: the frame period while deep idle (0 when not): IdleMode caps every camera to
      * DEEP_FPS. Cleared before the clocks come back, so the full rate is back within 5 ms of a robot
