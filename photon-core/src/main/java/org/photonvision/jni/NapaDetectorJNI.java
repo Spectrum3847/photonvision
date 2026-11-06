@@ -108,6 +108,13 @@ public final class NapaDetectorJNI {
     public static native double nativeLatencyMs(long handle);
 
     /**
+     * Spectrum (sc/mjpeg-napa): the tagQuality DoubleArray publisher (ntcore handle; 0: none) on
+     * which the native publish sends each result's tag quality, with the result's sequence ID, just
+     * before the result.
+     */
+    public static native void setNativeQualityPub(long handle, int pub);
+
+    /**
      * Spectrum (sc/mjpeg-napa): this camera's frame policy for streamed frames: decode scale 1, 2 or
      * 4, every fullEvery-th processed frame at full scale (0: never), process 1 frame in
      * processEvery. Applies while nobody watches the stream. Returns frames decoded reduced so far.

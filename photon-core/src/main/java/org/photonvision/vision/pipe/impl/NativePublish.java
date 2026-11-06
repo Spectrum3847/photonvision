@@ -82,6 +82,9 @@ public final class NativePublish {
 
     private org.wpilib.networktables.NetworkTableInstance ownInst;
     private org.wpilib.networktables.RawPublisher ownPub;
+    private org.wpilib.networktables.DoubleArrayPublisher ownQualityPub;
+    // the tagQuality publisher the native side sends each result's quality on (0: none)
+    public volatile int qualityHandle = 0;
     private String ownTopic, ownServer;
 
     /**
@@ -92,16 +95,19 @@ public final class NativePublish {
     public synchronized void bind(
             org.wpilib.networktables.NetworkTableInstance pvInst,
             org.wpilib.networktables.RawPublisher javaPub,
+            org.wpilib.networktables.DoubleArrayPublisher javaQualityPub,
             long offsetNs,
             long sincePong) {
         ntOffsetNs = offsetNs;
         sincePongNs = sincePong;
         int pub = javaPub.getHandle(), inst = pvInst.getHandle();
+        int quality = javaQualityPub != null ? javaQualityPub.getHandle() : 0;
         if (OWN_CLIENT) {
             try {
                 if (ensureOwnClient(pvInst, javaPub)) {
                     pub = ownPub.getHandle();
                     inst = ownInst.getHandle();
+                    quality = ownQualityPub != null ? ownQualityPub.getHandle() : 0;
                 }
             } catch (Exception e) {
                 // stay on PhotonVision's connection
@@ -109,6 +115,7 @@ public final class NativePublish {
         }
         pubHandle = pub;
         instHandle = inst;
+        qualityHandle = quality;
         // the robot's frame policy for this camera: /photonvision/<camera>/input/*
         String topicName = javaPub.getTopic().getName();
         String dir = topicName.substring(0, topicName.lastIndexOf('/'));
@@ -192,7 +199,16 @@ public final class NativePublish {
         }
         if (!name.equals(ownTopic)) { // first use, or the camera was renamed
             if (ownPub != null) ownPub.close();
+            if (ownQualityPub != null) ownQualityPub.close();
             ownPub = ownInst.getRawTopic(name).publish(topic.getTypeString());
+            // photonvision-61's tagQuality, on the same connection as the results it belongs to
+            ownQualityPub =
+                    ownInst
+                            .getDoubleArrayTopic(name.substring(0, name.lastIndexOf('/')) + "/tagQuality")
+                            .publish(
+                                    org.wpilib.networktables.PubSubOption.periodic(0.01),
+                                    org.wpilib.networktables.PubSubOption.SEND_ALL,
+                                    org.wpilib.networktables.PubSubOption.KEEP_DUPLICATES);
             ownTopic = name;
         }
         return ownInst.isConnected();
@@ -202,6 +218,8 @@ public final class NativePublish {
     public synchronized void close() {
         pubHandle = 0;
         if (ownPub != null) ownPub.close();
+        if (ownQualityPub != null) ownQualityPub.close();
+        ownQualityPub = null;
         if (ownInst != null) ownInst.close();
         ownPub = null;
         ownInst = null;
@@ -249,6 +267,11 @@ public final class NativePublish {
                     org.photonvision.jni.NapaDetectorJNI.setNativeCamShift(napaHandle, camShiftNs, anchor);
         } catch (UnsatisfiedLinkError e) {
             // an older NAPA library: first-sight stamps only
+        }
+        try {
+            org.photonvision.jni.NapaDetectorJNI.setNativeQualityPub(napaHandle, qualityHandle);
+        } catch (UnsatisfiedLinkError e) {
+            // an older NAPA library: no tag quality from the native side
         }
         try {
             int[] pol = policy();

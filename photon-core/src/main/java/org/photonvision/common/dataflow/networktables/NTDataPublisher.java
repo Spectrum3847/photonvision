@@ -254,7 +254,11 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
         // SpectrumJetson (photonvision-61): each tag's quality, sent just before the result it
         // belongs to (same sequence ID), and only for frames with tags.
         var quality = TagQuality.toArray(acceptedResult.sequenceID, acceptedResult.targets);
-        if (quality != null && tagQualityPublisher != null) tagQualityPublisher.set(quality);
+        var nativePubQ = org.photonvision.vision.pipe.impl.NativePublish.current();
+        // (fast path: the native side sends quality with each result it publishes, same sequence ID)
+        if (quality != null
+                && tagQualityPublisher != null
+                && (nativePubQ == null || !nativePubQ.active())) tagQualityPublisher.set(quality);
 
         // random guess at size of the array
         // Spectrum (sc/mjpeg-napa) fast path: the camera's streaming thread publishes rawBytes itself
@@ -266,6 +270,7 @@ public class NTDataPublisher implements CVPipelineResultConsumer {
             nativePub.bind(
                     rootTable.getInstance(),
                     ts.resultPublisher.publisher,
+                    tagQualityPublisher,
                     offsetNanos,
                     NetworkTablesManager.getInstance().getTimeSinceLastPong());
         if (nativePub == null || !nativePub.active()) ts.resultPublisher.set(simplified, 1024);
