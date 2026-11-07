@@ -111,6 +111,32 @@ public sealed interface PVCameraInfo {
                     .orElse(path());
         }
 
+        /**
+         * SpectrumJetson (photonvision-138): a camera with no serial of its own whose model has one
+         * fixed name (the ThriftyCam, 05c8:0a00, "SPCA2630 PC Camera") is named by model and USB port,
+         * e.g. "ThriftyCam_xhci0-1" for /dev/v4l/by-path/platform-xhci-hcd.0-usb-0:1:1.0: the same name
+         * for the same port, and two of them get different names.
+         */
+        @Override
+        public String humanReadableName() {
+            if (super.vendorId == 0x05c8 && super.productId == 0x0a00) {
+                String port = portTag(uniquePath());
+                return port.isEmpty() ? "ThriftyCam" : "ThriftyCam_" + port;
+            }
+            return name().replaceAll(" ", "_");
+        }
+
+        /**
+         * "xhci0-1" for ".../platform-xhci-hcd.0-usb-0:1:1.0-video-index0" (controller 0, port 1; hubs
+         * add ".N"); "" if the path isn't a by-path USB path.
+         */
+        static String portTag(String path) {
+            var m =
+                    java.util.regex.Pattern.compile("xhci-hcd\\.(\\d+)-usb[v0-9]*-\\d+:([0-9.]+):")
+                            .matcher(path == null ? "" : path);
+            return m.find() ? "xhci" + m.group(1) + "-" + m.group(2) : "";
+        }
+
         @Override
         public String[] otherPaths() {
             return super.otherPaths;

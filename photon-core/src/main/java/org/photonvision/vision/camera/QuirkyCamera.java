@@ -85,6 +85,9 @@ public class QuirkyCamera {
                             CameraQuirk.ArduCamCamera,
                             CameraQuirk.Gain,
                             CameraQuirk.ArduOV9782Controls),
+                    // Thrifty Bot ThriftyCam (OmniVision OG02B1B mono global shutter, SunplusIT SPCA2630,
+                    // USB 3): MJPEG 1600x1304 at 60 fps (its YUYV modes are slower or don't stream)
+                    new QuirkyCamera(0x05C8, 0x0A00, CameraQuirk.Gain, CameraQuirk.MJPEGOnly),
                     // FRC 4143: Innomaker OV9281 on the Jetson Orin's MIPI CSI ports
                     new QuirkyCamera(
                             -1, -1, "vi-output, ov9281 10-0060", "vi-output,_ov9821_10-0060", CameraQuirk.Gain),

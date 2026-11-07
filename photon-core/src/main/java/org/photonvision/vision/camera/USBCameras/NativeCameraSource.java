@@ -33,7 +33,8 @@ import org.wpilib.util.PixelFormat;
 /**
  * Spectrum (sc/mjpeg-napa) native camera backend (SpectrumJetson
  * docs/SYSTEMCORE-NATIVE-BACKEND.md): a USB camera with no cscore UsbCamera. Chosen per camera by
- * {@link #createOrNull}: verified cameras (Thriftiest Cam 1bcf:28c5, Swyft 0bda:3035; more with
+ * {@link #createOrNull}: verified cameras (Thriftiest Cam 1bcf:28c5, Swyft 0bda:3035, ThriftyCam
+ * 05c8:0a00 (USB 3, 1600x1304 at 60 fps, no serial: known by its USB port); more with
  * SPECTRUM_NATIVE_CAMERA_IDS) with MJPEG modes, when the library is there. SPECTRUM_NATIVE_CAMERA=0
  * turns it off. Anything else, or any failure here, and the camera is a normal USBCameraSource.
  */
@@ -47,7 +48,7 @@ public class NativeCameraSource extends VisionSource {
 
     /** "vid:pid" (hex) pairs the native backend takes. */
     private static final String IDS =
-            System.getenv().getOrDefault("SPECTRUM_NATIVE_CAMERA_IDS", "1bcf:28c5,0bda:3035");
+            System.getenv().getOrDefault("SPECTRUM_NATIVE_CAMERA_IDS", "1bcf:28c5,0bda:3035,05c8:0a00");
 
     static boolean verified(int vid, int pid) {
         String want = String.format(Locale.ROOT, "%04x:%04x", vid, pid);

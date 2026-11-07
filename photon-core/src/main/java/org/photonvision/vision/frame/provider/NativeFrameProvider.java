@@ -270,10 +270,18 @@ public class NativeFrameProvider extends CpuImageProcessor {
             var c = settables.getConfiguration();
             cameraDelayUs =
                     USBFrameProvider.cameraDelayUs(
-                            USBFrameProvider.CAMERA_DELAY_SPEC, c.nickname, c.uniqueName, 400);
+                            USBFrameProvider.CAMERA_DELAY_SPEC,
+                            c.nickname,
+                            c.uniqueName,
+                            400,
+                            USBFrameProvider.modelCameraDelayUs(settables, false));
             ptsDelayUs =
                     USBFrameProvider.cameraDelayUs(
-                            USBFrameProvider.PTS_DELAY_SPEC, c.nickname, c.uniqueName, 180);
+                            USBFrameProvider.PTS_DELAY_SPEC,
+                            c.nickname,
+                            c.uniqueName,
+                            180,
+                            USBFrameProvider.modelCameraDelayUs(settables, true));
         }
         long halfExposureUs =
                 USBFrameProvider.realExposureUs(settables, settables.getExposureTimeUs()) / 2;

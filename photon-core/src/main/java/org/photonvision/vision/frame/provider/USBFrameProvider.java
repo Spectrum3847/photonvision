@@ -1250,6 +1250,37 @@ public class USBFrameProvider extends CpuImageProcessor {
         return match >= 0 ? match : def;
     }
 
+    /**
+     * As {@link #cameraDelayUs}, but a camera model with a delay of its own (modelUs >= 0) keeps it
+     * unless the spec names this camera: a bare number in the spec (the drop-in's 400, measured on
+     * the Thriftiest) is the default of the other cameras only.
+     */
+    static long cameraDelayUs(
+            String spec, String nickname, String uniqueName, long def, long modelUs) {
+        if (modelUs < 0) return cameraDelayUs(spec, nickname, uniqueName, def);
+        String keyed = null;
+        if (spec != null) {
+            var parts = new java.util.ArrayList<String>();
+            for (String part : spec.split(",")) if (part.contains("=")) parts.add(part);
+            keyed = String.join(",", parts);
+        }
+        long named = cameraDelayUs(keyed, nickname, uniqueName, -1);
+        return named >= 0 ? named : modelUs;
+    }
+
+    /**
+     * The ThriftyCam (05c8:0a00): exposure end -> first USB data packet, and the PTS's delay after
+     * exposure end. Not measured (no LED test yet): its PTS is ~0.7 ms before the first data packet
+     * (tests/thriftycam), taken as the end of exposure. -1 for other cameras.
+     */
+    static long modelCameraDelayUs(VisionSourceSettables settables, boolean pts) {
+        var info = settables.getConfiguration().matchedCameraInfo;
+        if (info instanceof org.photonvision.vision.camera.PVCameraInfo.PVUsbCameraInfo usb
+                && usb.vendorId == 0x05c8
+                && usb.productId == 0x0a00) return pts ? 0 : 700;
+        return -1;
+    }
+
     private static boolean hwTimestamps() {
         try {
             var hw = java.nio.file.Path.of("/sys/module/uvcvideo/parameters/hwtimestamps");
@@ -1385,8 +1416,16 @@ public class USBFrameProvider extends CpuImageProcessor {
         if (captureTimeNs == 0) return 0;
         if (cameraDelayUs < 0) {
             var c = settables.getConfiguration();
-            cameraDelayUs = cameraDelayUs(CAMERA_DELAY_SPEC, c.nickname, c.uniqueName, 400);
-            ptsDelayUs = cameraDelayUs(PTS_DELAY_SPEC, c.nickname, c.uniqueName, 180);
+            cameraDelayUs =
+                    cameraDelayUs(
+                            CAMERA_DELAY_SPEC,
+                            c.nickname,
+                            c.uniqueName,
+                            400,
+                            modelCameraDelayUs(settables, false));
+            ptsDelayUs =
+                    cameraDelayUs(
+                            PTS_DELAY_SPEC, c.nickname, c.uniqueName, 180, modelCameraDelayUs(settables, true));
         }
         long halfExposureUs = realExposureUs(settables.getExposureTimeUs()) / 2;
         // the V4L2 stamp -> mid-exposure: from the camera's PTS (hwtimestamps=1), or from the driver's

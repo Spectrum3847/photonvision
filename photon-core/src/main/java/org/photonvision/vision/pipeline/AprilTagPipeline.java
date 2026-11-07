@@ -260,6 +260,10 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         }
         List<AprilTagDetection> usedDetections = new ArrayList<>();
         List<TrackedTarget> targetList = new ArrayList<>();
+        // SpectrumJetson (photonvision-138): solvePNP needs a calibration for this resolution; a
+        // camera that has none yet (a new ThriftyCam at 1600x1304) publishes 2D targets meanwhile
+        // instead of failing every frame
+        boolean solvePnp = settings.solvePNPEnabled && frameStaticProperties.cameraCalibration != null;
 
         // Filter out detections based on pipeline settings
         for (AprilTagDetection detection : detections) {
@@ -279,7 +283,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
                             new TargetCalculationParameters(
                                     false, null, null, null, null, frameStaticProperties));
             // SpectrumJetson (photonvision-61): without solvePNP these are the published targets.
-            if (!settings.solvePNPEnabled) {
+            if (!solvePnp) {
                 TagQuality.fill(target, detection, null, frameStaticProperties, tagWidthMeters);
             }
 
@@ -288,7 +292,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
 
         // Do multi-tag pose estimation
         Optional<MultiTargetPNPResult> multiTagResult = Optional.empty();
-        if (settings.solvePNPEnabled && settings.doMultiTarget) {
+        if (solvePnp && settings.doMultiTarget) {
             // SpectrumJetson: leave the listed bad tags out of multi-tag (photonvision-22). They're
             // still reported, with single-tag poses.
             var excluded = ExcludedTags.getInstance().active();
@@ -302,7 +306,7 @@ public class AprilTagPipeline extends CVPipeline<CVPipelineResult, AprilTagPipel
         }
 
         // Do single-tag pose estimation
-        if (settings.solvePNPEnabled) {
+        if (solvePnp) {
             // Clear target list that was used for multitag so we can add target transforms.
             // SpectrumJetson (photonvision-12): release them first; their contour Mats were left
             // for the GC.
