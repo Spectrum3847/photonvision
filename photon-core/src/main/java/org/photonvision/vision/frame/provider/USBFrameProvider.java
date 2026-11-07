@@ -171,6 +171,7 @@ public class USBFrameProvider extends CpuImageProcessor {
                 camera.setConnectionStrategy(VideoSource.ConnectionStrategy.AUTO_MANAGE);
                 return false;
             }
+            org.photonvision.jni.NapaDetectorJNI.cameraOpens.incrementAndGet();
             nativeHandle = h;
             java.util.Arrays.fill(mirrored, Integer.MIN_VALUE);
             nativeGray = new org.opencv.core.Mat(mode.height, mode.width, org.opencv.core.CvType.CV_8UC1);

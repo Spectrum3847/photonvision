@@ -63,7 +63,7 @@ public final class NativePublish {
     public volatile long midShiftNs = 0;
     // native camera backend: the NAPA handle that owns this camera (0: not native)
     public volatile long cameraHandle = 0;
-    private long lastNapaHandle = 0;
+    private long lastNapaHandle = 0, lastOpens = -1;
     // from the camera's frame provider: its camera-clock stamp (PTS) -> mid-exposure (0: no camera
     // clock)
     public volatile long camShiftNs = 0;
@@ -249,8 +249,11 @@ public final class NativePublish {
      */
     void update(long napaHandle) {
         if (napaHandle == 0) return;
-        if (napaHandle != lastNapaHandle) { // a native camera reopened: its counters start over
+        long opens = org.photonvision.jni.NapaDetectorJNI.cameraOpens.get();
+        // a native camera reopened (maybe at the same handle value): its counters start over
+        if (napaHandle != lastNapaHandle || opens != lastOpens) {
             lastNapaHandle = napaHandle;
+            lastOpens = opens;
             published = 0;
         }
         long n =

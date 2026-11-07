@@ -84,13 +84,15 @@ public class NapaDetector implements Releasable {
     }
 
     private Object[] lastParams;
-    private long sentCam = 0;
+    private long sentCam = 0, sentCamOpens = -1;
 
     /**
      * Spectrum (sc/mjpeg-napa) native camera backend: its detector follows this pipeline's settings.
      */
     private void configureCamera(long cam) {
-        if (cam == sentCam || lastParams == null) return;
+        // a reopened camera may have the closed one's handle value: the open count tells them apart
+        long opens = NapaDetectorJNI.cameraOpens.get();
+        if ((cam == sentCam && opens == sentCamOpens) || lastParams == null) return;
         NapaDetectorJNI.setParams(
                 cam,
                 (int) lastParams[0],
@@ -100,6 +102,7 @@ public class NapaDetector implements Releasable {
                 (int) lastParams[3],
                 (double) lastParams[4]);
         sentCam = cam;
+        sentCamOpens = opens;
     }
 
     private static Boolean streamOn = null;

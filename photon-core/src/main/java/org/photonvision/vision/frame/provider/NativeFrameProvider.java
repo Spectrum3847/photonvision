@@ -42,6 +42,13 @@ import org.wpilib.vision.camera.VideoMode;
  * <p>cscore handover: while the calibration pipeline runs, or the selected video mode isn't MJPEG,
  * or the native open failed, the native capture is closed and a temporary cscore UsbCamera streams
  * the device for the Java pipeline (closed again, and native reopened, afterwards).
+ *
+ * <p>Reconnect (photonvision-137): the native thread notices a lost device (a V4L2 error such as
+ * ENODEV, or no frame for SPECTRUM_NATIVE_FRAME_TIMEOUT_MS, default 500) and lets go of it at once;
+ * this then closes the handle and reopens the camera by its path ({@code /dev/v4l/by-id/...}, the
+ * camera's serial: whatever /dev/videoN it comes back as) every 100 ms until it captures again, in
+ * the selected mode, with its controls written back. Health: state {@code disconnected} (no node) /
+ * {@code recovering}, {@code recoveries} counts each reconnect.
  */
 public class NativeFrameProvider extends CpuImageProcessor {
     private final Logger logger;
@@ -60,6 +67,14 @@ public class NativeFrameProvider extends CpuImageProcessor {
     private long opens = 0;
     private volatile String state = "starting";
     private volatile String problem = "";
+
+    // reconnect after the device was lost (photonvision-137)
+    private boolean reconnecting = false;
+    private long lostAtNs = 0, nextTryNs = 0;
+    private int reconnectTries = 0;
+    private String lostReason = "";
+    private static final long RECONNECT_EVERY_NS = 100_000_000L;
+    private static final int ENODEV = 19, ETIMEDOUT = 110;
 
     // the cscore handover (calibration, non-MJPEG modes, native open failure)
     private UsbCamera cscore;
@@ -145,12 +160,17 @@ public class NativeFrameProvider extends CpuImageProcessor {
     }
 
     private boolean openNative(VideoMode m) {
+        return openNative(m, 10);
+    }
+
+    private boolean openNative(VideoMode m, int attempts) {
         long h = 0;
-        for (int attempt = 0; attempt < 10 && h == 0; attempt++) {
+        for (int attempt = 0; attempt < attempts && h == 0; attempt++) {
+            if (attempt > 0) sleepMs(100);
             h = NapaDetectorJNI.cameraOpenSeq(dev, m.width, m.height, m.fps, "tag36h11", sequenceID);
-            if (h == 0) sleepMs(100);
         }
         if (h == 0) return false;
+        NapaDetectorJNI.cameraOpens.incrementAndGet();
         handle = h;
         openMode = m;
         opens++;
@@ -207,6 +227,14 @@ public class NativeFrameProvider extends CpuImageProcessor {
     private void sync() {
         VideoMode m = settables.getCurrentVideoMode();
         boolean wantNative = wantNative();
+        if (reconnecting) {
+            // reconnect() opens it, in the mode selected then; not a native open failure (cscore)
+            if (wantNative) {
+                reopen = false;
+                return;
+            }
+            reconnecting = false;
+        }
         if (!reopen && (wantNative ? handle != 0 : cscore != null)) return;
         reopen = false;
         if (wantNative) {
@@ -260,12 +288,89 @@ public class NativeFrameProvider extends CpuImageProcessor {
 
     private long lastFrameNs = 0;
 
+    /**
+     * The native thread gave the device up (stats[5], its errno): close it and start reconnecting.
+     */
+    private void checkLost() {
+        long[] s = NapaDetectorJNI.cameraStats(handle);
+        if (s == null || s.length < 6 || s[5] == 0) return;
+        int err = (int) s[5];
+        lostReason =
+                err == ETIMEDOUT
+                        ? "no frame"
+                        : err == ENODEV ? "device gone (ENODEV)" : "V4L2 error " + err;
+        long frames = s[0];
+        closeNative();
+        NapaDetectorJNI.deviceClose(
+                dev); // the old device's control fd, if Java's settables reopened it
+        reconnecting = true;
+        lostAtNs = System.nanoTime();
+        nextTryNs = lostAtNs;
+        reconnectTries = 0;
+        problem = "reconnecting: " + lostReason;
+        state = "recovering";
+        logger.warn(
+                "Native camera: "
+                        + dev
+                        + " lost ("
+                        + lostReason
+                        + ") after "
+                        + frames
+                        + " frames; reconnecting");
+    }
+
+    /** Every 100 ms while reconnecting: reopen the camera by its path once it's there. */
+    private void reconnect() {
+        long now = System.nanoTime();
+        if (now < nextTryNs) return;
+        nextTryNs = now + RECONNECT_EVERY_NS;
+        if (!new java.io.File(dev).exists()) {
+            state = "disconnected";
+            return;
+        }
+        state = "recovering";
+        VideoMode m = settables.getCurrentVideoMode();
+        if (m == null) return;
+        reconnectTries++;
+        NapaDetectorJNI.deviceClose(dev); // a fresh control fd, on the device that came back
+        if (!openNative(m, 1)) return;
+        int[] c =
+                settables instanceof org.photonvision.vision.camera.USBCameras.NativeCameraSettables n
+                        ? n.restoreControls()
+                        : new int[] {0, 0};
+        reconnecting = false;
+        problem = "";
+        String node = dev;
+        try {
+            node = java.nio.file.Path.of(dev).toRealPath().toString();
+        } catch (java.io.IOException | RuntimeException e) {
+            // logged as the path PhotonVision knows it by
+        }
+        logger.info(
+                String.format(
+                        "Native camera: %s (%s) reconnected %.0f ms after it was lost (%s), %d open"
+                                + " attempts; controls written back: %d (%d failed)",
+                        dev,
+                        node,
+                        (System.nanoTime() - lostAtNs) / 1e6,
+                        lostReason,
+                        reconnectTries,
+                        c[0],
+                        c[1]));
+    }
+
     @Override
     CapturedFrame getInputMat() {
         try {
             sync();
+            if (handle != 0) checkLost();
+            if (reconnecting) reconnect();
         } catch (RuntimeException e) {
             logger.error("Native camera: switching capture failed", e);
+        }
+        if (reconnecting && handle == 0) {
+            sleepMs(20); // the Java pipeline waits here, not in a busy loop of empty frames
+            return new CapturedFrame(new CVMat(), settables.getFrameStaticProperties(), 0);
         }
         if (handle != 0) {
             state = "streaming";

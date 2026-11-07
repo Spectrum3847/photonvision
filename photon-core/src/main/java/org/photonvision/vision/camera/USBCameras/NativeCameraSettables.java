@@ -46,6 +46,7 @@ public class NativeCameraSettables extends VisionSourceSettables {
     /** One V4L2 control, as cscore names it. */
     static final class Ctl {
         final int id, type, min, max, step, def;
+        final long flags;
         final String name;
         volatile int value;
 
@@ -58,6 +59,7 @@ public class NativeCameraSettables extends VisionSourceSettables {
             step = Integer.parseInt(f[4]);
             def = Integer.parseInt(f[5]);
             value = Integer.parseInt(f[6]);
+            flags = Long.parseLong(f[7]);
             name = normalize(f[8]);
         }
     }
@@ -211,6 +213,25 @@ public class NativeCameraSettables extends VisionSourceSettables {
 
     public String devicePath() {
         return dev;
+    }
+
+    private static final long V4L2_CTRL_FLAG_READ_ONLY = 0x0004;
+
+    /**
+     * Spectrum (photonvision-137): the camera came back (USB reset, re-enumeration): every control as
+     * last set or read here is written back where the device differs (read first, so a control the
+     * camera kept isn't rewritten; the Swyft stores its controls in flash). Returns {written,
+     * failed}.
+     */
+    public int[] restoreControls() {
+        int written = 0, failed = 0;
+        for (Ctl c : controls.values()) { // device order: auto exposure before the exposure time
+            if ((c.flags & V4L2_CTRL_FLAG_READ_ONLY) != 0) continue;
+            int r = NapaDetectorJNI.deviceSetControl(dev, c.id, c.value);
+            if (r > 0) written++;
+            else if (r < 0) failed++;
+        }
+        return new int[] {written, failed};
     }
 
     void setModeListener(Consumer<VideoMode> l) {

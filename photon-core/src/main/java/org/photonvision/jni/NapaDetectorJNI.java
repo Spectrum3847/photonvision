@@ -146,7 +146,8 @@ public final class NapaDetectorJNI {
 
     /**
      * {frames, bad frames, skipped by the policy, ms since the last frame (-1: none), Rewind frames
-     * kept}.
+     * kept, the errno that ended capture (0 while capturing; ETIMEDOUT: no frame for
+     * SPECTRUM_NATIVE_FRAME_TIMEOUT_MS, default 500)}.
      */
     public static native long[] cameraStats(long handle);
 
@@ -162,6 +163,16 @@ public final class NapaDetectorJNI {
      * buffer. Returns its length; 0 when none newer is ready yet; -n when the buffer needs n bytes.
      */
     public static native int cameraLatestJpeg(long handle, java.nio.ByteBuffer direct);
+
+    /**
+     * Spectrum (photonvision-137): native camera opens so far, bumped by every caller of cameraOpen /
+     * cameraOpenSeq. A reopened camera's handle is often the closed one's address again (freed, then
+     * allocated at the same size), so "same handle" alone missed reopens: its detector kept NAPA's
+     * defaults instead of the pipeline's (min tag 22), the Swyft fell to ~85 fps at ~40 ms after a
+     * reconnect, and NativePublish didn't see it publish. Compare (handle, opens) instead.
+     */
+    public static final java.util.concurrent.atomic.AtomicLong cameraOpens =
+            new java.util.concurrent.atomic.AtomicLong();
 
     /** As cameraOpen; the first published result's sequence ID is lastSeq + 1. */
     public static native long cameraOpenSeq(
